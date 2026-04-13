@@ -1,0 +1,2554 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEXUS — Soporte Investigativo Clínico</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Instrument+Sans:wght@300;400;500;600&display=swap"
+        rel="stylesheet">
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        :root {
+            --bg: #f7f6f2;
+            --surface: #ffffff;
+            --surface2: #f0efe9;
+            --border: #e2e0d8;
+            --ink: #111110;
+            --muted: #78756a;
+            --accent: #1a56db;
+            --accent-light: rgba(26, 86, 219, 0.08);
+            --accent2: #b83232;
+            --green: #1a6b3c;
+            --green-light: rgba(26, 107, 60, 0.08);
+            --amber: #92510a;
+            --amber-light: rgba(146, 81, 10, 0.08);
+            --red-light: rgba(184, 50, 50, 0.08);
+            --shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 16px rgba(0, 0, 0, 0.04);
+            --shadow-lg: 0 4px 24px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.06);
+        }
+
+        body {
+            font-family: 'Instrument Sans', sans-serif;
+            background: var(--bg);
+            color: var(--ink);
+            font-size: 15px;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        /* NAV */
+        .topnav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 200;
+            background: rgba(247, 246, 242, 0.93);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 2.5rem;
+            height: 56px;
+        }
+
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .nav-logo-mark {
+            width: 28px;
+            height: 28px;
+            background: var(--ink);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .nav-logo-mark svg {
+            width: 16px;
+            height: 16px;
+            fill: white;
+        }
+
+        .nav-brand-name {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.95rem;
+            font-weight: 500;
+            letter-spacing: 0.08em;
+            color: var(--ink);
+        }
+
+        .nav-tabs {
+            display: flex;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            padding: 3px;
+            gap: 0;
+        }
+
+        .nav-tab {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.68rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 0.4rem 1.1rem;
+            cursor: pointer;
+            color: var(--muted);
+            border: none;
+            background: transparent;
+            transition: all 0.18s;
+        }
+
+        .nav-tab.active {
+            background: var(--ink);
+            color: white;
+        }
+
+        .nav-tab:not(.active):hover {
+            color: var(--ink);
+        }
+
+        .nav-right {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.68rem;
+            color: var(--muted);
+            letter-spacing: 0.06em;
+        }
+
+        /* VIEWS */
+        .view {
+            display: none;
+            padding-top: 56px;
+        }
+
+        .view.active {
+            display: block;
+        }
+
+        /* BADGE */
+        .badge {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.58rem;
+            letter-spacing: 0.06em;
+            padding: 0.2rem 0.5rem;
+            border: 1px solid;
+            white-space: nowrap;
+        }
+
+        .badge-green {
+            color: var(--green);
+            border-color: rgba(26, 107, 60, 0.3);
+            background: var(--green-light);
+        }
+
+        .badge-blue {
+            color: var(--accent);
+            border-color: rgba(26, 86, 219, 0.3);
+            background: var(--accent-light);
+        }
+
+        .badge-amber {
+            color: var(--amber);
+            border-color: rgba(146, 81, 10, 0.3);
+            background: var(--amber-light);
+        }
+
+        .badge-red {
+            color: var(--accent2);
+            border-color: rgba(184, 50, 50, 0.3);
+            background: var(--red-light);
+        }
+
+        .badge-ink {
+            color: var(--muted);
+            border-color: var(--border);
+            background: var(--surface2);
+        }
+
+        /* BTN */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            font-family: 'DM Mono', monospace;
+            font-size: 0.72rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            border: none;
+            cursor: pointer;
+            transition: all 0.18s;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: var(--ink);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--muted);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--ink);
+            color: var(--ink);
+        }
+
+        /* ══════════════════════ LANDING ══════════════════════ */
+        .hero {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            min-height: calc(100vh - 56px);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .hero-left {
+            padding: 6rem 4rem 5rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            border-right: 1px solid var(--border);
+        }
+
+        .hero-eyebrow {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            font-family: 'DM Mono', monospace;
+            font-size: 0.68rem;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 2rem;
+        }
+
+        .hero-eyebrow::before {
+            content: '';
+            width: 1.5rem;
+            height: 1px;
+            background: var(--accent);
+        }
+
+        h1 {
+            font-family: 'DM Serif Display', serif;
+            font-size: clamp(2.8rem, 4.5vw, 5rem);
+            line-height: 1.02;
+            letter-spacing: -0.02em;
+            margin-bottom: 1.5rem;
+        }
+
+        h1 em {
+            font-style: italic;
+            color: var(--accent);
+        }
+
+        .hero-desc {
+            font-size: 1.05rem;
+            color: var(--muted);
+            line-height: 1.75;
+            max-width: 440px;
+            margin-bottom: 2.5rem;
+            font-weight: 300;
+        }
+
+        .hero-actions {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        .hero-right {
+            background: var(--surface);
+            padding: 5rem 4rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-right::before {
+            content: '';
+            position: absolute;
+            top: -80px;
+            right: -80px;
+            width: 320px;
+            height: 320px;
+            background: radial-gradient(circle, rgba(26, 86, 219, 0.06) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .mini-report {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .mini-report-header {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .mini-report-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .mini-report-meta {
+            padding: 0.5rem 1.25rem;
+            border-bottom: 1px solid var(--border);
+            font-family: 'DM Mono', monospace;
+            font-size: 0.6rem;
+            color: var(--muted);
+        }
+
+        .mini-report-body {
+            padding: 1.25rem;
+        }
+
+        .mini-section-label {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.58rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 0.6rem;
+            margin-top: 1rem;
+            padding-bottom: 0.4rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .mini-section-label:first-child {
+            margin-top: 0;
+        }
+
+        .mini-item {
+            display: flex;
+            gap: 0.6rem;
+            padding: 0.55rem 0;
+            border-bottom: 1px dashed rgba(0, 0, 0, 0.06);
+            align-items: flex-start;
+        }
+
+        .mini-item:last-child {
+            border-bottom: none;
+        }
+
+        .mini-item-text {
+            font-size: 0.77rem;
+            line-height: 1.4;
+            flex: 1;
+        }
+
+        .mini-item-text small {
+            display: block;
+            font-size: 0.68rem;
+            color: var(--muted);
+            margin-top: 0.15rem;
+            font-family: 'DM Mono', monospace;
+        }
+
+        .source-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+            margin-top: 0.5rem;
+        }
+
+        .source-pill {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.6rem;
+            padding: 0.2rem 0.5rem;
+            border: 1px solid var(--border);
+            color: var(--muted);
+            background: var(--surface);
+        }
+
+        .disclaimer {
+            background: rgba(184, 50, 50, 0.05);
+            border: 1px solid rgba(184, 50, 50, 0.15);
+            border-left: 3px solid var(--accent2);
+            padding: 1rem 1.5rem;
+            font-size: 0.8rem;
+            color: var(--muted);
+            line-height: 1.6;
+            margin-top: 2.5rem;
+        }
+
+        .disclaimer strong {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.65rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--accent2);
+        }
+
+        /* STATS */
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+        }
+
+        .stat-cell {
+            padding: 2.5rem 2rem;
+            border-right: 1px solid var(--border);
+        }
+
+        .stat-cell:last-child {
+            border-right: none;
+        }
+
+        .stat-n {
+            font-family: 'DM Serif Display', serif;
+            font-size: 3rem;
+            color: var(--accent);
+            line-height: 1;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            font-size: 0.83rem;
+            color: var(--muted);
+            line-height: 1.5;
+        }
+
+        .stat-source {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.58rem;
+            color: rgba(120, 117, 106, 0.55);
+            margin-top: 0.5rem;
+        }
+
+        /* HOW */
+        .how-section {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .section-wrap {
+            max-width: 1160px;
+            margin: 0 auto;
+            padding: 5rem 2.5rem;
+        }
+
+        .section-eyebrow {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.65rem;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .section-eyebrow::after {
+            content: '';
+            flex: 1;
+            max-width: 3rem;
+            height: 1px;
+            background: var(--border);
+        }
+
+        h2 {
+            font-family: 'DM Serif Display', serif;
+            font-size: clamp(1.8rem, 3vw, 2.8rem);
+            letter-spacing: -0.02em;
+            line-height: 1.1;
+            margin-bottom: 1rem;
+        }
+
+        h2 em {
+            font-style: italic;
+            color: var(--accent);
+        }
+
+        .section-lead {
+            font-size: 1rem;
+            color: var(--muted);
+            max-width: 580px;
+            line-height: 1.7;
+            font-weight: 300;
+            margin-bottom: 3.5rem;
+        }
+
+        .steps-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1px;
+            background: var(--border);
+            border: 1px solid var(--border);
+        }
+
+        .step-card {
+            background: var(--surface);
+            padding: 2rem;
+            transition: background 0.2s;
+        }
+
+        .step-card:hover {
+            background: #fafaf8;
+        }
+
+        .step-num {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.62rem;
+            color: var(--accent);
+            letter-spacing: 0.1em;
+            margin-bottom: 1rem;
+        }
+
+        .step-card h3 {
+            font-family: 'DM Serif Display', serif;
+            font-size: 1.2rem;
+            margin-bottom: 0.6rem;
+            letter-spacing: -0.01em;
+        }
+
+        .step-card p {
+            font-size: 0.83rem;
+            color: var(--muted);
+            line-height: 1.65;
+        }
+
+        .step-tag {
+            display: inline-block;
+            font-family: 'DM Mono', monospace;
+            font-size: 0.58rem;
+            letter-spacing: 0.08em;
+            padding: 0.2rem 0.5rem;
+            border: 1px solid var(--border);
+            color: var(--muted);
+            margin-top: 0.75rem;
+        }
+
+        /* AGENTS DARK */
+        .agents-section {
+            background: var(--ink);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .agents-section .section-eyebrow {
+            color: rgba(255, 255, 255, 0.35);
+        }
+
+        .agents-section .section-eyebrow::after {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .agents-section h2 {
+            color: white;
+        }
+
+        .agents-section .section-lead {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .agents-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1px;
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+        }
+
+        .agent-card {
+            background: var(--ink);
+            padding: 2rem;
+            transition: background 0.2s;
+        }
+
+        .agent-card:hover {
+            background: #1a1a18;
+        }
+
+        .agent-icon-wrap {
+            width: 36px;
+            height: 36px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.1rem;
+            font-size: 1rem;
+        }
+
+        .agent-num {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.6rem;
+            color: rgba(26, 86, 219, 0.7);
+            letter-spacing: 0.1em;
+            margin-bottom: 0.4rem;
+        }
+
+        .agent-card h3 {
+            font-family: 'DM Serif Display', serif;
+            font-size: 1.15rem;
+            color: white;
+            margin-bottom: 0.5rem;
+            line-height: 1.2;
+        }
+
+        .agent-card p {
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.45);
+            line-height: 1.6;
+        }
+
+        .agent-models {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.3rem;
+            margin-top: 1rem;
+        }
+
+        .model-tag {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.58rem;
+            padding: 0.18rem 0.45rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        /* PRINCIPLES */
+        .principles-section {
+            border-bottom: 1px solid var(--border);
+        }
+
+        .principles-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1px;
+            background: var(--border);
+            border: 1px solid var(--border);
+        }
+
+        .principle-card {
+            background: var(--surface);
+            padding: 2.25rem;
+            position: relative;
+            overflow: hidden;
+            transition: background 0.2s;
+        }
+
+        .principle-card:hover {
+            background: #fafaf8;
+        }
+
+        .principle-accent-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 3px;
+            height: 100%;
+            background: var(--accent);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .principle-card:hover .principle-accent-line {
+            opacity: 1;
+        }
+
+        .principle-num {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.62rem;
+            color: var(--muted);
+            letter-spacing: 0.1em;
+            margin-bottom: 0.75rem;
+        }
+
+        .principle-card h3 {
+            font-family: 'DM Serif Display', serif;
+            font-size: 1.15rem;
+            margin-bottom: 0.6rem;
+        }
+
+        .principle-card p {
+            font-size: 0.82rem;
+            color: var(--muted);
+            line-height: 1.65;
+        }
+
+        /* SCOPE */
+        .scope-section {
+            background: var(--surface2);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .scope-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3rem;
+        }
+
+        .scope-col h3 {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.68rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            padding-bottom: 0.6rem;
+            border-bottom: 2px solid;
+            margin-bottom: 1.25rem;
+        }
+
+        .scope-col.yes h3 {
+            color: var(--green);
+            border-color: var(--green);
+        }
+
+        .scope-col.no h3 {
+            color: var(--accent2);
+            border-color: var(--accent2);
+        }
+
+        .scope-item {
+            display: flex;
+            gap: 0.75rem;
+            padding: 0.7rem 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.85rem;
+            align-items: flex-start;
+        }
+
+        .scope-item:last-child {
+            border-bottom: none;
+        }
+
+        .scope-mark {
+            flex-shrink: 0;
+            margin-top: 0.1rem;
+            font-size: 0.78rem;
+        }
+
+        /* LANDING FOOTER */
+        .landing-footer {
+            background: var(--ink);
+            color: white;
+            padding: 3rem 2.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        .footer-brand {
+            font-family: 'DM Serif Display', serif;
+            font-size: 2rem;
+            color: white;
+            margin-bottom: 0.4rem;
+        }
+
+        .footer-sub {
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .footer-right {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.62rem;
+            color: rgba(255, 255, 255, 0.25);
+            letter-spacing: 0.06em;
+            text-align: right;
+            line-height: 1.8;
+        }
+
+        /* ══════════════════════ APP ══════════════════════ */
+        .app-layout {
+            display: flex;
+            min-height: calc(100vh - 56px);
+        }
+
+        .app-sidebar {
+            width: 220px;
+            flex-shrink: 0;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            padding: 1.5rem 0;
+            position: sticky;
+            top: 56px;
+            height: calc(100vh - 56px);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-section {
+            padding: 0 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .sidebar-label {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.6rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 0.5rem;
+            padding: 0 0.5rem;
+        }
+
+        .sidebar-item {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.55rem 0.75rem;
+            font-size: 0.82rem;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.15s;
+            color: var(--muted);
+            background: transparent;
+            width: 100%;
+            text-align: left;
+        }
+
+        .sidebar-item:hover {
+            background: var(--surface2);
+            color: var(--ink);
+        }
+
+        .sidebar-item.active {
+            background: var(--accent-light);
+            border-color: rgba(26, 86, 219, 0.15);
+            color: var(--accent);
+        }
+
+        .sidebar-item-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .dot-blue {
+            background: var(--accent);
+        }
+
+        .dot-green {
+            background: var(--green);
+        }
+
+        .dot-amber {
+            background: var(--amber);
+        }
+
+        .dot-muted {
+            background: var(--border);
+        }
+
+        .sidebar-spacer {
+            flex: 1;
+        }
+
+        .sidebar-footer {
+            padding: 1rem;
+            border-top: 1px solid var(--border);
+            font-family: 'DM Mono', monospace;
+            font-size: 0.58rem;
+            color: rgba(120, 117, 106, 0.6);
+            line-height: 1.6;
+        }
+
+        .app-main {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .app-panel {
+            display: none;
+        }
+
+        .app-panel.active {
+            display: block;
+        }
+
+        /* UPLOAD */
+        .upload-panel {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 2.5rem 2rem;
+        }
+
+        .panel-header {
+            margin-bottom: 2rem;
+            padding-bottom: 1.25rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .panel-title {
+            font-family: 'DM Serif Display', serif;
+            font-size: 1.6rem;
+            letter-spacing: -0.02em;
+            margin-bottom: 0.3rem;
+        }
+
+        .panel-subtitle {
+            font-size: 0.85rem;
+            color: var(--muted);
+        }
+
+        .form-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            padding: 1.75rem;
+            margin-bottom: 1rem;
+            box-shadow: var(--shadow);
+        }
+
+        .form-card-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 1.25rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .dropzone {
+            border: 1.5px dashed var(--border);
+            padding: 2.5rem 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: var(--bg);
+        }
+
+        .dropzone:hover,
+        .dropzone.dragover {
+            border-color: var(--accent);
+            background: var(--accent-light);
+        }
+
+        .dropzone-icon {
+            font-size: 2rem;
+            margin-bottom: 0.75rem;
+            display: block;
+        }
+
+        .dropzone-main {
+            font-size: 0.9rem;
+            color: var(--ink);
+            margin-bottom: 0.3rem;
+        }
+
+        .dropzone-main strong {
+            color: var(--accent);
+        }
+
+        .dropzone-sub {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.65rem;
+            color: var(--muted);
+            letter-spacing: 0.05em;
+        }
+
+        .file-list {
+            margin-top: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.6rem 0.75rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            font-size: 0.82rem;
+        }
+
+        .file-icon {
+            font-size: 1rem;
+        }
+
+        .file-name {
+            flex: 1;
+            font-weight: 500;
+        }
+
+        .file-size {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.65rem;
+            color: var(--muted);
+        }
+
+        .file-remove {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--muted);
+            font-size: 1rem;
+            padding: 0 0.25rem;
+            line-height: 1;
+            transition: color 0.15s;
+        }
+
+        .file-remove:hover {
+            color: var(--accent2);
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 500;
+            margin-bottom: 0.45rem;
+        }
+
+        textarea,
+        select {
+            width: 100%;
+            font-family: 'Instrument Sans', sans-serif;
+            font-size: 0.85rem;
+            color: var(--ink);
+            background: var(--bg);
+            border: 1px solid var(--border);
+            padding: 0.65rem 0.85rem;
+            outline: none;
+            transition: border-color 0.15s;
+            resize: vertical;
+        }
+
+        textarea:focus,
+        select:focus {
+            border-color: var(--accent);
+        }
+
+        textarea {
+            min-height: 90px;
+        }
+
+        select {
+            appearance: none;
+            cursor: pointer;
+        }
+
+        .agents-check-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+        }
+
+        .agent-check-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            padding: 0.85rem;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            transition: all 0.15s;
+            background: var(--bg);
+        }
+
+        .agent-check-item:hover,
+        .agent-check-item.checked {
+            border-color: var(--accent);
+            background: var(--accent-light);
+        }
+
+        .agent-check-item input {
+            margin-top: 2px;
+            accent-color: var(--accent);
+            flex-shrink: 0;
+        }
+
+        .agent-check-name {
+            font-size: 0.82rem;
+            font-weight: 500;
+        }
+
+        .agent-check-desc {
+            font-size: 0.73rem;
+            color: var(--muted);
+            margin-top: 0.15rem;
+            line-height: 1.4;
+        }
+
+        .submit-row {
+            display: flex;
+            justify-content: flex-end;
+            padding-top: 1.5rem;
+            gap: 0.75rem;
+        }
+
+        /* PIPELINE */
+        .pipeline-panel {
+            padding: 2rem 2.5rem;
+        }
+
+        .pipeline-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.75rem;
+            padding-bottom: 1.25rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .pipeline-case-name {
+            font-family: 'DM Serif Display', serif;
+            font-size: 1.4rem;
+            letter-spacing: -0.01em;
+        }
+
+        .pipeline-case-meta {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.62rem;
+            color: var(--muted);
+            margin-top: 0.2rem;
+        }
+
+        .round-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-family: 'DM Mono', monospace;
+            font-size: 0.68rem;
+            color: var(--muted);
+            background: var(--surface);
+            border: 1px solid var(--border);
+            padding: 0.35rem 0.85rem;
+        }
+
+        .round-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--amber);
+            animation: pulse 1.2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1)
+            }
+
+            50% {
+                opacity: 0.5;
+                transform: scale(0.8)
+            }
+        }
+
+        .overall-progress-wrap {
+            margin-bottom: 2rem;
+        }
+
+        .progress-label-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .progress-label {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.65rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .progress-pct {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--accent);
+            font-weight: 500;
+        }
+
+        .progress-track {
+            height: 4px;
+            background: var(--border);
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--accent);
+            transition: width 0.5s ease;
+            width: 0%;
+        }
+
+        .progress-fill.green {
+            background: var(--green);
+        }
+
+        .pipeline-body {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 1.5rem;
+            align-items: start;
+        }
+
+        .agents-run-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+        }
+
+        .agent-run-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            padding: 1.25rem;
+            transition: border-color 0.2s;
+        }
+
+        .agent-run-card.running {
+            border-color: var(--accent);
+        }
+
+        .agent-run-card.done {
+            border-color: rgba(26, 107, 60, 0.3);
+        }
+
+        .agent-run-top {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 0.75rem;
+        }
+
+        .agent-run-icon {
+            font-size: 1.1rem;
+            margin-bottom: 0.3rem;
+            display: block;
+        }
+
+        .agent-run-name {
+            font-size: 0.82rem;
+            font-weight: 600;
+        }
+
+        .agent-run-model {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.6rem;
+            color: var(--muted);
+            margin-top: 0.15rem;
+        }
+
+        .agent-status-badge {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.58rem;
+            letter-spacing: 0.06em;
+            padding: 0.2rem 0.5rem;
+            border: 1px solid var(--border);
+            color: var(--muted);
+            white-space: nowrap;
+        }
+
+        .agent-status-badge.running {
+            color: var(--accent);
+            border-color: rgba(26, 86, 219, 0.3);
+            background: var(--accent-light);
+            animation: badge-pulse 1.5s infinite;
+        }
+
+        @keyframes badge-pulse {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: 0.6
+            }
+        }
+
+        .agent-status-badge.done {
+            color: var(--green);
+            border-color: rgba(26, 107, 60, 0.3);
+            background: var(--green-light);
+        }
+
+        .agent-prog-track {
+            height: 2px;
+            background: var(--border);
+            overflow: hidden;
+            margin-bottom: 0.75rem;
+        }
+
+        .agent-prog-fill {
+            height: 100%;
+            background: var(--accent);
+            transition: width 0.4s ease;
+        }
+
+        .agent-prog-fill.green {
+            background: var(--green);
+        }
+
+        .agent-typewriter {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.63rem;
+            color: var(--muted);
+            line-height: 1.55;
+            min-height: 2.5rem;
+            border-top: 1px solid var(--border);
+            padding-top: 0.6rem;
+            overflow: hidden;
+        }
+
+        .pipeline-log {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            position: sticky;
+            top: 76px;
+        }
+
+        .log-header {
+            padding: 0.85rem 1rem;
+            border-bottom: 1px solid var(--border);
+            font-family: 'DM Mono', monospace;
+            font-size: 0.65rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--muted);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .log-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--green);
+            animation: pulse 1s infinite;
+        }
+
+        .log-body {
+            padding: 0.75rem;
+            height: 380px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+
+        .log-entry {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.63rem;
+            line-height: 1.5;
+            padding: 0.4rem 0.5rem;
+            border-left: 2px solid var(--border);
+            color: var(--muted);
+            opacity: 0;
+            animation: logSlide 0.3s forwards;
+        }
+
+        @keyframes logSlide {
+            from {
+                opacity: 0;
+                transform: translateX(-4px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0)
+            }
+        }
+
+        .log-entry.info {
+            border-left-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .log-entry.success {
+            border-left-color: var(--green);
+            color: var(--green);
+        }
+
+        .log-entry.warn {
+            border-left-color: var(--amber);
+            color: var(--amber);
+        }
+
+        .log-time {
+            color: rgba(120, 117, 106, 0.5);
+            margin-right: 0.4rem;
+        }
+
+        .done-bar {
+            background: var(--green-light);
+            border: 1px solid rgba(26, 107, 60, 0.2);
+            padding: 1rem 1.5rem;
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+        }
+
+        .done-bar-text {
+            font-size: 0.88rem;
+            color: var(--green);
+            font-weight: 500;
+        }
+
+        .done-bar-sub {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.62rem;
+            color: var(--muted);
+            margin-top: 0.15rem;
+        }
+
+        /* REPORT */
+        .report-panel {
+            padding: 2rem 2.5rem;
+        }
+
+        .report-header-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 2rem;
+            padding-bottom: 1.25rem;
+            border-bottom: 1px solid var(--border);
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .report-case-name {
+            font-family: 'DM Serif Display', serif;
+            font-size: 1.5rem;
+            letter-spacing: -0.02em;
+        }
+
+        .report-case-meta {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.62rem;
+            color: var(--muted);
+            margin-top: 0.2rem;
+        }
+
+        .report-actions {
+            display: flex;
+            gap: 0.6rem;
+            flex-shrink: 0;
+        }
+
+        .report-body {
+            display: grid;
+            grid-template-columns: 1fr 280px;
+            gap: 1.5rem;
+            align-items: start;
+        }
+
+        .report-section {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            margin-bottom: 1rem;
+            box-shadow: var(--shadow);
+        }
+
+        .report-section-header {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .report-section-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .report-count {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.62rem;
+            color: var(--muted);
+        }
+
+        .report-section-body {
+            padding: 1.25rem;
+        }
+
+        .summary-text {
+            font-size: 0.85rem;
+            color: var(--ink);
+            line-height: 1.7;
+        }
+
+        .hyp-item {
+            display: flex;
+            gap: 0.75rem;
+            padding: 0.85rem 0;
+            border-bottom: 1px solid var(--border);
+            align-items: flex-start;
+        }
+
+        .hyp-item:last-child {
+            border-bottom: none;
+        }
+
+        .hyp-body {
+            flex: 1;
+        }
+
+        .hyp-text {
+            font-size: 0.84rem;
+            line-height: 1.4;
+            font-weight: 500;
+        }
+
+        .hyp-source {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.62rem;
+            color: var(--muted);
+            margin-top: 0.3rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .hyp-ev {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.6rem;
+            padding: 0.15rem 0.4rem;
+            border: 1px solid var(--border);
+            color: var(--muted);
+        }
+
+        .trial-item {
+            padding: 0.9rem;
+            border: 1px solid var(--border);
+            margin-bottom: 0.5rem;
+            background: var(--bg);
+            transition: border-color 0.15s;
+        }
+
+        .trial-item:hover {
+            border-color: var(--accent);
+        }
+
+        .trial-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .trial-top {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 0.4rem;
+            gap: 0.5rem;
+        }
+
+        .trial-name {
+            font-size: 0.84rem;
+            font-weight: 600;
+        }
+
+        .trial-desc {
+            font-size: 0.78rem;
+            color: var(--muted);
+            line-height: 1.4;
+            margin-bottom: 0.4rem;
+        }
+
+        .trial-meta {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.6rem;
+            color: var(--muted);
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .div-item {
+            padding: 0.9rem 1rem;
+            border: 1px solid rgba(146, 81, 10, 0.2);
+            background: var(--amber-light);
+            margin-bottom: 0.5rem;
+        }
+
+        .div-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .div-label {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.6rem;
+            color: var(--amber);
+            letter-spacing: 0.08em;
+            margin-bottom: 0.4rem;
+        }
+
+        .div-text {
+            font-size: 0.82rem;
+            line-height: 1.5;
+        }
+
+        .div-agents {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.65rem;
+            color: var(--muted);
+            margin-top: 0.3rem;
+        }
+
+        .sidebar-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            margin-bottom: 0.75rem;
+            box-shadow: var(--shadow);
+        }
+
+        .sidebar-card-header {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.78rem;
+            font-weight: 600;
+        }
+
+        .sidebar-card-body {
+            padding: 1rem;
+        }
+
+        .meta-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.45rem 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.78rem;
+        }
+
+        .meta-row:last-child {
+            border-bottom: none;
+        }
+
+        .meta-key {
+            color: var(--muted);
+        }
+
+        .meta-val {
+            font-weight: 500;
+            font-family: 'DM Mono', monospace;
+            font-size: 0.72rem;
+        }
+
+        .agent-done-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.78rem;
+            padding: 0.35rem 0;
+        }
+
+        .agent-done-check {
+            color: var(--green);
+        }
+
+        .app-disclaimer {
+            position: fixed;
+            bottom: 0;
+            left: 220px;
+            right: 0;
+            background: rgba(247, 246, 242, 0.95);
+            backdrop-filter: blur(8px);
+            border-top: 1px solid var(--border);
+            padding: 0.5rem 2rem;
+            font-family: 'DM Mono', monospace;
+            font-size: 0.6rem;
+            color: var(--muted);
+            letter-spacing: 0.04em;
+            text-align: center;
+            z-index: 50;
+        }
+
+        @media(max-width:900px) {
+            .hero {
+                grid-template-columns: 1fr
+            }
+
+            .hero-left {
+                padding: 4rem 1.5rem 2.5rem;
+                border-right: none;
+                border-bottom: 1px solid var(--border)
+            }
+
+            .hero-right {
+                padding: 2.5rem 1.5rem
+            }
+
+            .stats-bar {
+                grid-template-columns: 1fr 1fr
+            }
+
+            .steps-grid,
+            .agents-grid,
+            .principles-grid,
+            .scope-grid {
+                grid-template-columns: 1fr
+            }
+
+            .app-sidebar {
+                display: none
+            }
+
+            .app-disclaimer {
+                left: 0
+            }
+
+            .pipeline-body,
+            .agents-run-grid,
+            .report-body {
+                grid-template-columns: 1fr
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav class="topnav">
+        <div class="nav-brand" onclick="showView('landing')">
+            <div class="nav-logo-mark"><svg viewBox="0 0 16 16">
+                    <path d="M8 1L1 4v5c0 3.5 2.9 6.7 7 7.8C12.1 15.7 15 12.5 15 9V4L8 1z" />
+                </svg></div>
+            <span class="nav-brand-name">NEXUS</span>
+        </div>
+        <div class="nav-tabs">
+            <button class="nav-tab active" id="tab-landing" onclick="showView('landing')">Proyecto</button>
+            <button class="nav-tab" id="tab-app" onclick="showView('app')">Plataforma</button>
+        </div>
+        <div class="nav-right">v0.1 — Demo</div>
+    </nav>
+
+    <!-- ═══ LANDING ═══ -->
+    <div class="view active" id="view-landing">
+
+        <div class="hero">
+            <div class="hero-left">
+                <div class="hero-eyebrow">Soporte investigativo clínico multi-agente</div>
+                <h1>Más rutas.<br><em>Mejor</em><br>evidencia.</h1>
+                <p class="hero-desc">NEXUS analiza historiales clínicos complejos mediante múltiples agentes de IA en
+                    debate adversarial, generando un mapa de hipótesis investigativas con evidencia verificable para el
+                    médico responsable.</p>
+                <div class="hero-actions">
+                    <button class="btn btn-primary" onclick="showView('app')">Probar plataforma →</button>
+                    <button class="btn btn-secondary" onclick="document.getElementById('how').scrollIntoView()">Ver cómo
+                        funciona</button>
+                </div>
+                <div class="disclaimer"><strong>Aviso —</strong> NEXUS no emite diagnósticos ni recomendaciones
+                    terapéuticas. Es una herramienta de apoyo investigativo exclusivamente dirigida al profesional
+                    médico responsable del caso.</div>
+            </div>
+            <div class="hero-right">
+                <div class="mini-report">
+                    <div class="mini-report-header">
+                        <span class="mini-report-title">Reporte NEXUS — Caso #2847</span>
+                        <span class="badge badge-green">VERIFICADO</span>
+                    </div>
+                    <div class="mini-report-meta">5 agentes · 5 rondas · 31 fuentes · Oncología</div>
+                    <div class="mini-report-body">
+                        <div class="mini-section-label">Hipótesis prioritarias</div>
+                        <div class="mini-item"><span class="badge badge-red">ALTA</span>
+                            <div class="mini-item-text">ctDNA urgente — Panel ESR1/PIK3CA/AKT1<small>Guardant360 CDx ·
+                                    Prob. pre-test 40–43% · Cambia línea sistémica</small></div>
+                        </div>
+                        <div class="mini-item"><span class="badge badge-red">ALTA</span>
+                            <div class="mini-item-text">Rebiopsia metástasis — HER2 ultralow y SSTR2<small>Tarantino JCO
+                                    2023 · HER2 0→low en ~32% rebiopsias</small></div>
+                        </div>
+                        <div class="mini-item"><span class="badge badge-amber">MEDIA</span>
+                            <div class="mini-item-text">DLCO + TAC torácico previo a T-DXd<small>Antecedente pulmonar
+                                    grave · Requiere Neumología</small></div>
+                        </div>
+                        <div class="mini-section-label">Ensayo activo</div>
+                        <div class="mini-item"><span class="badge badge-blue">NCT</span>
+                            <div class="mini-item-text">SOLTI-HOPE · Imlunestrant ESR1-mut<small>Estado: Reclutando ·
+                                    ClinicalTrials.gov API v2</small></div>
+                        </div>
+                        <div class="mini-section-label">Fuentes verificadas</div>
+                        <div class="source-pills"><span class="source-pill">PubMed (18)</span><span
+                                class="source-pill">ClinicalTrials (6)</span><span class="source-pill">Orphanet
+                                (4)</span><span class="source-pill">PharmGKB (3)</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-bar">
+            <div class="stat-cell">
+                <div class="stat-n">5–7</div>
+                <div class="stat-label">Años promedio de odisea diagnóstica en enfermedades raras</div>
+                <div class="stat-source">Rare Barometer Survey · 2024</div>
+            </div>
+            <div class="stat-cell">
+                <div class="stat-n">70%</div>
+                <div class="stat-label">De casos raros enfrenta diagnóstico tardío o erróneo antes del correcto</div>
+                <div class="stat-source">PUMCH-GENESIS · Nature 2025</div>
+            </div>
+            <div class="stat-cell">
+                <div class="stat-n">5%</div>
+                <div class="stat-label">De enfermedades raras tiene tratamiento aprobado. Para el resto: ensayos
+                    clínicos.</div>
+                <div class="stat-source">PMC · Intractable Rare Dis 2025</div>
+            </div>
+            <div class="stat-cell">
+                <div class="stat-n">50M+</div>
+                <div class="stat-label">Publicaciones en PubMed. Ningún médico puede procesarlas para un caso
+                    individual.</div>
+                <div class="stat-source">NLM · PubMed 2025</div>
+            </div>
+        </div>
+
+        <div class="how-section" id="how">
+            <div class="section-wrap">
+                <div class="section-eyebrow">Arquitectura del sistema</div>
+                <h2>Un pipeline diseñado<br>para <em>afilar hipótesis.</em></h2>
+                <p class="section-lead">Cada etapa reduce el sesgo y amplía la cobertura informacional. La metodología
+                    adversarial está respaldada por investigación publicada en Nature y NPJ Digital Medicine.</p>
+                <div class="steps-grid">
+                    <div class="step-card">
+                        <div class="step-num">01 /</div>
+                        <h3>Ingesta documental</h3>
+                        <p>PDFs, imágenes, análisis. OCR avanzado + síntesis estructurada con taxonomía PICO antes de
+                            distribuir a los agentes.</p><span class="step-tag">OCR · PDF parsing · NLP</span>
+                    </div>
+                    <div class="step-card">
+                        <div class="step-num">02 /</div>
+                        <h3>Análisis multi-modelo</h3>
+                        <p>El caso se envía simultáneamente a múltiples modelos con roles diferenciados: oncólogo,
+                            genetista, internista.</p><span class="step-tag">Claude · GPT-4o · Gemini</span>
+                    </div>
+                    <div class="step-card">
+                        <div class="step-num">03 /</div>
+                        <h3>Debate adversarial</h3>
+                        <p>Cada agente critica el output de los otros durante 5 rondas. Cuando no convergen, la
+                            divergencia se documenta.</p><span class="step-tag">≥5 rondas · Adversarial</span>
+                    </div>
+                    <div class="step-card">
+                        <div class="step-num">04 /</div>
+                        <h3>Verificación externa</h3>
+                        <p>Un árbitro cruza cada hipótesis con PubMed, ClinicalTrials.gov y Orphanet. Sin fuente
+                            verificable, sin hipótesis.</p><span class="step-tag">PubMed API · ClinicalTrials v2</span>
+                    </div>
+                    <div class="step-card">
+                        <div class="step-num">05 /</div>
+                        <h3>Reporte estructurado</h3>
+                        <p>Documento priorizado con hipótesis, ensayos activos, biomarcadores no evaluados y
+                            divergencias documentadas.</p><span class="step-tag">PDF exportable · Trazable</span>
+                    </div>
+                    <div class="step-card" style="background:var(--accent);cursor:pointer" onclick="showView('app')">
+                        <div class="step-num" style="color:rgba(255,255,255,0.6)">→ /</div>
+                        <h3 style="color:white">Probar ahora</h3>
+                        <p style="color:rgba(255,255,255,0.7)">La plataforma demo tiene datos mock del caso real de
+                            Miriam. Navegá el pipeline completo.</p><span class="step-tag"
+                            style="border-color:rgba(255,255,255,0.3);color:rgba(255,255,255,0.6)">Demo
+                            disponible</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="agents-section">
+            <div class="section-wrap">
+                <div class="section-eyebrow">Arquitectura de agentes</div>
+                <h2>No un modelo.<br>Un <em>comité digital.</em></h2>
+                <p class="section-lead">Cada agente tiene un rol y un modelo base asignado. La diversidad intencional
+                    evita la convergencia prematura y amplía el espacio de hipótesis exploradas.</p>
+                <div class="agents-grid">
+                    <div class="agent-card">
+                        <div class="agent-icon-wrap">🔬</div>
+                        <div class="agent-num">Agente 01</div>
+                        <h3>Análisis de Literatura</h3>
+                        <p>Recupera papers de PubMed, preprints y revisiones sistemáticas relevantes para el caso.</p>
+                        <div class="agent-models"><span class="model-tag">Claude Opus</span><span
+                                class="model-tag">Perplexity</span></div>
+                    </div>
+                    <div class="agent-card">
+                        <div class="agent-icon-wrap">🧬</div>
+                        <div class="agent-num">Agente 02</div>
+                        <h3>Especialista Genómica</h3>
+                        <p>Analiza perfiles mutacionales y su relación con opciones terapéuticas emergentes.</p>
+                        <div class="agent-models"><span class="model-tag">GPT-4o</span><span
+                                class="model-tag">PharmGKB</span></div>
+                    </div>
+                    <div class="agent-card">
+                        <div class="agent-icon-wrap">🏥</div>
+                        <div class="agent-num">Agente 03</div>
+                        <h3>Consultor Clínico</h3>
+                        <p>Busca conexiones entre síntomas, comorbilidades y rutas diagnósticas no exploradas.</p>
+                        <div class="agent-models"><span class="model-tag">Gemini Pro</span><span
+                                class="model-tag">Claude</span></div>
+                    </div>
+                    <div class="agent-card">
+                        <div class="agent-icon-wrap">⚖️</div>
+                        <div class="agent-num">Agente 04</div>
+                        <h3>Árbitro Verificador</h3>
+                        <p>Identifica contradicciones y verifica cada hipótesis contra fuentes externas verificables.
+                        </p>
+                        <div class="agent-models"><span class="model-tag">Claude Opus</span><span
+                                class="model-tag">GPT-4o</span></div>
+                    </div>
+                    <div class="agent-card">
+                        <div class="agent-icon-wrap">🔭</div>
+                        <div class="agent-num">Agente 05</div>
+                        <h3>Navegador de Ensayos</h3>
+                        <p>Consulta ClinicalTrials.gov API v2 en tiempo real según el perfil clínico del caso.</p>
+                        <div class="agent-models"><span class="model-tag">ClinicalTrials API v2</span><span
+                                class="model-tag">Orphanet</span></div>
+                    </div>
+                    <div class="agent-card">
+                        <div class="agent-icon-wrap">📋</div>
+                        <div class="agent-num">Agente 06</div>
+                        <h3>Sintetizador</h3>
+                        <p>Ensambla el consenso en un documento estructurado y priorizado con lenguaje clínico preciso.
+                        </p>
+                        <div class="agent-models"><span class="model-tag">Claude Opus</span><span
+                                class="model-tag">Post-processing</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="principles-section">
+            <div class="section-wrap">
+                <div class="section-eyebrow">Principios del proyecto</div>
+                <h2>Lo que NEXUS<br><em>es y no es.</em></h2>
+                <p class="section-lead">La línea que separa una herramienta útil de una peligrosa en salud es el
+                    framing. Estos principios son restricciones técnicas grabadas en la arquitectura.</p>
+                <div class="principles-grid">
+                    <div class="principle-card">
+                        <div class="principle-accent-line"></div>
+                        <div class="principle-num">Principio 01</div>
+                        <h3>El médico es el usuario</h3>
+                        <p>NEXUS no habla directamente con el paciente sobre su caso. El output está diseñado para el
+                            profesional a cargo. La información clínica requiere un intermediario calificado.</p>
+                    </div>
+                    <div class="principle-card">
+                        <div class="principle-accent-line"></div>
+                        <div class="principle-num">Principio 02</div>
+                        <h3>Hipótesis, no diagnósticos</h3>
+                        <p>Genera rutas de investigación con respaldo bibliográfico, no veredictos. La distinción entre
+                            "merece explorarse" y "el paciente tiene X" es la diferencia entre aumentar y reemplazar el
+                            juicio clínico.</p>
+                    </div>
+                    <div class="principle-card">
+                        <div class="principle-accent-line"></div>
+                        <div class="principle-num">Principio 03</div>
+                        <h3>Sin fuente, sin hipótesis</h3>
+                        <p>Ninguna hipótesis puede existir sin referencia verificable. El agente árbitro bloquea
+                            activamente las alucinaciones. La trazabilidad es el núcleo del contrato de confianza.</p>
+                    </div>
+                    <div class="principle-card">
+                        <div class="principle-accent-line"></div>
+                        <div class="principle-num">Principio 04</div>
+                        <h3>Documentar divergencias</h3>
+                        <p>Cuando dos agentes llegan a conclusiones distintas, el reporte lo expone. La incertidumbre
+                            documentada es más útil que el consenso fabricado.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="scope-section">
+            <div class="section-wrap">
+                <div class="section-eyebrow">Alcance definido</div>
+                <h2>Qué hace. <em>Qué no hace.</em></h2>
+                <div class="scope-grid">
+                    <div class="scope-col yes">
+                        <h3>✓ Sí hace</h3>
+                        <div class="scope-item"><span class="scope-mark">✓</span>Unificar historial clínico disperso en
+                            múltiples documentos</div>
+                        <div class="scope-item"><span class="scope-mark">✓</span>Identificar rutas diagnósticas no
+                            exploradas según literatura reciente</div>
+                        <div class="scope-item"><span class="scope-mark">✓</span>Detectar ensayos clínicos activos para
+                            los que el paciente podría ser elegible</div>
+                        <div class="scope-item"><span class="scope-mark">✓</span>Señalar biomarcadores no evaluados con
+                            impacto potencial en el caso</div>
+                        <div class="scope-item"><span class="scope-mark">✓</span>Documentar divergencias entre agentes
+                            como información valiosa</div>
+                        <div class="scope-item"><span class="scope-mark">✓</span>Citar y verificar cada hipótesis con
+                            fuentes rastreables</div>
+                    </div>
+                    <div class="scope-col no">
+                        <h3>✗ No hace</h3>
+                        <div class="scope-item"><span class="scope-mark">✗</span>Emitir diagnósticos ni conclusiones
+                            clínicas definitivas</div>
+                        <div class="scope-item"><span class="scope-mark">✗</span>Recomendar tratamientos, dosis ni
+                            protocolos específicos</div>
+                        <div class="scope-item"><span class="scope-mark">✗</span>Comunicar resultados directamente al
+                            paciente</div>
+                        <div class="scope-item"><span class="scope-mark">✗</span>Reemplazar el examen clínico ni el
+                            juicio del profesional</div>
+                        <div class="scope-item"><span class="scope-mark">✗</span>Almacenar datos clínicos identificables
+                            más allá de la sesión</div>
+                        <div class="scope-item"><span class="scope-mark">✗</span>Garantizar exhaustividad: es apoyo, no
+                            un oráculo</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="landing-footer">
+            <div>
+                <div class="footer-brand">NEXUS</div>
+                <div class="footer-sub">Soporte investigativo clínico multi-agente</div>
+            </div>
+            <div class="footer-right">Proyecto de tesis — Analista en Sistemas<br>Basado en: Nature 2026 · NPJ Digital
+                Medicine 2025<br>Demo conceptual · No es un producto médico aprobado</div>
+        </div>
+
+    </div>
+
+    <!-- ═══ APP ═══ -->
+    <div class="view" id="view-app">
+        <div class="app-layout">
+            <aside class="app-sidebar">
+                <div class="sidebar-section">
+                    <div class="sidebar-label">Nuevo</div>
+                    <button class="sidebar-item active" id="sb-upload" onclick="showPanel('upload')">
+                        <div class="sidebar-item-dot dot-blue"></div>Nuevo caso
+                    </button>
+                </div>
+                <div class="sidebar-section">
+                    <div class="sidebar-label">En proceso</div>
+                    <button class="sidebar-item" id="sb-pipeline" onclick="showPanel('pipeline')">
+                        <div class="sidebar-item-dot dot-amber"></div>Caso #2847 — Miriam R.
+                    </button>
+                </div>
+                <div class="sidebar-section">
+                    <div class="sidebar-label">Completados</div>
+                    <button class="sidebar-item" id="sb-report" onclick="showPanel('report')">
+                        <div class="sidebar-item-dot dot-green"></div>Reporte — Caso #2847
+                    </button>
+                    <button class="sidebar-item" style="opacity:0.4;pointer-events:none">
+                        <div class="sidebar-item-dot dot-muted"></div>Caso #2801 — J.M.
+                    </button>
+                </div>
+                <div class="sidebar-spacer"></div>
+                <div class="sidebar-footer">NEXUS v0.1 — Demo<br>No emite diagnósticos</div>
+            </aside>
+
+            <main class="app-main" style="padding-bottom:48px">
+
+                <!-- UPLOAD -->
+                <div class="app-panel active" id="panel-upload">
+                    <div class="upload-panel">
+                        <div class="panel-header">
+                            <div class="panel-title">Nuevo análisis</div>
+                            <div class="panel-subtitle">Cargá los documentos clínicos del paciente para iniciar el
+                                pipeline multi-agente.</div>
+                        </div>
+                        <div class="form-card">
+                            <div class="form-card-title">📁 Documentos del paciente</div>
+                            <div class="dropzone" id="dropzone" onclick="document.getElementById('finput').click()"
+                                ondragover="dOver(event)" ondragleave="dLeave(event)" ondrop="dDrop(event)">
+                                <span class="dropzone-icon">📄</span>
+                                <div class="dropzone-main">Arrastrá archivos aquí, o <strong>hacé clic para
+                                        seleccionar</strong></div>
+                                <div class="dropzone-sub">Soporta PDF, DOCX, JPG, PNG · Máx 50MB por archivo</div>
+                            </div>
+                            <input type="file" id="finput" multiple style="display:none" onchange="fSelect(event)">
+                            <div class="file-list" id="flist"></div>
+                        </div>
+                        <div class="form-card">
+                            <div class="form-card-title">📝 Contexto del médico</div>
+                            <div class="form-group">
+                                <label class="form-label">Observaciones adicionales</label>
+                                <textarea>Paciente femenina de 58 años con cáncer de mama metastásico HR+/HER2−, ER+. Ha recibido palbociclib + letrozol (1L), fulvestrant (2L) y exemestano + everolimus (3L) con progresión en todas. Metástasis óseas múltiples incluyendo fémur proximal derecho y pelvis. Antecedente de fibrosis pulmonar. Principal preocupación: determinar opciones de 4L y seguridad ósea urgente.</textarea>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Especialidad principal del caso</label>
+                                <select>
+                                    <option>Oncología</option>
+                                    <option>Neurología</option>
+                                    <option>Genética</option>
+                                    <option>Medicina Interna</option>
+                                    <option>Reumatología</option>
+                                    <option>Otra</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-card">
+                            <div class="form-card-title">🤖 Agentes analíticos</div>
+                            <div class="agents-check-grid">
+                                <label class="agent-check-item checked"><input type="checkbox" checked>
+                                    <div>
+                                        <div class="agent-check-name">🔬 Análisis de Literatura</div>
+                                        <div class="agent-check-desc">Búsqueda masiva en PubMed y preprints.</div>
+                                    </div>
+                                </label>
+                                <label class="agent-check-item checked"><input type="checkbox" checked>
+                                    <div>
+                                        <div class="agent-check-name">🧬 Especialista Genómica</div>
+                                        <div class="agent-check-desc">Análisis de biomarcadores y mutaciones.</div>
+                                    </div>
+                                </label>
+                                <label class="agent-check-item checked"><input type="checkbox" checked>
+                                    <div>
+                                        <div class="agent-check-name">🏥 Consultor Clínico</div>
+                                        <div class="agent-check-desc">Correlación de síntomas e historia clínica.</div>
+                                    </div>
+                                </label>
+                                <label class="agent-check-item checked"><input type="checkbox" checked>
+                                    <div>
+                                        <div class="agent-check-name">⚖️ Árbitro Verificador</div>
+                                        <div class="agent-check-desc">Resolución de discrepancias y alucinaciones.</div>
+                                    </div>
+                                </label>
+                                <label class="agent-check-item checked"><input type="checkbox" checked>
+                                    <div>
+                                        <div class="agent-check-name">🔭 Navegador de Ensayos</div>
+                                        <div class="agent-check-desc">Búsqueda en ClinicalTrials.gov API v2.</div>
+                                    </div>
+                                </label>
+                                <label class="agent-check-item checked"><input type="checkbox" checked>
+                                    <div>
+                                        <div class="agent-check-name">📋 Sintetizador</div>
+                                        <div class="agent-check-desc">Estructuración final del reporte.</div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="submit-row">
+                            <button class="btn btn-secondary" onclick="showPanel('report')">Ver reporte demo</button>
+                            <button class="btn btn-primary" onclick="startPipeline()">Iniciar análisis multi-agente
+                                →</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PIPELINE -->
+                <div class="app-panel" id="panel-pipeline">
+                    <div class="pipeline-panel">
+                        <div class="pipeline-header">
+                            <div>
+                                <div class="pipeline-case-name">Caso #2847 — Oncología</div>
+                                <div class="pipeline-case-meta">Iniciado: hoy 14:32 · 6 agentes activos · Debate
+                                    adversarial</div>
+                            </div>
+                            <div class="round-indicator">
+                                <div class="round-dot"></div><span id="round-lbl">Ronda 1 de 5</span>
+                            </div>
+                        </div>
+                        <div class="done-bar" id="done-bar">
+                            <div>
+                                <div class="done-bar-text">✓ Análisis completado</div>
+                                <div class="done-bar-sub">5 rondas · 31 fuentes verificadas · Listo para revisión</div>
+                            </div>
+                            <button class="btn btn-primary" onclick="showPanel('report')">Ver reporte →</button>
+                        </div>
+                        <div class="overall-progress-wrap">
+                            <div class="progress-label-row"><span class="progress-label">Progreso general</span><span
+                                    class="progress-pct" id="ovr-pct">0%</span></div>
+                            <div class="progress-track">
+                                <div class="progress-fill" id="ovr-bar"></div>
+                            </div>
+                        </div>
+                        <div class="pipeline-body">
+                            <div class="agents-run-grid" id="agents-grid"></div>
+                            <div class="pipeline-log">
+                                <div class="log-header">
+                                    <div class="log-dot"></div>Log en tiempo real
+                                </div>
+                                <div class="log-body" id="log-body"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- REPORT -->
+                <div class="app-panel" id="panel-report">
+                    <div class="report-panel">
+                        <div class="report-header-bar">
+                            <div>
+                                <div class="report-case-name">Reporte — Caso #2847</div>
+                                <div class="report-case-meta">Oncología · 6 agentes · 5 rondas · 31 fuentes · 09.04.2026
+                                    15:14</div>
+                            </div>
+                            <div class="report-actions">
+                                <span class="badge badge-green"
+                                    style="padding:0.4rem 0.85rem;font-size:0.65rem">VERIFICADO</span>
+                                <button class="btn btn-secondary"
+                                    onclick="alert('Exportando PDF… (disponible en v1)')">Exportar PDF</button>
+                                <button class="btn btn-primary" onclick="showPanel('upload')">Nuevo caso</button>
+                            </div>
+                        </div>
+                        <div class="report-body">
+                            <div>
+                                <div class="report-section">
+                                    <div class="report-section-header">
+                                        <div class="report-section-title">📋 Resumen del caso</div>
+                                    </div>
+                                    <div class="report-section-body">
+                                        <p class="summary-text">Paciente femenina de 58 años con cáncer de mama
+                                            metastásico HR+/HER2− con tres líneas de tratamiento previas
+                                            (palbociclib+letrozol, fulvestrant, exemestano+everolimus), todas con
+                                            progresión documentada. Metástasis óseas múltiples con compromiso del fémur
+                                            proximal derecho y pelvis, con riesgo potencial de fractura patológica.
+                                            Antecedente de fibrosis pulmonar que condiciona el uso de agentes con
+                                            toxicidad pulmonar conocida. Los agentes identificaron tres vectores de
+                                            investigación prioritarios: evaluación del perfil mutacional actualizado
+                                            (especialmente ESR1), rebiopsia para confirmar biología de progresión, y
+                                            exploración de ensayos clínicos con imlunestrant y ADC HER2-ultralow.</p>
+                                    </div>
+                                </div>
+                                <div class="report-section">
+                                    <div class="report-section-header">
+                                        <div class="report-section-title">🔬 Hipótesis de investigación</div><span
+                                            class="report-count">5 hipótesis · por prioridad</span>
+                                    </div>
+                                    <div class="report-section-body">
+                                        <div class="hyp-item"><span class="badge badge-red">ALTA</span>
+                                            <div class="hyp-body">
+                                                <div class="hyp-text">Evaluación urgente ESR1 vía ctDNA — Panel
+                                                    Guardant360 CDx o FoundationOne Liquid CDx</div>
+                                                <div class="hyp-source"><span class="hyp-ev">Evidencia I</span>PADA-1
+                                                    trial · Prob. pre-test 40–43% · Si ESR1-mut: imlunestrant aprobado
+                                                    EMA<span class="badge badge-ink" style="font-size:0.58rem">PubMed:
+                                                        38291042</span></div>
+                                            </div>
+                                        </div>
+                                        <div class="hyp-item"><span class="badge badge-red">ALTA</span>
+                                            <div class="hyp-body">
+                                                <div class="hyp-text">Rebiopsia de metástasis accesible — solicitar
+                                                    ER/PR/HER2 (0 vs ultralow), Ki67, CgA, Syn, CD56, SSTR2</div>
+                                                <div class="hyp-source"><span class="hyp-ev">Evidencia
+                                                        II</span>Tarantino JCO 2023 · HER2 0→low en ~32% rebiopsias ·
+                                                    SSTR2 abre rama PRRT<span class="badge badge-ink"
+                                                        style="font-size:0.58rem">PubMed: 37276291</span></div>
+                                            </div>
+                                        </div>
+                                        <div class="hyp-item"><span class="badge badge-amber">MEDIA</span>
+                                            <div class="hyp-body">
+                                                <div class="hyp-text">DLCO + TAC torácico alta resolución + visto bueno
+                                                    Neumología antes de considerar T-DXd</div>
+                                                <div class="hyp-source"><span class="hyp-ev">Evidencia
+                                                        II</span>Antecedente fibrosis pulmonar · Toxicidad pulmonar
+                                                    T-DXd documentada<span class="badge badge-ink"
+                                                        style="font-size:0.58rem">PubMed: 36328470</span></div>
+                                            </div>
+                                        </div>
+                                        <div class="hyp-item"><span class="badge badge-amber">MEDIA</span>
+                                            <div class="hyp-body">
+                                                <div class="hyp-text">Radioterapia local en lesiones óseas femorales e
+                                                    ilíacas sintomáticas o de alto riesgo</div>
+                                                <div class="hyp-source"><span class="hyp-ev">Evidencia I</span>Control
+                                                    local mientras se define siguiente línea sistémica · Reduce riesgo
+                                                    de fractura<span class="badge badge-ink"
+                                                        style="font-size:0.58rem">NCCN Guidelines 2024</span></div>
+                                            </div>
+                                        </div>
+                                        <div class="hyp-item"><span class="badge badge-ink">BAJA</span>
+                                            <div class="hyp-body">
+                                                <div class="hyp-text">Screening NF2/mTOR en panel NGS para elegibilidad
+                                                    en ensayos de inhibidores PI3K/AKT</div>
+                                                <div class="hyp-source"><span class="hyp-ev">Evidencia
+                                                        III</span>Relevante en caso de progresión post-ESR1 ·
+                                                    CAPItello-291, FAKTION trials<span class="badge badge-ink"
+                                                        style="font-size:0.58rem">PubMed: 36689928</span></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="report-section">
+                                    <div class="report-section-header">
+                                        <div class="report-section-title">🔭 Ensayos clínicos activos</div><span
+                                            class="report-count">3 ensayos · ClinicalTrials.gov API v2</span>
+                                    </div>
+                                    <div class="report-section-body">
+                                        <div class="trial-item">
+                                            <div class="trial-top">
+                                                <div class="trial-name">SOLTI-HOPE</div><span
+                                                    class="badge badge-green">Reclutando</span>
+                                            </div>
+                                            <div class="trial-desc">Imlunestrant en HR+/HER2− metastásico con mutación
+                                                ESR1. Compatibilidad: alta si ctDNA confirma ESR1-mut.</div>
+                                            <div class="trial-meta"><span>Fase
+                                                    III</span><span>NCT05514054</span><span>SOLTI · VHIO · España</span>
+                                            </div>
+                                        </div>
+                                        <div class="trial-item">
+                                            <div class="trial-top">
+                                                <div class="trial-name">VHIO-0034</div><span
+                                                    class="badge badge-green">Reclutando</span>
+                                            </div>
+                                            <div class="trial-desc">ADC anti-HER2 en HER2-ultralow con metástasis ósea
+                                                predominante. Compatibilidad: pendiente rebiopsia.</div>
+                                            <div class="trial-meta"><span>Fase
+                                                    II</span><span>NCT05629585</span><span>VHIO · Barcelona</span></div>
+                                        </div>
+                                        <div class="trial-item">
+                                            <div class="trial-top">
+                                                <div class="trial-name">GEICAM-2024</div><span
+                                                    class="badge badge-amber">Fase II</span>
+                                            </div>
+                                            <div class="trial-desc">Combinación CDK4/6 + PARP en HR+ con múltiples
+                                                líneas previas. Requiere evaluación BRCA.</div>
+                                            <div class="trial-meta"><span>Fase
+                                                    II</span><span>NCT05731089</span><span>GEICAM · España</span></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="report-section">
+                                    <div class="report-section-header">
+                                        <div class="report-section-title">⚡ Divergencias entre agentes</div><span
+                                            class="report-count">2 divergencias</span>
+                                    </div>
+                                    <div class="report-section-body">
+                                        <div class="div-item">
+                                            <div class="div-label">Divergencia 01 — Secuencia de acciones urgentes</div>
+                                            <div class="div-text">Prioridad relativa entre seguridad ósea (RMN +
+                                                Traumatología) y ctDNA urgente como primera acción.</div>
+                                            <div class="div-agents">Agente Clínico: priorizar RMN fémur proximal antes
+                                                que cualquier otro estudio · Agente Literatura: ctDNA define la línea
+                                                sistémica, condiciona la decisión ortopédica — hacerlos en paralelo ·
+                                                <strong>Árbitro: paralelo si recursos disponibles</strong></div>
+                                        </div>
+                                        <div class="div-item">
+                                            <div class="div-label">Divergencia 02 — T-DXd con antecedente pulmonar</div>
+                                            <div class="div-text">Viabilidad de T-DXd ante fibrosis pulmonar
+                                                preexistente.</div>
+                                            <div class="div-agents">Agente Genómica: T-DXd es la opción biológicamente
+                                                más atractiva, riesgo pulmonar manejable con monitoreo · Agente Clínico:
+                                                contraindicación relativa seria, requiere evaluación funcional completa
+                                                · <strong>Árbitro: no excluir, filtro neumológico obligatorio</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="sidebar-card">
+                                    <div class="sidebar-card-header">📊 Metadata</div>
+                                    <div class="sidebar-card-body">
+                                        <div class="meta-row"><span class="meta-key">Caso</span><span
+                                                class="meta-val">#2847</span></div>
+                                        <div class="meta-row"><span class="meta-key">Especialidad</span><span
+                                                class="meta-val">Oncología</span></div>
+                                        <div class="meta-row"><span class="meta-key">Agentes</span><span
+                                                class="meta-val">6</span></div>
+                                        <div class="meta-row"><span class="meta-key">Rondas</span><span
+                                                class="meta-val">5 / 5</span></div>
+                                        <div class="meta-row"><span class="meta-key">Duración</span><span
+                                                class="meta-val">18 min</span></div>
+                                        <div class="meta-row"><span class="meta-key">Fuentes</span><span
+                                                class="meta-val">31 total</span></div>
+                                    </div>
+                                </div>
+                                <div class="sidebar-card">
+                                    <div class="sidebar-card-header">📚 Fuentes</div>
+                                    <div class="sidebar-card-body">
+                                        <div class="source-pills"><span class="source-pill">PubMed (18)</span><span
+                                                class="source-pill">ClinicalTrials (6)</span><span
+                                                class="source-pill">Orphanet (4)</span><span
+                                                class="source-pill">PharmGKB (3)</span></div>
+                                    </div>
+                                </div>
+                                <div class="sidebar-card">
+                                    <div class="sidebar-card-header">🤖 Agentes</div>
+                                    <div class="sidebar-card-body">
+                                        <div class="agent-done-item"><span class="agent-done-check">✓</span>🔬 Análisis
+                                            de Literatura</div>
+                                        <div class="agent-done-item"><span class="agent-done-check">✓</span>🧬
+                                            Especialista Genómica</div>
+                                        <div class="agent-done-item"><span class="agent-done-check">✓</span>🏥 Consultor
+                                            Clínico</div>
+                                        <div class="agent-done-item"><span class="agent-done-check">✓</span>⚖️ Árbitro
+                                            Verificador</div>
+                                        <div class="agent-done-item"><span class="agent-done-check">✓</span>🔭 Navegador
+                                            Ensayos</div>
+                                        <div class="agent-done-item"><span class="agent-done-check">✓</span>📋
+                                            Sintetizador</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </main>
+        </div>
+        <div class="app-disclaimer">NEXUS no emite diagnósticos. Output dirigido exclusivamente al profesional médico
+            responsable del caso.</div>
+    </div>
+
+    <script>
+        function showView(v) {
+            document.querySelectorAll('.view').forEach(e => e.classList.remove('active'));
+            document.getElementById('view-' + v).classList.add('active');
+            document.querySelectorAll('.nav-tab').forEach(e => e.classList.remove('active'));
+            document.getElementById('tab-' + v).classList.add('active');
+            window.scrollTo(0, 0);
+        }
+        function showPanel(p) {
+            document.querySelectorAll('.app-panel').forEach(e => e.classList.remove('active'));
+            document.getElementById('panel-' + p).classList.add('active');
+            document.querySelectorAll('.sidebar-item').forEach(e => e.classList.remove('active'));
+            const sb = document.getElementById('sb-' + p);
+            if (sb) sb.classList.add('active');
+        }
+        // DROPZONE
+        function dOver(e) { e.preventDefault(); e.currentTarget.classList.add('dragover'); }
+        function dLeave(e) { e.currentTarget.classList.remove('dragover'); }
+        function dDrop(e) { e.preventDefault(); e.currentTarget.classList.remove('dragover'); addFiles(Array.from(e.dataTransfer.files)); }
+        function fSelect(e) { addFiles(Array.from(e.target.files)); }
+        let files = [];
+        function addFiles(fs) { fs.forEach(f => { if (!files.find(x => x.name === f.name)) files.push(f); }); renderFiles(); }
+        function removeFile(n) { files = files.filter(f => f.name !== n); renderFiles(); }
+        function renderFiles() {
+            const l = document.getElementById('flist');
+            if (!files.length) { l.innerHTML = ''; return; }
+            l.innerHTML = files.map(f => `<div class="file-item"><span class="file-icon">${fIcon(f.name)}</span><span class="file-name">${f.name}</span><span class="file-size">${fSize(f.size)}</span><button class="file-remove" onclick="removeFile('${f.name}')">✕</button></div>`).join('');
+        }
+        function fIcon(n) { const e = n.split('.').pop().toLowerCase(); if (e === 'pdf') return '📄'; if (['jpg', 'jpeg', 'png'].includes(e)) return '🖼️'; if (['doc', 'docx'].includes(e)) return '📝'; return '📎'; }
+        function fSize(b) { if (b < 1024) return b + ' B'; if (b < 1048576) return (b / 1024).toFixed(1) + ' KB'; return (b / 1048576).toFixed(1) + ' MB'; }
+
+        // PIPELINE
+        const agentDefs = [
+            { id: 'a1', icon: '🔬', name: 'Análisis de Literatura', model: 'Claude Opus + PubMed' },
+            { id: 'a2', icon: '🧬', name: 'Especialista Genómica', model: 'GPT-4o + PharmGKB' },
+            { id: 'a3', icon: '🏥', name: 'Consultor Clínico', model: 'Gemini Pro' },
+            { id: 'a4', icon: '⚖️', name: 'Árbitro Verificador', model: 'Claude Opus' },
+            { id: 'a5', icon: '🔭', name: 'Navegador de Ensayos', model: 'ClinicalTrials API v2' },
+            { id: 'a6', icon: '📋', name: 'Sintetizador', model: 'Claude Opus' },
+        ];
+        const twTexts = [
+            'Analizando 847 papers en PubMed... identificando 18 de alta relevancia para el perfil clínico.',
+            'Perfil mutacional: ESR1 con probabilidad 40-43% según cohorte PADA-1. Secundarios: PIK3CA, AKT1...',
+            'Historial de 3 líneas previas. Patrón compatible con resistencia adquirida CDK4/6. Explorando vías alternativas...',
+            'Verificando hipótesis contra guías NCCN 2024 y ESMO. 2 divergencias detectadas entre agentes...',
+            'ClinicalTrials.gov query: HR+/HER2- metastatic + ESR1 + recruiting. 6 estudios activos encontrados...',
+            'Ensamblando reporte final. Priorización por nivel de evidencia + urgencia clínica...',
+        ];
+        const logMsgs = [
+            { t: 'info', m: 'Pipeline iniciado — 6 agentes activados' },
+            { t: '', m: 'Agente 1: Consultando PubMed API — "ESR1 mutation HR+ metastatic breast cancer ctDNA"' },
+            { t: '', m: 'Agente 1: 847 resultados, aplicando filtros de relevancia...' },
+            { t: '', m: 'Agente 2: Iniciando análisis mutacional — ESR1, PIK3CA, AKT1, PTEN, RB1, TP53' },
+            { t: '', m: 'Agente 1: 18 papers de alta relevancia seleccionados' },
+            { t: 'info', m: 'Ronda 1 completada — iniciando debate adversarial' },
+            { t: '', m: 'Agente 3: Correlacionando historial con 3 líneas de tratamiento previas' },
+            { t: '', m: 'Agente 4: Verificando hipótesis ESR1 contra guías NCCN 2024 y ESMO' },
+            { t: 'warn', m: 'Divergencia detectada: Agentes 1 y 3 difieren en secuenciación de acciones' },
+            { t: '', m: 'Agente 5: Consultando ClinicalTrials.gov — ESR1 + HR+ + metastatic + recruiting' },
+            { t: 'info', m: 'Ronda 2 completada — refinando hipótesis' },
+            { t: '', m: 'Agente 5: 6 ensayos activos, evaluando criterios de elegibilidad' },
+            { t: '', m: 'Agente 2: HER2 ultralow pathway — T-DXd requiere confirmación en rebiopsia' },
+            { t: 'warn', m: 'Divergencia detectada: Agentes 2 y 3 difieren en viabilidad T-DXd' },
+            { t: '', m: 'Agente 4: Árbitro resuelve divergencias — documentando para reporte' },
+            { t: 'info', m: 'Ronda 3 completada — convergencia parcial alcanzada' },
+            { t: '', m: 'Agente 1: Verificando fuentes secundarias — Orphanet, PharmGKB consultados' },
+            { t: '', m: 'Agente 4: 31 fuentes totales verificadas y citadas' },
+            { t: 'info', m: 'Rondas 4-5 completadas — consenso final alcanzado' },
+            { t: 'success', m: 'Pipeline completado — reporte listo para revisión médica' },
+        ];
+        let running = false;
+        function startPipeline() {
+            showView('app'); showPanel('pipeline');
+            if (running) return; running = true;
+            const grid = document.getElementById('agents-grid');
+            grid.innerHTML = agentDefs.map(a => `
+    <div class="agent-run-card" id="c-${a.id}">
+      <div class="agent-run-top">
+        <div><span class="agent-run-icon">${a.icon}</span><div class="agent-run-name">${a.name}</div><div class="agent-run-model">${a.model}</div></div>
+        <span class="agent-status-badge" id="s-${a.id}">Esperando</span>
+      </div>
+      <div class="agent-prog-track"><div class="agent-prog-fill" id="p-${a.id}" style="width:0%"></div></div>
+      <div class="agent-typewriter" id="tw-${a.id}"></div>
+    </div>`).join('');
+            const logBody = document.getElementById('log-body');
+            logBody.innerHTML = '';
+            document.getElementById('ovr-bar').style.width = '0%';
+            document.getElementById('ovr-pct').textContent = '0%';
+            document.getElementById('done-bar').style.display = 'none';
+            let li = 0, op = 0;
+            const logInt = setInterval(() => {
+                if (li >= logMsgs.length) { clearInterval(logInt); return; }
+                const m = logMsgs[li++];
+                const d = document.createElement('div');
+                d.className = 'log-entry ' + (m.t || '');
+                const now = new Date();
+                const t = now.getHours() + ':' + String(now.getMinutes()).padStart(2, '0') + ':' + String(now.getSeconds()).padStart(2, '0');
+                d.innerHTML = `<span class="log-time">${t}</span>${m.m}`;
+                logBody.appendChild(d);
+                logBody.scrollTop = logBody.scrollHeight;
+            }, 950);
+            const ovrInt = setInterval(() => {
+                op = Math.min(op + 1, 100);
+                document.getElementById('ovr-bar').style.width = op + '%';
+                document.getElementById('ovr-pct').textContent = op + '%';
+                const rl = document.getElementById('round-lbl');
+                if (op > 20 && op <= 40) rl.textContent = 'Ronda 2 de 5';
+                if (op > 40 && op <= 60) rl.textContent = 'Ronda 3 de 5';
+                if (op > 60 && op <= 80) rl.textContent = 'Ronda 4 de 5';
+                if (op > 80) rl.textContent = 'Ronda 5 de 5';
+                if (op >= 100) { clearInterval(ovrInt); const db = document.getElementById('done-bar'); db.style.display = 'flex'; }
+            }, 200);
+            agentDefs.forEach((a, i) => {
+                setTimeout(() => {
+                    const card = document.getElementById('c-' + a.id);
+                    const status = document.getElementById('s-' + a.id);
+                    const prog = document.getElementById('p-' + a.id);
+                    const tw = document.getElementById('tw-' + a.id);
+                    card.classList.add('running');
+                    status.className = 'agent-status-badge running';
+                    status.textContent = 'En proceso';
+                    let ci = 0;
+                    const txt = twTexts[i];
+                    const twInt = setInterval(() => { if (ci >= txt.length) { clearInterval(twInt); return; } tw.textContent += txt[ci++]; }, 28);
+                    let ap = 0;
+                    const apInt = setInterval(() => {
+                        ap = Math.min(ap + 2, 100);
+                        prog.style.width = ap + '%';
+                        if (ap >= 100) {
+                            clearInterval(apInt);
+                            card.classList.remove('running'); card.classList.add('done');
+                            prog.classList.add('green');
+                            status.className = 'agent-status-badge done';
+                            status.textContent = 'Completado';
+                        }
+                    }, 80 + i * 20);
+                }, i * 2200);
+            });
+        }
+    </script>
+</body>
+
+</html>
