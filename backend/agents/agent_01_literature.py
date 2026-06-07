@@ -65,15 +65,17 @@ def _extract_json(raw: str) -> dict:
     except json.JSONDecodeError:
         pass
 
-    # 2. Buscar bloque entre ```json ... ``` o ``` ... ```
-    match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', raw, re.DOTALL)
-    if match:
+    # 2. Remover fences de markdown (```json ... ``` o ``` ... ```)
+    stripped = raw.strip()
+    if stripped.startswith("```"):
+        stripped = re.sub(r'^```(?:json)?\s*', '', stripped)
+        stripped = re.sub(r'\s*```\s*$', '', stripped.strip())
         try:
-            return json.loads(match.group(1))
+            return json.loads(stripped)
         except json.JSONDecodeError:
             pass
 
-    # 3. Buscar el bloque { ... } más grande
+    # 3. Buscar el bloque { ... } más grande (greedy)
     match = re.search(r'\{.*\}', raw, re.DOTALL)
     if match:
         try:
