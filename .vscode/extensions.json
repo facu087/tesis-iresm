@@ -1,0 +1,23 @@
+{
+  "recommendations": [
+    // Git y GitHub
+    "eamodio.gitlens",
+    "github.vscode-pull-request-github",
+
+    // Python
+    "ms-python.python",
+    "ms-python.pylance",
+    "ms-python.black-formatter",
+
+    // Calidad de código
+    "charliermarsh.ruff",
+
+    // Archivos del proyecto
+    "redhat.vscode-yaml",
+    "dotenv.dotenv-vscode",
+    "tamasfe.even-better-toml",
+
+    // Colaboración
+    "ms-vsliveshare.vsliveshare"
+  ]
+}

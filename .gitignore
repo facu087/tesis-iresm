@@ -24,7 +24,7 @@ temp/
 Thumbs.db
 
 # IDE
-.vscode/
+# .vscode/ — se versiona para compartir configuración del equipo
 .idea/
 
 # Reportes generados
