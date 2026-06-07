@@ -1,10 +1,13 @@
 """
 Extracción de texto de documentos clínicos.
 Soporta PDF nativos (pdfplumber), PDFs escaneados (Tesseract OCR) y texto plano.
+Compatible con Linux, macOS y Windows.
 """
 
 import io
 import os
+import platform
+import sys
 
 import pdfplumber
 import pypdfium2 as pdfium
@@ -18,6 +21,38 @@ _TESSDATA_DIR = os.path.abspath(_TESSDATA_DIR)
 
 # Idiomas a usar en OCR: español + inglés (terminología médica mixta).
 _OCR_LANG = "spa+eng"
+
+# ── Detección del binario Tesseract por plataforma ────────────────────────────
+# En Linux el binario está en PATH. En macOS (Homebrew) y Windows hay rutas
+# específicas que pytesseract no detecta automáticamente.
+def _configure_tesseract() -> None:
+    system = platform.system()
+    if system == "Windows":
+        candidates = [
+            r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+            r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+        ]
+        for path in candidates:
+            if os.path.isfile(path):
+                pytesseract.pytesseract.tesseract_cmd = path
+                return
+        print(
+            "[NEXUS] Advertencia: no se encontró Tesseract en la ruta por defecto "
+            "de Windows. Instalalo desde https://github.com/UB-Mannheim/tesseract/wiki "
+            "y asegurate de que esté en PATH.",
+            file=sys.stderr,
+        )
+    elif system == "Darwin":
+        candidates = [
+            "/opt/homebrew/bin/tesseract",   # Apple Silicon
+            "/usr/local/bin/tesseract",       # Intel Mac
+        ]
+        for path in candidates:
+            if os.path.isfile(path):
+                pytesseract.pytesseract.tesseract_cmd = path
+                return
+
+_configure_tesseract()
 
 # DPI de renderizado: 300 es el mínimo recomendado para OCR médico.
 _RENDER_DPI = 300
