@@ -7,6 +7,7 @@ preguntas clínicas claras y reproducibles.
 """
 
 from pydantic import BaseModel
+from .biomarkers import BiomarkerProfile
 
 
 class PICOSynthesis(BaseModel):
@@ -37,5 +38,6 @@ class PICOSynthesis(BaseModel):
 
 
 class ClinicalCase(BaseModel):
-    raw_text: str                        # Texto clínico original (ya anonimizado)
-    pico: PICOSynthesis | None = None    # Se completa después del análisis PICO
+    raw_text: str                               # Texto clínico original (ya anonimizado)
+    pico: PICOSynthesis | None = None           # Se completa tras el análisis PICO
+    biomarkers: BiomarkerProfile | None = None  # Se completa tras la extracción de biomarcadores
