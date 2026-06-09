@@ -1,22 +1,20 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { analyzeFile, analyzeText } from "@/lib/api";
-import type { StructuredReport } from "@/lib/types";
+import type { AnalysisInput } from "@/lib/inputStore";
+
+interface Props {
+  onReady: (input: AnalysisInput) => void;
+}
 
 type InputMode = "file" | "text";
 
-interface Props {
-  onSuccess: (report: StructuredReport) => void;
-}
-
-export default function UploadForm({ onSuccess }: Props) {
+export default function UploadForm({ onReady }: Props) {
   const [mode, setMode] = useState<InputMode>("file");
   const [file, setFile] = useState<File | null>(null);
   const [text, setText] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -40,41 +38,25 @@ export default function UploadForm({ onSuccess }: Props) {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-
-    if (mode === "file" && !file) {
-      setError("Seleccioná un archivo PDF.");
-      return;
-    }
-    if (mode === "text" && !text.trim()) {
-      setError("Ingresá el texto del caso clínico.");
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const report =
-        mode === "file" && file
-          ? await analyzeFile(file)
-          : await analyzeText(text);
-      onSuccess(report);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error inesperado.");
-    } finally {
-      setIsLoading(false);
+    if (mode === "file") {
+      if (!file) { setError("Seleccioná un archivo PDF."); return; }
+      onReady({ mode: "file", file });
+    } else {
+      if (!text.trim()) { setError("Ingresá el texto del caso clínico."); return; }
+      onReady({ mode: "text", text });
     }
   };
 
   const canSubmit =
-    !isLoading &&
-    ((mode === "file" && file !== null) ||
-      (mode === "text" && text.trim().length > 0));
+    (mode === "file" && file !== null) ||
+    (mode === "text" && text.trim().length > 0);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      {/* Tabs de modo */}
+      {/* Tabs */}
       <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-1">
         {(["file", "text"] as InputMode[]).map((m) => (
           <button
@@ -92,7 +74,7 @@ export default function UploadForm({ onSuccess }: Props) {
         ))}
       </div>
 
-      {/* Área de archivo */}
+      {/* Zona de archivo */}
       {mode === "file" && (
         <div
           onDrop={handleDrop}
@@ -103,8 +85,8 @@ export default function UploadForm({ onSuccess }: Props) {
             isDragging
               ? "border-blue-400 bg-blue-50"
               : file
-              ? "border-green-400 bg-green-50"
-              : "border-gray-300 hover:border-blue-300 hover:bg-gray-50"
+              ? "border-emerald-400 bg-emerald-50"
+              : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
           }`}
         >
           <input
@@ -117,38 +99,34 @@ export default function UploadForm({ onSuccess }: Props) {
           {file ? (
             <div className="space-y-1">
               <p className="text-2xl">✓</p>
-              <p className="font-medium text-green-700">{file.name}</p>
-              <p className="text-sm text-gray-400">
-                {(file.size / 1024).toFixed(1)} KB
-              </p>
+              <p className="font-medium text-emerald-700">{file.name}</p>
+              <p className="text-sm text-slate-400">{(file.size / 1024).toFixed(1)} KB</p>
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setFile(null); }}
-                className="mt-2 text-xs text-gray-400 underline hover:text-gray-600"
+                className="mt-2 text-xs text-slate-400 underline hover:text-slate-600"
               >
                 Cambiar archivo
               </button>
             </div>
           ) : (
-            <div className="space-y-2 text-gray-500">
+            <div className="space-y-2 text-slate-400">
               <p className="text-4xl">📄</p>
-              <p className="font-medium">Arrastrá un PDF aquí</p>
-              <p className="text-sm text-gray-400">
-                o hacé clic para seleccionar
-              </p>
+              <p className="font-medium text-slate-600">Arrastrá un PDF aquí</p>
+              <p className="text-sm">o hacé clic para seleccionar</p>
             </div>
           )}
         </div>
       )}
 
-      {/* Textarea de texto */}
+      {/* Textarea */}
       {mode === "text" && (
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Pegá el texto del caso clínico aquí..."
           rows={10}
-          className="w-full resize-none rounded-xl border border-gray-300 px-4 py-3 text-sm leading-relaxed placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-300"
+          className="w-full resize-none rounded-xl border border-slate-200 px-4 py-3 text-sm leading-relaxed placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300"
         />
       )}
 
@@ -159,20 +137,13 @@ export default function UploadForm({ onSuccess }: Props) {
         </p>
       )}
 
-      {/* Botón de envío */}
+      {/* Submit */}
       <button
         type="submit"
         disabled={!canSubmit}
         className="w-full rounded-xl bg-slate-900 py-3 font-semibold text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
       >
-        {isLoading ? (
-          <span className="flex items-center justify-center gap-2">
-            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-            Analizando caso clínico…
-          </span>
-        ) : (
-          "Analizar caso clínico"
-        )}
+        Analizar caso clínico →
       </button>
     </form>
   );

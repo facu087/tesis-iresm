@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import UploadForm from "@/components/UploadForm";
-import type { StructuredReport } from "@/lib/types";
+import { inputStore } from "@/lib/inputStore";
+import type { AnalysisInput } from "@/lib/inputStore";
 
 const AGENTS = [
   { icon: "🔬", name: "Analista de Literatura", desc: "Evidencia PubMed" },
@@ -25,9 +26,9 @@ const STEPS = [
 export default function HomePage() {
   const router = useRouter();
 
-  const handleSuccess = (report: StructuredReport) => {
-    sessionStorage.setItem("nexus_report", JSON.stringify(report));
-    router.push("/report");
+  const handleReady = (input: AnalysisInput) => {
+    inputStore.set(input);
+    router.push("/analyzing");
   };
 
   return (
@@ -90,7 +91,7 @@ export default function HomePage() {
               <p className="text-sm text-slate-400 mb-6">
                 Subí la historia clínica en PDF o pegá el texto directamente.
               </p>
-              <UploadForm onSuccess={handleSuccess} />
+              <UploadForm onReady={handleReady} />
             </div>
 
             {/* Pipeline steps */}
