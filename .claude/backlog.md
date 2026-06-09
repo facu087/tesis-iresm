@@ -24,52 +24,65 @@ URL: https://trello.com/b/kdXM36sU/sistema-soporte-de-investigacion-clinico-mult
 
 ## Finalizado ✅
 
+**Sprint 1 — PoC (Etapa 2)**
 - Setup del repositorio, estructura de carpetas y .env
 - Módulo de ingesta: extracción de texto de PDF nativo (pdfplumber)
-- Agente 01 (Analista Literatura): prompt + llamada Claude API + parseo JSON
+- Agente 01 (Analista Literatura): prompt + Groq/LLaMA + parseo JSON
 - Script de prueba con caso clínico anonimizado (neuropatía axonal, 42 años)
+
+**Sprint 2 — Pipeline básico (Etapa 3)**
+- Módulo de ingesta: OCR básico para PDFs escaneados (Tesseract)
+- Normalización terminológica: nombres INN y unidades de medida
+- Agente Orquestador: construcción de síntesis PICO (Groq/LLaMA)
+- Extracción de biomarcadores y mapeo del historial terapéutico
+- Clase base de agentes (BaseAgent ABC — interfaz común)
+- Agente 03 (Consultor Clínico): prompt + Groq/LLaMA + parseo JSON
+- Orquestador: distribución paralela con asyncio (Ronda 1)
+- Motor de debate: Rondas 2–4 (crítica cruzada entre agentes)
+- Cliente ClinicalTrials.gov API v2: búsqueda de ensayos activos
 
 ---
 
 ## Sprint 1 — PoC (Etapa 2) ✅ COMPLETO
 
-Todas las tareas fueron movidas a **Finalizado**.
 Caso de prueba usado: **neuropatía axonal, paciente de 42 años**.
 
 ---
 
-## Sprint 2 — Pipeline básico (Etapa 3) 🔜 EN CURSO
+## Sprint 2 — Pipeline básico (Etapa 3) ✅ COMPLETO
 
 Épicas cubiertas: EP-01, EP-02, EP-03, EP-05
 
-| # | Tarea | Épica | Estado |
-|---|-------|-------|--------|
-| 1 | Módulo de ingesta: OCR básico para PDFs escaneados (Tesseract) | EP-01 | Por hacer |
-| 2 | Normalización terminológica: nombres INN y unidades de medida | EP-01 | Por hacer |
-| 3 | Agente Orquestador: construcción de síntesis PICO con Claude API | EP-02 | Por hacer |
-| 4 | Extracción de biomarcadores y mapeo del historial terapéutico | EP-02 | Por hacer |
-| 5 | Clase base de agentes (interfaz común) | EP-03 | Por hacer |
-| 6 | Agente 03 (Consultor Clínico): prompt + llamada Gemini API + parseo JSON | EP-03 | Por hacer |
-| 7 | Orquestador: distribución paralela con asyncio (Ronda 1) | EP-03 | Por hacer |
-| 8 | Motor de debate: Rondas 2–4 (crítica cruzada entre agentes) | EP-03 | Por hacer |
-| 9 | Cliente ClinicalTrials.gov API v2: búsqueda de ensayos activos | EP-05 | Por hacer |
+| # | Tarea | Épica | Archivos clave |
+|---|-------|-------|----------------|
+| 1 | OCR para PDFs escaneados (Tesseract) | EP-01 | `backend/ingestion/extractor.py` |
+| 2 | Normalización INN y unidades de medida | EP-01 | `backend/ingestion/normalizer.py` |
+| 3 | Síntesis PICO con LLM | EP-02 | `backend/pipeline/pico.py` |
+| 4 | Extracción de biomarcadores e historial terapéutico | EP-02 | `backend/ingestion/biomarker_extractor.py` |
+| 5 | Clase base de agentes (BaseAgent ABC) | EP-03 | `backend/agents/base_agent.py` |
+| 6 | Agente 03 — Consultor Clínico | EP-03 | `backend/agents/agent_03_clinical.py` |
+| 7 | Orquestador asyncio — Ronda 1 | EP-03 | `backend/pipeline/orchestrator.py` |
+| 8 | Motor de debate — Rondas 2–4 | EP-03 | `backend/pipeline/debate.py` |
+| 9 | Cliente ClinicalTrials.gov API v2 | EP-05 | `backend/external/clinical_trials.py` |
+
+Suite de tests: **82 tests, 100% passing** (`pytest tests/`)
 
 ---
 
-## Sprint 3 — Frontend conectado (Etapa 4)
+## Sprint 3 — Frontend conectado (Etapa 4) 🔜 EN CURSO
 
 Épicas cubiertas: EP-07, EP-08
 
-| # | Tarea |
-|---|-------|
-| 1 | Modelos Pydantic: Report, Hypothesis, ClinicalCase, ClinicalTrial |
-| 2 | Endpoint FastAPI: POST /api/analyze |
-| 3 | Generación de JSON estructurado con todas las secciones del reporte |
-| 4 | Exportación del reporte a PDF (ReportLab o WeasyPrint) |
-| 5 | Setup Next.js + conexión al backend FastAPI |
-| 6 | Vista de carga de documentos |
-| 7 | Vista de pipeline con animación de progreso en tiempo real |
-| 8 | Vista de reporte: hipótesis, ensayos clínicos, divergencias y fuentes |
+| # | Tarea | Estado |
+|---|-------|--------|
+| 1 | Modelos Pydantic: Report, Hypothesis, ClinicalCase, ClinicalTrial | ✅ Hecho (Sprint 2) |
+| 2 | Endpoint FastAPI: POST /api/analyze | Por hacer |
+| 3 | Generación de JSON estructurado con todas las secciones del reporte | Por hacer |
+| 4 | Exportación del reporte a PDF (ReportLab) | Por hacer |
+| 5 | Setup Next.js + conexión al backend FastAPI | Por hacer |
+| 6 | Vista de carga de documentos | Por hacer |
+| 7 | Vista de pipeline con animación de progreso en tiempo real | Por hacer |
+| 8 | Vista de reporte: hipótesis, ensayos clínicos, divergencias y fuentes | Por hacer |
 
 ---
 
@@ -112,6 +125,6 @@ Caso de prueba usado: **neuropatía axonal, paciente de 42 años**.
 ## Notas importantes
 
 - El caso de prueba base del proyecto es **neuropatía axonal, paciente de 42 años**
-- En producción cada agente usa un modelo distinto; en el prototipo todos usan Claude Opus
+- En producción cada agente usa un modelo distinto; en el prototipo todos usan Groq/LLaMA 3.3 70B
 - El frontend definitivo será Next.js, no React (decisión del equipo)
 - El tablero tiene una columna **QA** (vacía) para tareas en revisión antes de pasar a Finalizado

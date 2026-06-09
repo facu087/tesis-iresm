@@ -20,8 +20,8 @@ evidencia, respaldadas por referencias bibliográficas verificables de PubMed.
 |-------|-------------|--------|
 | 1 | Fundamentación teórica y diseño | ✅ Completada |
 | 2 | Proof of concept (Sprint 1) | ✅ Completada |
-| 3 | Pipeline multi-agente (Sprint 2) | 🔜 En curso |
-| 4 | Frontend conectado (Sprint 3) | 📋 Planificada |
+| 3 | Pipeline multi-agente (Sprint 2) | ✅ Completada |
+| 4 | Frontend conectado (Sprint 3) | 🔜 En curso |
 | 5 | Árbitro + verificación (Sprint 4) | 📋 Planificada |
 | 6 | Validación clínica (Sprint 5) | 📋 Planificada |
 
@@ -31,16 +31,26 @@ evidencia, respaldadas por referencias bibliográficas verificables de PubMed.
 - Agente 01 (Analista Literatura): prompt + Groq/LLaMA + parseo JSON
 - Script de prueba con caso clínico anonimizado (neuropatía axonal, 42 años)
 
-### Sprint 2 — En curso 🔜 (Pipeline básico — Etapa 3)
+### Sprint 2 — Completado ✅ (Pipeline básico — Etapa 3)
 - [x] Módulo de ingesta: OCR básico para PDFs escaneados (Tesseract)
 - [x] Normalización terminológica: nombres INN y unidades de medida
 - [x] Síntesis PICO: construcción de narrativa clínica estructurada
 - [x] Extracción de biomarcadores y mapeo del historial terapéutico
 - [x] Clase base de agentes (interfaz común — BaseAgent ABC)
-- [ ] Agente 03 (Consultor Clínico): prompt + llamada Groq + parseo JSON
-- [ ] Orquestador: distribución paralela con asyncio (Ronda 1)
-- [ ] Motor de debate: Rondas 2–4 (crítica cruzada entre agentes)
-- [ ] Cliente ClinicalTrials.gov API v2: búsqueda de ensayos activos
+- [x] Agente 03 (Consultor Clínico): prompt + llamada Groq + parseo JSON
+- [x] Orquestador: distribución paralela con asyncio (Ronda 1)
+- [x] Motor de debate: Rondas 2–4 (crítica cruzada entre agentes)
+- [x] Cliente ClinicalTrials.gov API v2: búsqueda de ensayos activos
+
+### Sprint 3 — En curso 🔜 (Frontend conectado — Etapa 4)
+- [x] Modelos Pydantic: Report, Hypothesis, ClinicalCase, ClinicalTrial (hecho en Sprint 2)
+- [ ] Endpoint FastAPI: POST /api/analyze
+- [ ] Generación de JSON estructurado con todas las secciones del reporte
+- [ ] Exportación del reporte a PDF (ReportLab)
+- [ ] Setup Next.js + conexión al backend FastAPI
+- [ ] Vista de carga de documentos
+- [ ] Vista de pipeline con animación de progreso en tiempo real
+- [ ] Vista de reporte: hipótesis, ensayos clínicos, divergencias y fuentes
 
 ---
 
