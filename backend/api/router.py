@@ -6,6 +6,7 @@ import asyncio
 import time
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi.responses import Response
 
 from ..external.clinical_trials import search_by_biomarkers
 from ..ingestion.biomarker_extractor import extract as extract_biomarkers
@@ -13,6 +14,7 @@ from ..ingestion.extractor import extract
 from ..ingestion.normalizer import normalize
 from ..models.case import ClinicalCase
 from ..pipeline import debate, orchestrator, pico
+from ..pipeline.pdf_exporter import generate_pdf
 from ..pipeline.report_builder import build_export
 from .schemas import StructuredReport
 
@@ -97,4 +99,28 @@ async def analyze(
         report=final_report,
         trials=trials,
         processing_time=time.perf_counter() - start,
+    )
+
+
+@router.post(
+    "/report/pdf",
+    summary="Exportar reporte a PDF",
+    response_class=Response,
+    responses={200: {"content": {"application/pdf": {}}}},
+)
+async def export_pdf(report: StructuredReport) -> Response:
+    """
+    Recibe un StructuredReport (resultado de POST /api/analyze) y devuelve el PDF.
+
+    El frontend llama primero a /api/analyze para obtener el JSON,
+    lo muestra al usuario y, si quiere descargarlo, llama a este endpoint.
+    """
+    pdf_bytes = await asyncio.to_thread(generate_pdf, report)
+    filename = (
+        f"nexus_reporte_{report.metadata.generated_at.strftime('%Y%m%d_%H%M%S')}.pdf"
+    )
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
