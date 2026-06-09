@@ -151,29 +151,33 @@ class TestAnalyzeEndpoint:
         response = self._run(data={"text": "Paciente masculino 42 años con neuropatía."})
         assert response.status_code == 200
 
-    def test_respuesta_incluye_report_y_trials(self):
+    def test_respuesta_incluye_secciones_del_reporte(self):
         response = self._run(data={"text": "caso clínico de prueba"})
         body = response.json()
-        assert "report" in body
-        assert "trials" in body
-        assert "processing_time_seconds" in body
+        assert "metadata" in body
+        assert "case_summary" in body
+        assert "hypotheses" in body
+        assert "debate_summary" in body
+        assert "clinical_trials" in body
+        assert "bibliography" in body
 
     def test_report_tiene_hipotesis(self):
         response = self._run(data={"text": "caso clínico de prueba"})
-        hypotheses = response.json()["report"]["hypotheses"]
+        hypotheses = response.json()["hypotheses"]
         assert len(hypotheses) > 0
         assert "text" in hypotheses[0]
         assert "evidence_level" in hypotheses[0]
+        assert "rank" in hypotheses[0]
 
     def test_trials_son_lista(self):
         response = self._run(data={"text": "caso clínico de prueba"})
-        trials = response.json()["trials"]
+        trials = response.json()["clinical_trials"]
         assert isinstance(trials, list)
         assert trials[0]["nct_id"] == "NCT04000001"
 
     def test_processing_time_es_numero(self):
         response = self._run(data={"text": "caso clínico de prueba"})
-        assert isinstance(response.json()["processing_time_seconds"], float)
+        assert isinstance(response.json()["metadata"]["processing_time_seconds"], float)
 
     def test_sin_parametros_devuelve_422(self):
         with TestClient(app) as client:
@@ -229,7 +233,7 @@ class TestAnalyzeEndpoint:
         ):
             response = client.post("/api/analyze", data={"text": "caso clínico"})
         assert response.status_code == 200
-        assert response.json()["trials"] == []
+        assert response.json()["clinical_trials"] == []
 
     def test_llama_a_run_round_1_con_case(self):
         patches = _pipeline_patches()

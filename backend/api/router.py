@@ -13,18 +13,19 @@ from ..ingestion.extractor import extract
 from ..ingestion.normalizer import normalize
 from ..models.case import ClinicalCase
 from ..pipeline import debate, orchestrator, pico
-from .schemas import AnalyzeResponse
+from ..pipeline.report_builder import build_export
+from .schemas import StructuredReport
 
 router = APIRouter(prefix="/api", tags=["análisis"])
 
 _MAX_TEXT_BYTES = 500_000  # ~500 KB
 
 
-@router.post("/analyze", response_model=AnalyzeResponse, summary="Analizar caso clínico")
+@router.post("/analyze", response_model=StructuredReport, summary="Analizar caso clínico")
 async def analyze(
     file: UploadFile | None = File(default=None),
     text: str | None = Form(default=None),
-) -> AnalyzeResponse:
+) -> StructuredReport:
     """
     Recibe un documento clínico (PDF o texto plano) y ejecuta el pipeline completo:
     ingesta → normalización → PICO → biomarcadores → debate multi-agente →
@@ -91,8 +92,9 @@ async def analyze(
     except Exception:
         trials = []
 
-    return AnalyzeResponse(
+    return build_export(
+        case=case_with_pico,
         report=final_report,
         trials=trials,
-        processing_time_seconds=round(time.perf_counter() - start, 2),
+        processing_time=time.perf_counter() - start,
     )
