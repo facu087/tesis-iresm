@@ -21,7 +21,7 @@ evidencia, respaldadas por referencias bibliográficas verificables de PubMed.
 | 1 | Fundamentación teórica y diseño | ✅ Completada |
 | 2 | Proof of concept (Sprint 1) | ✅ Completada |
 | 3 | Pipeline multi-agente (Sprint 2) | ✅ Completada |
-| 4 | Frontend conectado (Sprint 3) | 🔜 En curso |
+| 4 | Frontend conectado (Sprint 3) | ✅ Completada |
 | 5 | Árbitro + verificación (Sprint 4) | 📋 Planificada |
 | 6 | Validación clínica (Sprint 5) | 📋 Planificada |
 
@@ -42,15 +42,15 @@ evidencia, respaldadas por referencias bibliográficas verificables de PubMed.
 - [x] Motor de debate: Rondas 2–4 (crítica cruzada entre agentes)
 - [x] Cliente ClinicalTrials.gov API v2: búsqueda de ensayos activos
 
-### Sprint 3 — En curso 🔜 (Frontend conectado — Etapa 4)
+### Sprint 3 — Completado ✅ (Frontend conectado — Etapa 4)
 - [x] Modelos Pydantic: Report, Hypothesis, ClinicalCase, ClinicalTrial (hecho en Sprint 2)
-- [ ] Endpoint FastAPI: POST /api/analyze
-- [ ] Generación de JSON estructurado con todas las secciones del reporte
-- [ ] Exportación del reporte a PDF (ReportLab)
-- [ ] Setup Next.js + conexión al backend FastAPI
-- [ ] Vista de carga de documentos
-- [ ] Vista de pipeline con animación de progreso en tiempo real
-- [ ] Vista de reporte: hipótesis, ensayos clínicos, divergencias y fuentes
+- [x] Endpoint FastAPI: POST /api/analyze (backend/api/router.py + schemas.py)
+- [x] Generación de JSON estructurado con todas las secciones del reporte (pipeline/report_builder.py)
+- [x] Exportación del reporte a PDF (ReportLab — pipeline/pdf_exporter.py)
+- [x] Setup Next.js + conexión al backend FastAPI (frontend/src/lib/api.ts, types.ts)
+- [x] Vista de carga de documentos (frontend/src/app/page.tsx + components/UploadForm.tsx)
+- [x] Vista de pipeline con animación de progreso en tiempo real (frontend/src/app/analyzing/page.tsx)
+- [x] Vista de reporte: hipótesis, ensayos clínicos, divergencias y fuentes (frontend/src/app/report/page.tsx)
 
 ---
 
@@ -68,12 +68,13 @@ tesis-iresm/
 │   └── settings.json           ← configuración compartida
 ├── backend/
 │   ├── agents/
-│   │   ├── base_agent.py       ← clase base ABC con interfaz común
+│   │   ├── base_agent.py           ← clase base ABC con interfaz común
 │   │   ├── agent_01_literature.py  ← Analista de Literatura (Groq/LLaMA)
+│   │   ├── agent_03_clinical.py    ← Consultor Clínico (Groq/LLaMA)
 │   │   └── __init__.py
 │   ├── ingestion/
-│   │   ├── extractor.py        ← PDF nativo (pdfplumber) + OCR (Tesseract)
-│   │   ├── normalizer.py       ← normalización INN y unidades de medida
+│   │   ├── extractor.py            ← PDF nativo (pdfplumber) + OCR (Tesseract)
+│   │   ├── normalizer.py           ← normalización INN y unidades de medida
 │   │   ├── biomarker_extractor.py  ← extracción genes, anticuerpos, fármacos
 │   │   └── __init__.py
 │   ├── models/
@@ -81,13 +82,36 @@ tesis-iresm/
 │   │   ├── report.py           ← AgentOutput, Report
 │   │   ├── case.py             ← ClinicalCase, PICOSynthesis
 │   │   ├── biomarkers.py       ← BiomarkerProfile
+│   │   ├── trial.py            ← ClinicalTrial
 │   │   └── __init__.py
 │   ├── pipeline/
 │   │   ├── pico.py             ← build() síntesis PICO + format_for_agents()
+│   │   ├── orchestrator.py     ← distribución paralela asyncio (Ronda 1)
+│   │   ├── debate.py           ← motor de debate adversarial (Rondas 2–4)
+│   │   ├── report_builder.py   ← generación de JSON estructurado del reporte
+│   │   ├── pdf_exporter.py     ← exportación a PDF con ReportLab
 │   │   └── __init__.py
-│   ├── external/               ← clientes APIs científicas (Sprint 4)
-│   ├── api/                    ← endpoints FastAPI (Sprint 3)
+│   ├── external/
+│   │   └── clinical_trials.py  ← cliente ClinicalTrials.gov API v2
+│   ├── api/
+│   │   ├── router.py           ← POST /api/analyze, POST /api/report/pdf
+│   │   └── schemas.py          ← schemas Pydantic para request/response
+│   ├── main.py                 ← FastAPI app + rutas + CORS
 │   └── requirements.txt
+├── frontend/
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── page.tsx            ← vista de carga de documentos
+│   │   │   ├── analyzing/page.tsx  ← vista de pipeline con progreso en tiempo real
+│   │   │   └── report/page.tsx     ← vista de reporte (5 tabs)
+│   │   ├── components/
+│   │   │   └── UploadForm.tsx      ← formulario de carga PDF/texto
+│   │   └── lib/
+│   │       ├── api.ts              ← cliente HTTP al backend FastAPI
+│   │       ├── types.ts            ← tipos TypeScript del reporte
+│   │       └── inputStore.ts       ← estado compartido entre vistas
+│   ├── next.config.ts
+│   └── package.json
 ├── scripts/
 │   └── poc_test.py             ← script de prueba end-to-end Sprint 1
 ├── tests/
