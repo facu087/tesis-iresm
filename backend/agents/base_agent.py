@@ -14,6 +14,7 @@ está implementada aquí y es heredada por todos los agentes.
 import json
 import os
 import re
+import time
 from abc import ABC, abstractmethod
 
 from pydantic import ValidationError
@@ -110,22 +111,39 @@ class BaseAgent(ABC):
         """
         Llama al modelo configurado en self.MODEL vía Groq.
         Devuelve el texto crudo de la respuesta.
-        Subclases pueden sobreescribir este método para usar otro proveedor
-        (OpenAI, Gemini, etc.) sin cambiar la lógica de parseo.
+        Reintenta hasta 3 veces con backoff incremental ante errores 429
+        (rate limit del tier gratuito de Groq: 12k TPM).
         """
-        from groq import Groq
+        from groq import Groq, RateLimitError
 
         client = Groq(api_key=os.environ["GROQ_API_KEY"])
-        response = client.chat.completions.create(
-            model=self.MODEL,
-            messages=[
-                {"role": "system", "content": self.SYSTEM_PROMPT},
-                {"role": "user", "content": user_message},
-            ],
-            max_tokens=4096,
-            temperature=0.3,
-        )
-        return response.choices[0].message.content
+        delays = [8, 20, 40]  # segundos de espera entre reintentos
+        last_exc: Exception | None = None
+
+        for attempt, delay in enumerate(delays + [None], start=1):
+            try:
+                response = client.chat.completions.create(
+                    model=self.MODEL,
+                    messages=[
+                        {"role": "system", "content": self.SYSTEM_PROMPT},
+                        {"role": "user", "content": user_message},
+                    ],
+                    max_tokens=4096,
+                    temperature=0.3,
+                )
+                return response.choices[0].message.content
+            except RateLimitError as exc:
+                last_exc = exc
+                if delay is None:
+                    break
+                print(
+                    f"[NEXUS] Agente {self.AGENT_NAME}: rate limit (intento {attempt}/3). "
+                    f"Reintentando en {delay}s…",
+                    file=__import__("sys").stderr,
+                )
+                time.sleep(delay)
+
+        raise last_exc  # type: ignore[misc]
 
     # ── Interfaz pública ──────────────────────────────────────────
 

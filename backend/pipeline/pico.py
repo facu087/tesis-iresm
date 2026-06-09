@@ -9,8 +9,9 @@ que reciben todos los agentes de análisis.
 import json
 import os
 import re
+import time
 
-from groq import Groq
+from groq import Groq, RateLimitError
 from pydantic import ValidationError
 
 from ..models.case import ClinicalCase, PICOSynthesis
@@ -82,26 +83,38 @@ def build(case: ClinicalCase) -> ClinicalCase:
     con el campo pico completado.
     """
     client = Groq(api_key=os.environ["GROQ_API_KEY"])
+    delays = [8, 20, 40]
+    last_exc: Exception | None = None
 
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": (
-                    "Construí la síntesis PICO para el siguiente caso clínico:\n\n"
-                    f"{case.raw_text}"
-                ),
-            },
-        ],
-        max_tokens=2048,
-        temperature=0.1,  # Bajo: queremos extracción fiel, no creatividad
-    )
+    for attempt, delay in enumerate(delays + [None], start=1):
+        try:
+            response = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {
+                        "role": "user",
+                        "content": (
+                            "Construí la síntesis PICO para el siguiente caso clínico:\n\n"
+                            f"{case.raw_text}"
+                        ),
+                    },
+                ],
+                max_tokens=2048,
+                temperature=0.1,
+            )
+            raw = response.choices[0].message.content
+            case.pico = _parse_pico(raw)
+            return case
+        except RateLimitError as exc:
+            last_exc = exc
+            if delay is None:
+                break
+            import sys
+            print(f"[NEXUS] PICO: rate limit (intento {attempt}/3). Reintentando en {delay}s…", file=sys.stderr)
+            time.sleep(delay)
 
-    raw = response.choices[0].message.content
-    case.pico = _parse_pico(raw)
-    return case
+    raise last_exc  # type: ignore[misc]
 
 
 def format_for_agents(pico: PICOSynthesis) -> str:

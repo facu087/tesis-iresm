@@ -39,6 +39,11 @@ export default function AnalyzingPage() {
 
   /* ── Animación + llamada a la API ──────────────────────────────────── */
   useEffect(() => {
+    // Resetear refs para el double-invoke de StrictMode en desarrollo
+    canceledRef.current = false;
+    apiDoneRef.current = false;
+    animDoneRef.current = false;
+
     const input = inputStore.get();
     if (!input) { router.replace("/"); return; }
 
