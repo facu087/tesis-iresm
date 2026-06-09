@@ -19,7 +19,7 @@ from abc import ABC, abstractmethod
 from pydantic import ValidationError
 
 from ..models.hypothesis import EvidenceLevel, Hypothesis, Priority, Source
-from ..models.report import AgentOutput
+from ..models.report import AgentOutput, Critique
 
 # Modelos disponibles
 GROQ_LLAMA = "llama-3.3-70b-versatile"   # Agentes 01, 03, 06
@@ -149,3 +149,117 @@ class BaseAgent(ABC):
             hypotheses=hypotheses,
             raw_response=raw,
         )
+
+    # ── Debate adversarial ────────────────────────────────────────
+
+    def critique(
+        self,
+        context: str,
+        own_output: AgentOutput,
+        other_outputs: list[AgentOutput],
+    ) -> list[Critique]:
+        """
+        Ronda 2: genera críticas sobre las hipótesis de los otros agentes.
+        Devuelve una lista de Critique con severidad y alternativa opcional.
+        """
+        own_text = _format_output(own_output, label="TUS HIPÓTESIS (Ronda 1)")
+        others_text = _format_outputs(other_outputs, label="HIPÓTESIS DE OTROS AGENTES")
+
+        prompt = (
+            f"Sos {self.AGENT_NAME}. Participás en un debate adversarial de análisis clínico.\n\n"
+            f"CONTEXTO CLÍNICO:\n{context}\n\n"
+            f"{own_text}\n\n"
+            f"{others_text}\n\n"
+            "Analizá críticamente las hipótesis de los otros agentes desde tu perspectiva.\n"
+            "Identificá inconsistencias, sobre-estimaciones o falta de evidencia.\n\n"
+            "Respondé ÚNICAMENTE con JSON válido:\n"
+            '{\n  "critiques": [\n    {\n'
+            '      "target_agent_id": "ID del agente",\n'
+            '      "target_hypothesis": "texto exacto de la hipótesis criticada",\n'
+            '      "critique_text": "crítica específica y fundamentada",\n'
+            '      "severity": "HIGH" | "MEDIUM" | "LOW",\n'
+            '      "alternative": "alternativa sugerida o null"\n'
+            "    }\n  ]\n}"
+        )
+        raw = self._call_llm(prompt)
+        return self._parse_critiques(raw)
+
+    def revise(
+        self,
+        context: str,
+        own_output: AgentOutput,
+        critiques_received: list[Critique],
+    ) -> AgentOutput:
+        """
+        Rondas 3-4: revisa o defiende hipótesis propias en respuesta a críticas.
+        Devuelve un AgentOutput con hipótesis ajustadas o defendidas.
+        """
+        own_text = _format_output(own_output, label="TUS HIPÓTESIS PREVIAS")
+        critiques_text = _format_critiques(critiques_received)
+
+        prompt = (
+            f"Sos {self.AGENT_NAME}. Participás en un debate adversarial de análisis clínico.\n\n"
+            f"CONTEXTO CLÍNICO:\n{context}\n\n"
+            f"{own_text}\n\n"
+            f"{critiques_text}\n\n"
+            "Respondé a cada crítica recibida: ajustá tu hipótesis si la crítica es válida,\n"
+            "o defendela con argumentación adicional. Podés agregar hipótesis nuevas si\n"
+            "el debate reveló perspectivas no consideradas.\n\n"
+            "Respondé ÚNICAMENTE con JSON en el formato estándar de hipótesis:\n"
+            '{\n  "hypotheses": [...]\n}'
+        )
+        raw = self._call_llm(prompt)
+        hypotheses = self.parse_hypotheses(raw)
+        return self._build_output(hypotheses, raw)
+
+    def _parse_critiques(self, raw: str) -> list[Critique]:
+        """Parsea el JSON de críticas devuelto por el modelo."""
+        data = self.extract_json(raw)
+        critiques = []
+        for c in data.get("critiques", []):
+            severity = c.get("severity", "MEDIUM").upper()
+            if severity not in ("HIGH", "MEDIUM", "LOW"):
+                severity = "MEDIUM"
+            critiques.append(Critique(
+                from_agent_id=self.AGENT_ID,
+                from_agent_name=self.AGENT_NAME,
+                target_agent_id=str(c.get("target_agent_id", "")),
+                target_hypothesis=c.get("target_hypothesis", ""),
+                critique_text=c.get("critique_text", ""),
+                severity=severity,
+                alternative=c.get("alternative") or None,
+            ))
+        return critiques
+
+
+# ── Helpers de formateo para el debate ────────────────────────────────────────
+
+def _format_output(output: AgentOutput, label: str) -> str:
+    lines = [f"=== {label} ({output.agent_name}) ==="]
+    for i, h in enumerate(output.hypotheses, 1):
+        lines.append(f"#{i} [{h.priority.value}] Evidencia {h.evidence_level.value}: {h.text}")
+        lines.append(f"   Fundamento: {h.rationale[:300]}")
+    return "\n".join(lines)
+
+
+def _format_outputs(outputs: list[AgentOutput], label: str) -> str:
+    lines = [f"=== {label} ==="]
+    for output in outputs:
+        lines.append(f"\n--- {output.agent_name} (Agente {output.agent_id}) ---")
+        for i, h in enumerate(output.hypotheses, 1):
+            lines.append(f"#{i} [{h.priority.value}] Evidencia {h.evidence_level.value}: {h.text}")
+            lines.append(f"   Fundamento: {h.rationale[:300]}")
+    return "\n".join(lines)
+
+
+def _format_critiques(critiques: list[Critique]) -> str:
+    if not critiques:
+        return "=== CRÍTICAS RECIBIDAS ===\nNinguna crítica recibida."
+    lines = ["=== CRÍTICAS RECIBIDAS ==="]
+    for c in critiques:
+        lines.append(f"\n- De: {c.from_agent_name} [{c.severity}]")
+        lines.append(f"  Hipótesis criticada: {c.target_hypothesis[:150]}")
+        lines.append(f"  Crítica: {c.critique_text}")
+        if c.alternative:
+            lines.append(f"  Alternativa sugerida: {c.alternative}")
+    return "\n".join(lines)
