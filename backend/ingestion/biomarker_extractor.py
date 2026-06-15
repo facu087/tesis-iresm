@@ -37,11 +37,22 @@ _NON_GENE_TERMS = {
     "INN", "OMS", "WHO", "FDA", "EMA", "NCCN", "ESMO",
 }
 
-# Anticuerpos anti-X
+# Anticuerpos anti-X. El separador (guion o espacio) es OBLIGATORIO para no
+# capturar la palabra española "anticuerpos" (anti + cuerpos) ni términos como
+# "antiinflamatorio", que no llevan separador.
 _ANTIBODY_PATTERN = re.compile(
-    r'\banti[-\s]?[A-Za-záéíóúÁÉÍÓÚñÑ0-9\-]{2,20}\b',
+    r'\banti[-\s][A-Za-záéíóúÁÉÍÓÚñÑ0-9\-]{2,20}\b',
     re.IGNORECASE
 )
+
+# Términos que empiezan con "anti" pero NO son anticuerpos (se comparan sin
+# guiones ni espacios). Filtran falsos positivos del patrón anterior.
+_NON_ANTIBODY_ANTI = {
+    "anticuerpos", "anticuerpo", "antiinflamatorio", "antiinflamatorios",
+    "anticoagulante", "anticoagulantes", "antiagregante", "antiagregantes",
+    "antibiotico", "antibioticos", "antidepresivo", "antidepresivos",
+    "antihipertensivo", "antiviral", "antivirales", "antialergico",
+}
 
 # Variantes genéticas tipo p.Val30Met o c.148G>A
 _VARIANT_PATTERN = re.compile(
@@ -111,15 +122,22 @@ def _extract_with_regex(text: str) -> dict:
     words = set(re.findall(r'\b[A-Z]{2,}\d*\b', text))
     genes_found.update(words & _KNOWN_GENES)
 
-    # Anticuerpos
-    antibodies = list({m.group() for m in _ANTIBODY_PATTERN.finditer(text)})
+    # Anticuerpos (excluye términos "anti…" que no son anticuerpos)
+    antibodies = list({
+        m.group() for m in _ANTIBODY_PATTERN.finditer(text)
+        if m.group().lower().replace("-", "").replace(" ", "") not in _NON_ANTIBODY_ANTI
+    })
 
     # Variantes
     variants = list({m.group() for m in _VARIANT_PATTERN.finditer(text)})
 
-    # Biomarcadores de lab por diccionario
+    # Biomarcadores de lab por diccionario. Se busca por palabra completa (\b)
+    # y no por subcadena, para que "ana" no matchee dentro de "analizados", etc.
     text_lower = text.lower()
-    lab_markers = [marker for marker in _LAB_MARKERS if marker in text_lower]
+    lab_markers = [
+        marker for marker in _LAB_MARKERS
+        if re.search(r"\b" + re.escape(marker) + r"\b", text_lower)
+    ]
 
     return {
         "genes_regex": sorted(genes_found),
