@@ -22,7 +22,7 @@ evidencia, respaldadas por referencias bibliográficas verificables de PubMed.
 | 2 | Proof of concept (Sprint 1) | ✅ Completada |
 | 3 | Pipeline multi-agente (Sprint 2) | ✅ Completada |
 | 4 | Frontend conectado (Sprint 3) | ✅ Completada |
-| 5 | Árbitro + verificación (Sprint 4) | 📋 Planificada |
+| 5 | Árbitro + verificación (Sprint 4) | 🔄 En curso |
 | 6 | Validación clínica (Sprint 5) | 📋 Planificada |
 
 ### Sprint 1 — Completado ✅
@@ -51,6 +51,29 @@ evidencia, respaldadas por referencias bibliográficas verificables de PubMed.
 - [x] Vista de carga de documentos (frontend/src/app/page.tsx + components/UploadForm.tsx)
 - [x] Vista de pipeline con animación de progreso en tiempo real (frontend/src/app/analyzing/page.tsx)
 - [x] Vista de reporte: hipótesis, ensayos clínicos, divergencias y fuentes (frontend/src/app/report/page.tsx)
+
+### Sprint 4 — En curso 🔄 (Árbitro + verificación — Etapa 5)
+Backend mergeado a `develop` (capa de recuperación de evidencia / RAG). Autor: Facundo.
+- [x] Setup ChromaDB con colección y embeddings biomédicos (backend/rag/chroma_store.py)
+- [x] Cliente PubMed E-utilities + verificación de PMIDs (backend/external/pubmed.py)
+- [x] Indexación de artículos PubMed en ChromaDB (backend/rag/indexer.py)
+- [x] Motor RAG: búsqueda semántica + formateo para prompts (backend/rag/retriever.py)
+- [x] Cliente Orphanet API: enfermedades raras (backend/external/orphanet.py)
+- [x] Cliente PharmGKB: relaciones fármaco-genómicas (backend/external/pharmgkb.py)
+- [x] Gestión de rate limits y fallbacks para APIs externas (backend/external/rate_limiter.py)
+- [ ] Agente 06 (Sintetizador / Árbitro): pendiente
+- [ ] **Integrar** RAG + verificador de PMIDs en el flujo del pipeline (router/orchestrator)
+
+> ⚠ Los módulos del Sprint 4 ya están en `develop` pero todavía NO están conectados
+> al pipeline principal. Próximo paso: integrarlos.
+
+### Verificación / evidencia (scripts de demo)
+Para documentar cada tarea (capturas para Trello) hay scripts en `scripts/demo_*.py`
+que muestran entrada → salida de cada módulo. Cada uno guarda artefactos en `output/`.
+Correr con: `source .venv/bin/activate && python scripts/demo_<nombre>.py`
+
+También se corrigió un bug del Sprint 2: falsos positivos en el extractor de
+biomarcadores (regex de anticuerpos y de marcadores de lab). Ver commit `e72e004`.
 
 ---
 
@@ -92,7 +115,16 @@ tesis-iresm/
 │   │   ├── pdf_exporter.py     ← exportación a PDF con ReportLab
 │   │   └── __init__.py
 │   ├── external/
-│   │   └── clinical_trials.py  ← cliente ClinicalTrials.gov API v2
+│   │   ├── clinical_trials.py  ← cliente ClinicalTrials.gov API v2
+│   │   ├── pubmed.py           ← cliente PubMed E-utilities + verificación PMIDs (S4)
+│   │   ├── orphanet.py         ← cliente Orphanet: enfermedades raras (S4)
+│   │   ├── pharmgkb.py         ← cliente PharmGKB: fármaco-genómica (S4)
+│   │   └── rate_limiter.py     ← rate limits y fallbacks para APIs externas (S4)
+│   ├── rag/                    ← capa RAG de evidencia (Sprint 4)
+│   │   ├── chroma_store.py     ← ChromaDB + embeddings biomédicos
+│   │   ├── indexer.py          ← indexación de artículos PubMed en ChromaDB
+│   │   ├── retriever.py        ← motor RAG: búsqueda semántica
+│   │   └── __init__.py
 │   ├── api/
 │   │   ├── router.py           ← POST /api/analyze, POST /api/report/pdf
 │   │   └── schemas.py          ← schemas Pydantic para request/response
@@ -113,7 +145,11 @@ tesis-iresm/
 │   ├── next.config.ts
 │   └── package.json
 ├── scripts/
-│   └── poc_test.py             ← script de prueba end-to-end Sprint 1
+│   ├── poc_test.py             ← script de prueba end-to-end Sprint 1
+│   └── demo_*.py               ← scripts de verificación por tarea (evidencia Trello):
+│       │                          extraccion, ocr, normalizacion, biomarcadores, pico,
+│       │                          base_agent, agente01, agente03, orquestador,
+│       └─                         clinical_trials, debate, pdf
 ├── tests/
 │   ├── test_ingesta.py
 │   ├── test_normalizer.py
