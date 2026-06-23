@@ -61,6 +61,9 @@ Backend mergeado a `develop` (capa de recuperación de evidencia / RAG). Autor: 
 - [x] Cliente Orphanet API: enfermedades raras (backend/external/orphanet.py)
 - [x] Cliente PharmGKB: relaciones fármaco-genómicas (backend/external/pharmgkb.py)
 - [x] Gestión de rate limits y fallbacks para APIs externas (backend/external/rate_limiter.py)
+- [x] Scripts de demo EP05: pubmed, orphanet, pharmgkb, rate_limiter (scripts/demo_*.py)
+- [x] Scripts de demo RAG: chromadb, indexacion_pubmed, motor_rag (scripts/demo_*.py)
+- [x] Scripts de demo EP07: modelos_pydantic, reporte_json, endpoint_fastapi (scripts/demo_*.py)
 - [ ] Agente 06 (Sintetizador / Árbitro): pendiente
 - [ ] **Integrar** RAG + verificador de PMIDs en el flujo del pipeline (router/orchestrator)
 
@@ -70,7 +73,19 @@ Backend mergeado a `develop` (capa de recuperación de evidencia / RAG). Autor: 
 ### Verificación / evidencia (scripts de demo)
 Para documentar cada tarea (capturas para Trello) hay scripts en `scripts/demo_*.py`
 que muestran entrada → salida de cada módulo. Cada uno guarda artefactos en `output/`.
-Correr con: `source .venv/bin/activate && python scripts/demo_<nombre>.py`
+Correr con: `python3 scripts/demo_<nombre>.py`
+
+Scripts disponibles:
+- `demo_pubmed.py` — cliente PubMed E-utilities (búsqueda + verificación PMIDs)
+- `demo_orphanet.py` — cliente Orphanet (enfermedades raras)
+- `demo_pharmgkb.py` — cliente PharmGKB (fármaco-genómica)
+- `demo_rate_limiter.py` — RateLimiter, CircuitBreaker, with_fallback
+- `demo_chromadb.py` — setup ChromaDB + embeddings biomédicos
+- `demo_indexacion_pubmed.py` — indexación de artículos PubMed en ChromaDB
+- `demo_motor_rag.py` — búsqueda semántica RAG + formateo para prompts
+- `demo_modelos_pydantic.py` — modelos Pydantic: Report, Hypothesis, ClinicalCase, ClinicalTrial
+- `demo_reporte_json.py` — generación JSON estructurado via report_builder.build_export()
+- `demo_endpoint_fastapi.py` — contrato y ejemplo de respuesta del endpoint POST /api/analyze
 
 También se corrigió un bug del Sprint 2: falsos positivos en el extractor de
 biomarcadores (regex de anticuerpos y de marcadores de lab). Ver commit `e72e004`.
