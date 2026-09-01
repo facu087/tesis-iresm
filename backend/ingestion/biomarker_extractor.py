@@ -18,6 +18,7 @@ import re
 
 from groq import Groq
 
+from ..agents.base_agent import GROQ_MAIN
 from ..models.biomarkers import BiomarkerProfile
 
 # ── Patrones de reconocimiento rápido ────────────────────────────────────────
@@ -152,7 +153,7 @@ def _extract_with_llm(text: str) -> dict:
     client = Groq(api_key=os.environ["GROQ_API_KEY"])
 
     response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model=GROQ_MAIN,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT_LLM},
             {"role": "user", "content": f"Extraé las entidades biomédicas del siguiente texto clínico:\n\n{text}"},

@@ -23,8 +23,10 @@ from ..models.hypothesis import EvidenceLevel, Hypothesis, Priority, Source
 from ..models.report import AgentOutput, Critique
 
 # Modelos disponibles
-GROQ_LLAMA = "llama-3.3-70b-versatile"   # Agentes 01, 03, 06
-GROQ_LLAMA_FAST = "llama-3.1-8b-instant" # Agente rápido para tareas simples
+# Groq dio de baja los LLaMA 3.x (llama-3.3-70b-versatile / llama-3.1-8b-instant):
+# la API devuelve 404 model_not_found. Reemplazados por los gpt-oss disponibles.
+GROQ_MAIN = "openai/gpt-oss-120b"  # Agentes 01, 03, 06
+GROQ_FAST = "openai/gpt-oss-20b"   # Agente rápido para tareas simples
 
 
 class BaseAgent(ABC):
@@ -37,7 +39,7 @@ class BaseAgent(ABC):
 
     AGENT_ID: str = ""
     AGENT_NAME: str = ""
-    MODEL: str = GROQ_LLAMA
+    MODEL: str = GROQ_MAIN
     SYSTEM_PROMPT: str = ""
 
     # ── Utilidades de parseo ──────────────────────────────────────

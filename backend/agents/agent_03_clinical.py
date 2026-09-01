@@ -1,6 +1,6 @@
 """
 Agente 03 — Consultor Clínico
-Modelo: llama-3.3-70b-versatile via Groq (producción: Gemini Pro)
+Modelo: openai/gpt-oss-120b via Groq (producción: Gemini Pro)
 Rol: Generar hipótesis de investigación desde el razonamiento clínico y
      el diagnóstico diferencial, con referencia a guías clínicas vigentes.
 
@@ -10,7 +10,7 @@ criterios diagnósticos, causas tratables a descartar primero, y guías
 de sociedades médicas (AAN, NCCN, EFNS, etc.).
 """
 
-from .base_agent import BaseAgent, GROQ_LLAMA
+from .base_agent import BaseAgent, GROQ_MAIN
 from ..models.report import AgentOutput
 
 
@@ -18,7 +18,7 @@ class ClinicalConsultantAgent(BaseAgent):
 
     AGENT_ID = "03"
     AGENT_NAME = "Consultor Clínico"
-    MODEL = GROQ_LLAMA
+    MODEL = GROQ_MAIN
     SYSTEM_PROMPT = """Sos un médico especialista en neurología clínica y medicina interna con amplia
 experiencia en diagnóstico diferencial de casos complejos.
 

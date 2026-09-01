@@ -1,10 +1,10 @@
 """
 Agente 01 — Analista de Literatura Científica
-Modelo: llama-3.3-70b-versatile via Groq
+Modelo: openai/gpt-oss-120b via Groq
 Rol: Generar hipótesis de investigación basadas en literatura médica publicada.
 """
 
-from .base_agent import BaseAgent, GROQ_LLAMA
+from .base_agent import BaseAgent, GROQ_MAIN
 from ..models.report import AgentOutput
 
 
@@ -12,7 +12,7 @@ class LiteratureAnalystAgent(BaseAgent):
 
     AGENT_ID = "01"
     AGENT_NAME = "Analista de Literatura"
-    MODEL = GROQ_LLAMA
+    MODEL = GROQ_MAIN
     SYSTEM_PROMPT = """Eres un especialista en medicina interna y revisión de literatura científica médica.
 Tu rol en este sistema es analizar casos clínicos complejos y generar hipótesis de investigación
 fundamentadas en evidencia publicada.

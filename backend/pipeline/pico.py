@@ -14,6 +14,7 @@ import time
 from groq import Groq, RateLimitError
 from pydantic import ValidationError
 
+from ..agents.base_agent import GROQ_MAIN
 from ..models.case import ClinicalCase, PICOSynthesis
 
 SYSTEM_PROMPT = """Eres un médico especialista en metodología de investigación clínica.
@@ -89,7 +90,7 @@ def build(case: ClinicalCase) -> ClinicalCase:
     for attempt, delay in enumerate(delays + [None], start=1):
         try:
             response = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
+                model=GROQ_MAIN,
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {
