@@ -41,6 +41,15 @@ URL: https://trello.com/b/kdXM36sU/sistema-soporte-de-investigacion-clinico-mult
 - Motor de debate: Rondas 2–4 (crítica cruzada entre agentes)
 - Cliente ClinicalTrials.gov API v2: búsqueda de ensayos activos
 
+**Sprint 3 — Frontend conectado (Etapa 4)**
+- Endpoint FastAPI: POST /api/analyze
+- Generación de JSON estructurado con todas las secciones del reporte
+- Exportación del reporte a PDF (ReportLab)
+- Setup Next.js + conexión al backend FastAPI
+- Vista de carga de documentos
+- Vista de pipeline con animación de progreso en tiempo real
+- Vista de reporte: hipótesis, ensayos clínicos, divergencias y fuentes
+
 ---
 
 ## Sprint 1 — PoC (Etapa 2) ✅ COMPLETO
@@ -69,40 +78,53 @@ Suite de tests: **82 tests, 100% passing** (`pytest tests/`)
 
 ---
 
-## Sprint 3 — Frontend conectado (Etapa 4) 🔜 EN CURSO
+## Sprint 3 — Frontend conectado (Etapa 4) ✅ COMPLETO
 
 Épicas cubiertas: EP-07, EP-08
 
 | # | Tarea | Estado |
 |---|-------|--------|
 | 1 | Modelos Pydantic: Report, Hypothesis, ClinicalCase, ClinicalTrial | ✅ Hecho (Sprint 2) |
-| 2 | Endpoint FastAPI: POST /api/analyze | Por hacer |
-| 3 | Generación de JSON estructurado con todas las secciones del reporte | Por hacer |
-| 4 | Exportación del reporte a PDF (ReportLab) | Por hacer |
-| 5 | Setup Next.js + conexión al backend FastAPI | Por hacer |
-| 6 | Vista de carga de documentos | Por hacer |
-| 7 | Vista de pipeline con animación de progreso en tiempo real | Por hacer |
-| 8 | Vista de reporte: hipótesis, ensayos clínicos, divergencias y fuentes | Por hacer |
+| 2 | Endpoint FastAPI: POST /api/analyze | ✅ Hecho |
+| 3 | Generación de JSON estructurado con todas las secciones del reporte | ✅ Hecho |
+| 4 | Exportación del reporte a PDF (ReportLab) | ✅ Hecho |
+| 5 | Setup Next.js + conexión al backend FastAPI | ✅ Hecho |
+| 6 | Vista de carga de documentos | ✅ Hecho |
+| 7 | Vista de pipeline con animación de progreso en tiempo real | ✅ Hecho |
+| 8 | Vista de reporte: hipótesis, ensayos clínicos, divergencias y fuentes | ✅ Hecho |
 
 ---
 
-## Sprint 4 — Árbitro y verificación (Etapa 5)
+## Sprint 4 — Árbitro y verificación (Etapa 5) 🔄 EN CURSO
 
 Épicas cubiertas: EP-04, EP-05, EP-06
 
-| # | Tarea |
-|---|-------|
-| 1 | Setup ChromaDB: colección y embeddings biomédicos |
-| 2 | Indexación de artículos PubMed en ChromaDB |
-| 3 | Motor RAG: búsqueda semántica y formateo para prompts |
-| 4 | Cliente PubMed E-utilities: búsqueda y parseo de resultados |
-| 5 | Cliente Orphanet API: búsqueda de enfermedades raras |
-| 6 | Cliente PharmGKB: relaciones fármaco-genómicas |
-| 7 | Gestión de rate limits y fallbacks en APIs externas |
-| 8 | Agente 02 (Especialista Genómica): prompt + llamada GPT-4o + parseo JSON |
-| 9 | Agente 04 (Árbitro Verificador): síntesis y verificación bibliográfica externa |
-| 10 | Agente 05 (Navegador de Ensayos): búsqueda en ClinicalTrials + Orphanet |
-| 11 | Priorización de hipótesis por nivel de evidencia EBM (I, II, III) |
+| # | Tarea | Estado |
+|---|-------|--------|
+| 1 | Setup ChromaDB: colección y embeddings biomédicos | ✅ Hecho |
+| 2 | Indexación de artículos PubMed en ChromaDB | ✅ Hecho |
+| 3 | Motor RAG: búsqueda semántica y formateo para prompts | ✅ Hecho |
+| 4 | Cliente PubMed E-utilities: búsqueda y parseo de resultados | ✅ Hecho |
+| 5 | Cliente Orphanet API: búsqueda de enfermedades raras | ✅ Hecho |
+| 6 | Cliente PharmGKB: relaciones fármaco-genómicas | ✅ Hecho |
+| 7 | Gestión de rate limits y fallbacks en APIs externas | ✅ Hecho |
+| 8 | Agente 02 (Especialista Genómica): prompt + llamada GPT-4o + parseo JSON | 📋 Pendiente |
+| 9 | Agente 04 (Árbitro Verificador): síntesis y verificación bibliográfica externa | 📋 Pendiente |
+| 10 | Agente 05 (Navegador de Ensayos): búsqueda en ClinicalTrials + Orphanet | 📋 Pendiente |
+| 11 | Priorización de hipótesis por nivel de evidencia EBM (I, II, III) | 📋 Pendiente |
+| 12 | Integrar contexto RAG (búsqueda semántica PubMed) a la Ronda 1 del orquestador | ⚠️ Parcial |
+
+> Nota (12): se integró la búsqueda semántica RAG como contexto bibliográfico en
+> `backend/pipeline/orchestrator.py` (Ronda 1), pero el pipeline todavía **no** invoca
+> el verificador de PMIDs de `backend/external/pubmed.py` — falta esa conexión.
+
+> Nota (numeración): `CLAUDE.md` nombra al árbitro verificador como "Agente 06
+> (Sintetizador/Árbitro)", mientras que acá figura como "Agente 04". Ninguno de los dos
+> está implementado todavía (`backend/agents/` solo tiene `agent_01` y `agent_03`) —
+> confirmar con el equipo cuál numeración es la vigente antes de crear la tarjeta en Trello.
+
+Evidencia/verificación de las tareas 1–7: scripts `scripts/demo_*.py` (PubMed, Orphanet,
+PharmGKB, rate_limiter, ChromaDB, indexación, motor RAG).
 
 ---
 
