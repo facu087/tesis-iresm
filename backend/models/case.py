@@ -14,6 +14,7 @@ class PICOSynthesis(BaseModel):
     # P — Población
     patient_profile: str          # Descripción demográfica y clínica del paciente
     chief_complaint: str          # Motivo de consulta principal
+    condition_en: str = ""        # Condición en inglés médico, para APIs externas (todas son en inglés)
     relevant_history: list[str]   # Antecedentes relevantes (familiares, personales)
     negative_findings: list[str]  # Estudios negativos relevantes (importante para diagnóstico diferencial)
     disease_duration: str         # Tiempo de evolución

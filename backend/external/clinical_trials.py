@@ -170,8 +170,20 @@ def search_by_biomarkers(
         max_results: Número máximo de resultados.
     """
     keywords = " ".join(biomarkers[:5])  # Limitar para no saturar la query
-    return search(
-        condition=condition or " ".join(biomarkers[:2]),
+    base_condition = condition or " ".join(biomarkers[:2])
+
+    trials = search(
+        condition=base_condition,
         keywords=keywords,
         max_results=max_results,
     )
+
+    # La API combina los términos de query.term con AND: si los biomarcadores no
+    # coinciden todos en un mismo ensayo la búsqueda queda vacía. Pasa siempre que
+    # los biomarcadores del caso son hallazgos NEGATIVOS (ej: anti-Hu/Yo/Ri
+    # descartados), que es información diagnóstica pero no sirve para filtrar
+    # ensayos. En ese caso se reintenta con la condición sola.
+    if not trials and keywords and base_condition:
+        trials = search(condition=base_condition, max_results=max_results)
+
+    return trials

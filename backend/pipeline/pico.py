@@ -31,12 +31,19 @@ REGLAS:
 2. Los "negative_findings" son críticos: estudios negativos acotan el diagnóstico diferencial.
 3. El "clinical_narrative" debe ser un párrafo cohesivo en tercera persona que integre
    toda la información del caso de forma estructurada. Es lo que leerán los agentes de análisis.
-4. Respondé ÚNICAMENTE con JSON válido, sin texto adicional.
+4. El "condition_en" es la condición principal en inglés médico estándar, con la terminología
+   que usan los registros internacionales (ClinicalTrials.gov, PubMed). Es el único campo en inglés.
+   Usá el término GENERAL de 2-3 palabras (el paraguas de la patología), no el diagnóstico
+   detallado: los registros indexan por condición amplia y un término muy específico no matchea.
+   Omití calificadores como "idiopathic", "progressive", "severe", "chronic".
+   Ej: "neuropatía axonal sensitivomotora progresiva idiopática" → "axonal neuropathy".
+5. Respondé ÚNICAMENTE con JSON válido, sin texto adicional.
 
 FORMATO DE RESPUESTA (JSON exacto):
 {
   "patient_profile": "descripción demográfica y clínica principal",
   "chief_complaint": "motivo de consulta o síntoma principal",
+  "condition_en": "condición principal en inglés médico estándar",
   "relevant_history": ["antecedente 1", "antecedente 2"],
   "negative_findings": ["estudio negativo 1", "estudio negativo 2"],
   "disease_duration": "tiempo de evolución",

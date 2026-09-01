@@ -3,6 +3,7 @@ Router FastAPI — endpoints del pipeline NEXUS.
 """
 
 import asyncio
+import sys
 import time
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
@@ -88,10 +89,16 @@ async def analyze(
     if biomarkers and not biomarkers.is_empty():
         biomarker_names = (biomarkers.genes + biomarkers.antibodies + biomarkers.drugs)[:5]
 
-    condition = case_with_pico.pico.chief_complaint if case_with_pico.pico else ""
+    # ClinicalTrials.gov solo indexa en inglés: se usa condition_en, no el
+    # chief_complaint en español (si no, la búsqueda devuelve 0 resultados).
+    condition = ""
+    if case_with_pico.pico:
+        condition = case_with_pico.pico.condition_en or case_with_pico.pico.chief_complaint
+
     try:
         trials = await asyncio.to_thread(search_by_biomarkers, biomarker_names, condition)
-    except Exception:
+    except Exception as exc:
+        print(f"[NEXUS] Búsqueda de ensayos clínicos omitida: {exc}", file=sys.stderr)
         trials = []
 
     return build_export(

@@ -229,8 +229,28 @@ class TestSearchByBiomarkers:
         with patch("backend.external.clinical_trials.search") as mock_search:
             mock_search.return_value = []
             search_by_biomarkers(["TTR", "ATTR", "anti-Hu"])
-        _, kwargs = mock_search.call_args
-        assert "TTR" in kwargs.get("keywords", "") or "TTR" in mock_search.call_args[0][1]
+        # La primera llamada es la que lleva los biomarcadores como keywords;
+        # la segunda (si la hay) es el reintento sin ellos.
+        _, kwargs = mock_search.call_args_list[0]
+        assert "TTR" in kwargs.get("keywords", "")
+
+    def test_reintenta_sin_keywords_si_la_busqueda_queda_vacia(self):
+        """Los biomarcadores negativos del caso vacían la búsqueda (la API usa AND)."""
+        with patch("backend.external.clinical_trials.search") as mock_search:
+            mock_search.return_value = []
+            search_by_biomarkers(["anti-Hu", "anti-Yo"], condition="axonal neuropathy")
+
+        assert mock_search.call_count == 2
+        _, retry_kwargs = mock_search.call_args_list[1]
+        assert retry_kwargs["condition"] == "axonal neuropathy"
+        assert not retry_kwargs.get("keywords")
+
+    def test_no_reintenta_si_ya_hay_resultados(self):
+        with patch("backend.external.clinical_trials.search") as mock_search:
+            mock_search.return_value = [MagicMock()]
+            search_by_biomarkers(["TTR"], condition="amyloidosis")
+
+        assert mock_search.call_count == 1
 
     def test_usa_condicion_si_se_provee(self):
         with patch("backend.external.clinical_trials.search") as mock_search:

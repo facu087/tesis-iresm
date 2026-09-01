@@ -30,6 +30,48 @@ padre con "problemas de equilibrio" no estudiados.
 """.strip()
 
 
+# ── Tests del parser (deterministas, sin llamadas a la API) ───────────────────
+
+def _pico_json(**extra) -> str:
+    """JSON PICO mínimo válido, para probar el parseo."""
+    data = {
+        "patient_profile": "Masculino de 42 años",
+        "chief_complaint": "Neuropatía axonal sensitivomotora progresiva",
+        "relevant_history": [],
+        "negative_findings": [],
+        "disease_duration": "18 meses",
+        "current_treatments": [],
+        "procedures_done": [],
+        "comparison": "No aplica",
+        "primary_outcome": "Identificar la etiología",
+        "secondary_outcomes": [],
+        "biomarkers": [],
+        "genetic_findings": [],
+        "clinical_narrative": "Narrativa del caso.",
+    }
+    data.update(extra)
+    return json.dumps(data, ensure_ascii=False)
+
+
+def test_parse_pico_toma_condition_en():
+    """condition_en se parsea y queda disponible para las APIs externas."""
+    p = pico._parse_pico(_pico_json(condition_en="axonal neuropathy"))
+    assert p.condition_en == "axonal neuropathy"
+
+
+def test_parse_pico_sin_condition_en_usa_default():
+    """Un PICO sin condition_en sigue siendo válido (reportes previos al campo)."""
+    p = pico._parse_pico(_pico_json())
+    assert p.condition_en == ""
+    assert p.chief_complaint  # el resto del parseo no se ve afectado
+
+
+def test_condition_en_no_pisa_al_chief_complaint():
+    """El campo en inglés es adicional: la narrativa clínica sigue en español."""
+    p = pico._parse_pico(_pico_json(condition_en="axonal neuropathy"))
+    assert p.chief_complaint == "Neuropatía axonal sensitivomotora progresiva"
+
+
 def main():
     print("=" * 60)
     print("Test: Síntesis PICO")
