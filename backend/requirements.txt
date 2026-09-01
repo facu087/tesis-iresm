@@ -34,3 +34,4 @@ reportlab>=4.2.0
 python-dotenv>=1.0.1
 tenacity>=8.3.0
 pytest>=8.0.0
+pytest-asyncio>=0.23.0  # Requerido por los tests async de external/ y rag/

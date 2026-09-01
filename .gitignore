@@ -31,6 +31,9 @@ Thumbs.db
 output/
 reports/
 
+# Base vectorial local del RAG (se regenera indexando PubMed)
+chroma_db/
+
 # Frontend
 frontend/.next/
 frontend/node_modules/
