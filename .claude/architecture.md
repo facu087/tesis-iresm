@@ -8,7 +8,7 @@ Documentos clínicos (PDF / imágenes)
             ▼
     ┌───────────────────┐
     │  Módulo de Ingesta │
-    │  ingesta.py        │  PDF nativo → pdfplumber
+    │  extractor.py      │  PDF nativo → pdfplumber
     │                    │  PDF escaneado → Tesseract OCR
     └─────────┬──────────┘
               │ texto normalizado
@@ -19,10 +19,10 @@ Documentos clínicos (PDF / imágenes)
     │                    │  Extrae biomarcadores
     │                    │  Mapea historial terapéutico
     └─────────┬──────────┘
-              │ CasoClinico estructurado
+              │ ClinicalCase estructurado
               │
      ┌────────┴────────┐
-     │   Motor RAG      │  rag.py
+     │   Motor RAG      │  rag/retriever.py
      │   SciBERT +      │  Indexa literatura en ChromaDB
      │   ChromaDB       │  Busca por similitud semántica
      └────────┬─────────┘
@@ -74,50 +74,215 @@ Documentos clínicos (PDF / imágenes)
 
 ## Modelos de datos principales
 
-### CasoClinico
+> Todos los modelos son **Pydantic `BaseModel`** (no `dataclass`) y están nombrados
+> en inglés, siguiendo la convención del código. Viven en `backend/models/`.
+
+### ClinicalCase — `backend/models/case.py`
 ```python
-@dataclass
-class CasoClinico:
-    texto_raw: str                        # texto extraído del PDF
-    sintesis_pico: Optional[str] = None   # construida por el orquestador
-    biomarcadores: list[str]              # extraídos del texto
-    historial_terapeutico: list[str]      # extraído del texto
+class ClinicalCase(BaseModel):
+    raw_text: str                               # texto clínico original (ya anonimizado)
+    pico: PICOSynthesis | None = None           # se completa tras el análisis PICO
+    biomarkers: BiomarkerProfile | None = None  # se completa tras la extracción
 ```
 
-### Hipotesis
+### PICOSynthesis — `backend/models/case.py`
+Población / Intervención / Comparación / Outcome. Es un modelo completo,
+no un string: lo construye `backend/pipeline/pico.py`.
+
 ```python
-@dataclass
-class Hipotesis:
-    descripcion: str
-    nivel_evidencia: str          # "I", "II" o "III" (jerarquía EBM)
-    agente_origen: str            # qué agente la generó
-    referencia_pubmed: str | None # PubMed ID — obligatorio para reporte final
-    titulo_paper: str | None
-    url_paper: str | None
-    estado: str                   # "pendiente" | "verificada" | "descartada" | "especulativa"
+class PICOSynthesis(BaseModel):
+    # P — Población
+    patient_profile: str          # descripción demográfica y clínica
+    chief_complaint: str          # motivo de consulta principal
+    condition_en: str = ""        # condición en inglés médico, para APIs externas
+    relevant_history: list[str]   # antecedentes familiares y personales
+    negative_findings: list[str]  # estudios negativos (clave para el diferencial)
+    disease_duration: str         # tiempo de evolución
+
+    # I — Intervención / Exposición
+    current_treatments: list[str]
+    procedures_done: list[str]    # EMG, LCR, biopsias, etc.
+
+    # C — Comparación
+    comparison: str               # contexto de comparación o "No aplica"
+
+    # O — Outcome
+    primary_outcome: str
+    secondary_outcomes: list[str]
+
+    # Extras extraídos del texto
+    biomarkers: list[str]
+    genetic_findings: list[str]
+
+    clinical_narrative: str       # narrativa final que se pasa a los agentes
 ```
 
-### OutputAgente
+### BiomarkerProfile — `backend/models/biomarkers.py`
+Reemplaza a los campos planos `biomarcadores` / `historial_terapeutico`
+del diseño original. Lo construye `backend/ingestion/biomarker_extractor.py`.
+
 ```python
-@dataclass
-class OutputAgente:
-    agente_id: str        # "agente_01", "agente_02", etc.
-    rol: str
-    hipotesis: list[Hipotesis]
-    razonamiento: str     # cadena de razonamiento explícita
-    ronda: int            # en qué ronda del debate se generó
+class BiomarkerProfile(BaseModel):
+    genes: list[str] = []              # ej: TTR, PMP22
+    genetic_variants: list[str] = []   # ej: p.Val30Met, c.148G>A
+    antibodies: list[str] = []         # ej: anti-Hu, anti-gangliósido GM1
+    lab_biomarkers: list[str] = []     # marcadores séricos/LCR
+    pathways: list[str] = []           # diagnósticos/síndromes mencionados o descartados
+    drugs: list[str] = []              # fármacos (nombre INN) — historial terapéutico
+    procedures: list[str] = []
+    surgeries: list[str] = []
+
+    def is_empty(self) -> bool: ...
+    def summary(self) -> str: ...      # resumen compacto para logs y debugging
 ```
 
-### ReporteFinal
+### Hypothesis — `backend/models/hypothesis.py`
 ```python
-@dataclass
-class ReporteFinal:
-    hipotesis_verificadas: list[Hipotesis]
-    hipotesis_especulativas: list[Hipotesis]
-    ensayos_clinicos: list[EnsayoClinico]
-    divergencias: list[str]     # desacuerdos irresolubles documentados
-    resumen_ejecutivo: str
+class Priority(str, Enum):
+    HIGH = "HIGH"; MEDIUM = "MEDIUM"; LOW = "LOW"
+
+
+class EvidenceLevel(str, Enum):
+    I = "I"      # revisiones sistemáticas / meta-análisis / RCTs
+    II = "II"    # estudios de cohorte / caso-control
+    III = "III"  # series de casos / opinión de expertos / especulativo
+
+
+class Source(BaseModel):
+    pmid: str | None = None
+    title: str
+    journal: str | None = None
+    year: int | None = None
+    url: str | None = None
+
+
+class Hypothesis(BaseModel):
+    text: str
+    priority: Priority
+    evidence_level: EvidenceLevel
+    rationale: str                # razonamiento explícito, por hipótesis
+    sources: list[Source] = []    # varias referencias, no una sola
 ```
+
+### AgentOutput, Critique, DebateRound, Report — `backend/models/report.py`
+```python
+class AgentOutput(BaseModel):
+    agent_id: str                 # "01", "03", … (string, no int)
+    agent_name: str
+    hypotheses: list[Hypothesis]
+    raw_response: str | None = None
+
+
+class Critique(BaseModel):
+    """Crítica de un agente sobre la hipótesis de otro (Ronda 2)."""
+    from_agent_id: str
+    from_agent_name: str
+    target_agent_id: str
+    target_hypothesis: str        # texto de la hipótesis criticada
+    critique_text: str
+    severity: str                 # "HIGH" | "MEDIUM" | "LOW"
+    alternative: str | None = None
+
+
+class DebateRound(BaseModel):
+    round_number: int
+    agent_outputs: list[AgentOutput] = []  # hipótesis revisadas (Rondas 3–4)
+    critiques: list[Critique] = []         # críticas emitidas (Ronda 2)
+
+
+class Report(BaseModel):
+    """Salida interna del motor de debate (Rondas 1–4)."""
+    case_summary: str
+    hypotheses: list[Hypothesis] = []
+    agent_outputs: list[AgentOutput] = []  # outputs de Ronda 1
+    debate_rounds: list[DebateRound] = []  # Rondas 2–4
+    divergences: list[str] = []
+    sources_summary: dict[str, int] = {}
+```
+
+### ClinicalTrial — `backend/models/trial.py`
+```python
+class ClinicalTrial(BaseModel):
+    nct_id: str                   # ej: "NCT04123456"
+    title: str
+    status: str                   # RECRUITING, ACTIVE_NOT_RECRUITING, …
+    brief_summary: str
+    conditions: list[str] = []
+    phase: str | None = None      # PHASE1…PHASE4, NA
+    sponsor: str | None = None
+    start_date: str | None = None
+    completion_date: str | None = None
+    eligibility_criteria: str | None = None
+    min_age: str | None = None
+    max_age: str | None = None
+    sex: str | None = None        # ALL | MALE | FEMALE
+    locations: list[str] = []
+    url: str = ""
+
+    def summary_line(self) -> str: ...
+```
+
+### StructuredReport — `backend/api/schemas.py`
+Contrato de **exportación**: lo consume el frontend y el generador de PDF.
+Lo ensambla `backend/pipeline/report_builder.build_export()`, que es
+el módulo que el Agente 06 (Sintetizador) va a reemplazar sin cambiar
+este contrato JSON.
+
+```python
+class StructuredReport(BaseModel):
+    metadata: ReportMetadata            # incluye el disclaimer obligatorio
+    case_summary: CaseSummarySection
+    hypotheses: list[RankedHypothesis]  # ordenadas por priority, luego evidence_level
+    debate_summary: DebateSummary       # rondas, críticas, divergencias, consenso
+    clinical_trials: list[ClinicalTrial]
+    bibliography: list[Source]          # fuentes únicas, ordenadas por PMID
+```
+
+`RankedHypothesis` agrega `rank` y `supporting_agents` sobre `Hypothesis`.
+La atribución por agente **no** se guarda en `Hypothesis`: se reconstruye en
+`report_builder._rank_hypotheses()` cruzando el texto de la hipótesis contra
+los `AgentOutput` de Ronda 1 y de la última ronda del debate.
+
+---
+
+## Diferencias con el diseño original (y qué falta)
+
+El diseño inicial de esta arquitectura describía cuatro dataclasses en español
+(`CasoClinico`, `Hipotesis`, `OutputAgente`, `ReporteFinal`). La implementación
+divergió en estos puntos:
+
+| Diseño original | Implementación actual | Motivo |
+|-----------------|----------------------|--------|
+| `dataclass`, nombres en español | Pydantic `BaseModel`, nombres en inglés | Validación automática y serialización JSON para la API |
+| `Hipotesis.referencia_pubmed: str` | `Hypothesis.sources: list[Source]` | Una hipótesis puede tener varias referencias |
+| `Hipotesis.agente_origen` | `AgentOutput.agent_name` | La atribución es del output, no de la hipótesis |
+| `OutputAgente.razonamiento` (por agente) | `Hypothesis.rationale` (por hipótesis) | Razonamiento más granular |
+| (no existía) | `Hypothesis.priority` | Permite ordenar el reporte sin depender solo del nivel EBM |
+| `OutputAgente.ronda: int` | `DebateRound.round_number` | La ronda modela el conjunto, no cada output |
+| `CasoClinico.sintesis_pico: str` | `ClinicalCase.pico: PICOSynthesis` | PICO es un modelo estructurado, no texto libre |
+| `CasoClinico.biomarcadores: list[str]` | `ClinicalCase.biomarkers: BiomarkerProfile` | Los biomarcadores se clasifican por tipo |
+| `ReporteFinal.ensayos_clinicos` | `build_export(trials=...)` | Los ensayos entran en la exportación, no en el `Report` interno |
+| `ReporteFinal.resumen_ejecutivo` | `Report.case_summary` | Renombrado |
+
+### Pendiente — depende del Agente 04 (Árbitro Verificador)
+
+Dos elementos del diseño original **todavía no existen en el código**, y son
+justamente los que introduce el árbitro:
+
+1. **`Hypothesis.estado`** (`"pendiente"` | `"verificada"` | `"descartada"` |
+   `"especulativa"`). Hoy no hay campo de estado: toda hipótesis generada llega
+   al reporte. El árbitro necesita este campo para registrar el resultado de la
+   verificación contra PubMed.
+
+2. **La separación `hipotesis_verificadas` / `hipotesis_especulativas`** en el
+   reporte. Hoy `Report.hypotheses` y `StructuredReport.hypotheses` son una
+   lista única, ordenada por prioridad y nivel de evidencia, sin distinguir
+   qué se verificó bibliográficamente.
+
+> Definir estos dos puntos es prerrequisito de las tareas 9 y 11 del Sprint 4
+> (ver `.claude/backlog.md`). Cambiar `Hypothesis` impacta a `report_builder.py`,
+> `pdf_exporter.py`, `api/schemas.py` y a los tipos del frontend
+> (`frontend/src/lib/types.ts`).
 
 ---
 
