@@ -113,15 +113,22 @@ Suite de tests: **82 tests, 100% passing** (`pytest tests/`)
 | 10 | Agente 05 (Navegador de Ensayos): búsqueda en ClinicalTrials + Orphanet | 📋 Pendiente |
 | 11 | Priorización de hipótesis por nivel de evidencia EBM (I, II, III) | 📋 Pendiente |
 | 12 | Integrar contexto RAG (búsqueda semántica PubMed) a la Ronda 1 del orquestador | ⚠️ Parcial |
+| 13 | Agente 06 (Sintetizador): reporte final asistido por LLM | 📋 Pendiente |
 
 > Nota (12): se integró la búsqueda semántica RAG como contexto bibliográfico en
 > `backend/pipeline/orchestrator.py` (Ronda 1), pero el pipeline todavía **no** invoca
 > el verificador de PMIDs de `backend/external/pubmed.py` — falta esa conexión.
 
-> Nota (numeración): `CLAUDE.md` nombra al árbitro verificador como "Agente 06
-> (Sintetizador/Árbitro)", mientras que acá figura como "Agente 04". Ninguno de los dos
-> está implementado todavía (`backend/agents/` solo tiene `agent_01` y `agent_03`) —
-> confirmar con el equipo cuál numeración es la vigente antes de crear la tarjeta en Trello.
+> Nota (numeración) — **RESUELTA**: la numeración vigente es **04 = Árbitro Verificador**
+> y **06 = Sintetizador**, tal como figura en este backlog, en `.claude/architecture.md`,
+> en `.claude/stack.md` y en el propio código (`external/pubmed.py:256`,
+> `rag/retriever.py:189` → Agente 04; `pipeline/report_builder.py:7`,
+> `pipeline/pdf_exporter.py:4` → Agente 06). `CLAUDE.md` era el único documento que los
+> unificaba como "Agente 06 (Sintetizador/Árbitro)" y quedó corregido.
+> Ninguno de los dos está implementado todavía (`backend/agents/` solo tiene
+> `agent_01` y `agent_03`), y van como tarjetas separadas en Trello:
+> tarea 9 = Agente 04 (Árbitro Verificador), tarea 13 = Agente 06 (Sintetizador).
+> La tarea 13 no existía en este backlog: se agregó junto con esta corrección.
 
 Evidencia/verificación de las tareas 1–7: scripts `scripts/demo_*.py` (PubMed, Orphanet,
 PharmGKB, rate_limiter, ChromaDB, indexación, motor RAG).
