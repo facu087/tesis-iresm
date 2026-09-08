@@ -253,7 +253,11 @@ class PubMedClient:
     async def verify_pmid(self, pmid: str) -> bool:
         """
         Verifica si un PMID existe en PubMed.
-        Útil para el Árbitro Verificador (Agente 04).
+
+        OJO: la existencia no alcanza para validar una cita. Los LLM alucinan
+        PMIDs que existen pero corresponden a otro artículo. Para verificar de
+        verdad una referencia usar `fetch_metadata()` y comparar el título
+        (ver backend/pipeline/verification.py, Agente 04).
 
         Args:
             pmid: PMID a verificar
@@ -263,6 +267,19 @@ class PubMedClient:
         """
         result = await self._esummary([pmid])
         return pmid in result
+
+    async def fetch_metadata(self, pmids: list[str]) -> dict[str, dict]:
+        """
+        Trae metadatos de varios PMIDs en una sola consulta (batch).
+
+        Args:
+            pmids: Lista de PMIDs a consultar
+
+        Returns:
+            Dict {pmid: {title, journal, year, authors}}. Los PMIDs que no
+            existen simplemente no aparecen en el dict devuelto.
+        """
+        return await self._esummary(pmids)
 
 
 # ---------------------------------------------------------------------------

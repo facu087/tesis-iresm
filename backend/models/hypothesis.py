@@ -21,6 +21,12 @@ class Source(BaseModel):
     year: int | None = None
     url: str | None = None
 
+    # Resultado de la verificación contra PubMed (Agente 04). Se completa en
+    # backend/pipeline/verification.py; None = todavía no se verificó.
+    verified: bool | None = None
+    verification_status: str | None = None  # ver SourceStatus
+    actual_title: str | None = None  # título real en PubMed, si no coincide
+
 
 class Hypothesis(BaseModel):
     text: str
