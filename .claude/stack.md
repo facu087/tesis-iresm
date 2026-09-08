@@ -13,13 +13,18 @@ Las decisiones tecnológicas se guiaron por tres criterios:
 
 | Agente | Modelo (producción) | Modelo (prototipo) | Justificación |
 |--------|--------------------|--------------------|---------------|
-| 01, 04, 06 | Claude Opus | Claude Opus | Mayor razonamiento clínico, mejor manejo de textos largos |
-| 02 | GPT-4o | Claude Opus | Fortaleza en análisis genómico y biológico molecular |
-| 03 | Gemini Pro | Claude Opus | Capacidad multimodal para imágenes médicas (futuro) |
+| 01, 04, 06 | Claude Opus | Groq `gpt-oss-120b` | Mayor razonamiento clínico, mejor manejo de textos largos |
+| 02 | GPT-4o | Groq `gpt-oss-120b` | Fortaleza en análisis genómico y biológico molecular |
+| 03 | Gemini Pro | Groq `gpt-oss-120b` | Capacidad multimodal para imágenes médicas (futuro) |
 | Literatura | Perplexity Sonar Pro | — | Acceso en tiempo real a literatura reciente |
 
-**Decisión clave:** En el prototipo todos usan Claude Opus para simplificar.
-Cambiar el modelo de un agente = cambiar una sola variable en su clase.
+**Decisión clave:** en el prototipo todos los agentes corren sobre Groq
+(`openai/gpt-oss-120b`) para no depender de APIs pagas durante el desarrollo.
+La columna de producción es la arquitectura de destino.
+
+Cambiar el **modelo** de un agente = cambiar `MODEL` en su clase. Cambiar el
+**proveedor** = agregar despacho por proveedor en `BaseAgent._call_llm()`, que
+hoy instancia el cliente de Groq directamente.
 
 ---
 

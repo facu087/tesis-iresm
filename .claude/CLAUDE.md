@@ -28,7 +28,7 @@ evidencia, respaldadas por referencias bibliográficas verificables de PubMed.
 ### Sprint 1 — Completado ✅
 - Setup del repositorio, estructura de carpetas y .env
 - Módulo de ingesta: extracción de texto de PDF nativo (pdfplumber)
-- Agente 01 (Analista Literatura): prompt + Groq/LLaMA + parseo JSON
+- Agente 01 (Analista Literatura): prompt + Groq + parseo JSON
 - Script de prueba con caso clínico anonimizado (neuropatía axonal, 42 años)
 
 ### Sprint 2 — Completado ✅ (Pipeline básico — Etapa 3)
@@ -131,8 +131,8 @@ tesis-iresm/
 ├── backend/
 │   ├── agents/
 │   │   ├── base_agent.py           ← clase base ABC con interfaz común
-│   │   ├── agent_01_literature.py  ← Analista de Literatura (Groq/LLaMA)
-│   │   ├── agent_03_clinical.py    ← Consultor Clínico (Groq/LLaMA)
+│   │   ├── agent_01_literature.py  ← Analista de Literatura (Groq)
+│   │   ├── agent_03_clinical.py    ← Consultor Clínico (Groq)
 │   │   └── __init__.py
 │   ├── ingestion/
 │   │   ├── extractor.py            ← PDF nativo (pdfplumber) + OCR (Tesseract)
@@ -225,14 +225,30 @@ git push -u origin feature/s2-nombre-tarea
 
 ## Modelo de IA actual
 
-> **Groq (LLaMA 3.3 70B)** — reemplaza temporalmente a Claude/Gemini/GPT-4o
+> **Groq — `openai/gpt-oss-120b`** — reemplaza temporalmente a Claude/Gemini/GPT-4o
 > mientras se gestionan créditos en las APIs de pago.
 > La arquitectura final usará Claude Opus (agentes 01, 04, 06),
 > GPT-4o (agente 02) y Gemini Pro (agente 03).
 
 Constantes disponibles en `base_agent.py`:
-- `GROQ_LLAMA = "llama-3.3-70b-versatile"` — modelo principal
-- `GROQ_LLAMA_FAST = "llama-3.1-8b-instant"` — tareas simples/rápidas
+- `GROQ_MAIN = "openai/gpt-oss-120b"` — modelo principal (agentes 01, 03, 06)
+- `GROQ_FAST = "openai/gpt-oss-20b"` — tareas simples/rápidas
+
+> ⚠ Groq dio de baja los LLaMA 3.x (`llama-3.3-70b-versatile` y
+> `llama-3.1-8b-instant`): la API devuelve 404 `model_not_found`. Se reemplazaron
+> por los `gpt-oss` en el commit `5174330`. Las constantes anteriores
+> —`GROQ_LLAMA` y `GROQ_LLAMA_FAST`— **ya no existen**.
+
+### Swap de proveedor
+
+`MODEL` en la definición de cada agente elige **qué modelo de Groq** usar, no el
+proveedor: `BaseAgent._call_llm()` instancia el cliente de Groq directamente
+(`backend/agents/base_agent.py`). El swap a Claude / GPT-4o / Gemini se hace en
+ese único método, agregando despacho por proveedor.
+
+Vale tenerlo en cuenta al escribir los agentes 02, 04, 05 y 06: si cada uno
+asume la firma de Groq en lugar de delegar en `_call_llm()`, el swap se
+multiplica por la cantidad de agentes.
 
 ---
 
@@ -273,7 +289,7 @@ Constantes disponibles en `base_agent.py`:
 
 ```bash
 # Modelo de IA activo
-GROQ_API_KEY=           # LLaMA 3.3 via Groq — obligatorio hoy
+GROQ_API_KEY=           # Groq (gpt-oss) — obligatorio hoy
 
 # Modelos futuros (cuando se tengan créditos)
 ANTHROPIC_API_KEY=      # Claude — Agentes 01, 04, 06

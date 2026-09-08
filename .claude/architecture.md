@@ -290,15 +290,21 @@ justamente los que introduce el árbitro:
 
 | ID | Rol | Modelo (prod) | Modelo (proto) | Herramientas |
 |----|-----|---------------|----------------|--------------|
-| agente_01 | Analista de Literatura | Claude Opus | Claude Opus | PubMed API, RAG |
-| agente_02 | Especialista Genómica | GPT-4o | Claude Opus | PharmGKB, ClinVar |
-| agente_03 | Consultor Clínico | Gemini Pro | Claude Opus | NCCN Guidelines |
-| agente_04 | Árbitro Verificador | Claude Opus | Claude Opus | PubMed, ESMO, EMA |
-| agente_05 | Navegador de Ensayos | Dedicado | Claude Opus | ClinicalTrials.gov, Orphanet |
-| agente_06 | Sintetizador | Claude Opus | Claude Opus | ReportLab, python-docx |
+| agente_01 | Analista de Literatura | Claude Opus | Groq `gpt-oss-120b` | PubMed API, RAG |
+| agente_02 | Especialista Genómica | GPT-4o | Groq `gpt-oss-120b` | PharmGKB, ClinVar |
+| agente_03 | Consultor Clínico | Gemini Pro | Groq `gpt-oss-120b` | NCCN Guidelines |
+| agente_04 | Árbitro Verificador | Claude Opus | Groq `gpt-oss-120b` | PubMed, ESMO, EMA |
+| agente_05 | Navegador de Ensayos | Dedicado | Groq `gpt-oss-120b` | ClinicalTrials.gov, Orphanet |
+| agente_06 | Sintetizador | Claude Opus | Groq `gpt-oss-120b` | ReportLab, python-docx |
 
-> En el prototipo todos los agentes usan Claude Opus para simplificar la implementación.
-> El modelo de cada agente se cambia con una sola variable en su definición.
+> En el prototipo todos los agentes corren sobre Groq (`openai/gpt-oss-120b`,
+> constante `GROQ_MAIN`) mientras se gestionan créditos en las APIs de pago.
+> La columna de producción es la arquitectura de destino, no lo que corre hoy.
+>
+> `MODEL` en la definición de cada agente elige qué modelo de Groq usar. El
+> **proveedor** está fijo en `BaseAgent._call_llm()`, que instancia el cliente de
+> Groq directamente: el swap a la columna de producción se hace ahí, agregando
+> despacho por proveedor.
 
 ---
 

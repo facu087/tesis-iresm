@@ -27,16 +27,16 @@ URL: https://trello.com/b/kdXM36sU/sistema-soporte-de-investigacion-clinico-mult
 **Sprint 1 — PoC (Etapa 2)**
 - Setup del repositorio, estructura de carpetas y .env
 - Módulo de ingesta: extracción de texto de PDF nativo (pdfplumber)
-- Agente 01 (Analista Literatura): prompt + Groq/LLaMA + parseo JSON
+- Agente 01 (Analista Literatura): prompt + Groq + parseo JSON
 - Script de prueba con caso clínico anonimizado (neuropatía axonal, 42 años)
 
 **Sprint 2 — Pipeline básico (Etapa 3)**
 - Módulo de ingesta: OCR básico para PDFs escaneados (Tesseract)
 - Normalización terminológica: nombres INN y unidades de medida
-- Agente Orquestador: construcción de síntesis PICO (Groq/LLaMA)
+- Agente Orquestador: construcción de síntesis PICO (Groq)
 - Extracción de biomarcadores y mapeo del historial terapéutico
 - Clase base de agentes (BaseAgent ABC — interfaz común)
-- Agente 03 (Consultor Clínico): prompt + Groq/LLaMA + parseo JSON
+- Agente 03 (Consultor Clínico): prompt + Groq + parseo JSON
 - Orquestador: distribución paralela con asyncio (Ronda 1)
 - Motor de debate: Rondas 2–4 (crítica cruzada entre agentes)
 - Cliente ClinicalTrials.gov API v2: búsqueda de ensayos activos
@@ -154,6 +154,6 @@ PharmGKB, rate_limiter, ChromaDB, indexación, motor RAG).
 ## Notas importantes
 
 - El caso de prueba base del proyecto es **neuropatía axonal, paciente de 42 años**
-- En producción cada agente usa un modelo distinto; en el prototipo todos usan Groq/LLaMA 3.3 70B
+- En producción cada agente usa un modelo distinto; en el prototipo todos usan Groq `gpt-oss-120b`
 - El frontend definitivo será Next.js, no React (decisión del equipo)
 - El tablero tiene una columna **QA** (vacía) para tareas en revisión antes de pasar a Finalizado
