@@ -64,11 +64,35 @@ Backend mergeado a `develop` (capa de recuperación de evidencia / RAG). Autor: 
 - [x] Scripts de demo EP05: pubmed, orphanet, pharmgkb, rate_limiter (scripts/demo_*.py)
 - [x] Scripts de demo RAG: chromadb, indexacion_pubmed, motor_rag (scripts/demo_*.py)
 - [x] Scripts de demo EP07: modelos_pydantic, reporte_json, endpoint_fastapi (scripts/demo_*.py)
-- [ ] Agente 06 (Sintetizador / Árbitro): pendiente
+- [ ] Agente 02 (Especialista Genómica): prompt + llamada LLM + parseo JSON
+- [ ] Agente 04 (Árbitro Verificador): verificación bibliográfica de cada hipótesis
+- [ ] Agente 05 (Navegador de Ensayos): ClinicalTrials.gov + Orphanet
+- [ ] Agente 06 (Sintetizador): reporte final — reemplaza a `pipeline/report_builder.py`
+- [ ] Priorización de hipótesis por nivel de evidencia EBM (I, II, III)
 - [ ] **Integrar** RAG + verificador de PMIDs en el flujo del pipeline (router/orchestrator)
 
 > ⚠ Los módulos del Sprint 4 ya están en `develop` pero todavía NO están conectados
 > al pipeline principal. Próximo paso: integrarlos.
+
+#### Numeración de agentes (canónica)
+
+| ID | Rol | Estado |
+|----|-----|--------|
+| 01 | Analista de Literatura | ✅ Implementado |
+| 02 | Especialista Genómica | 📋 Pendiente |
+| 03 | Consultor Clínico | ✅ Implementado |
+| 04 | Árbitro Verificador | 📋 Pendiente |
+| 05 | Navegador de Ensayos | 📋 Pendiente |
+| 06 | Sintetizador | 📋 Pendiente |
+
+> La **fuente de verdad** de la numeración y los roles es la tabla de
+> `.claude/architecture.md`. Este archivo la replica solo para consulta rápida:
+> ante cualquier discrepancia, manda `architecture.md`.
+>
+> El código ya usa esta numeración: `external/pubmed.py` y `rag/retriever.py`
+> referencian al Agente 04 como Árbitro Verificador; `pipeline/report_builder.py`
+> y `pipeline/pdf_exporter.py` referencian al Agente 06 como Sintetizador;
+> `external/pharmgkb.py` referencia al Agente 02 como Especialista Genómica.
 
 ### Verificación / evidencia (scripts de demo)
 Para documentar cada tarea (capturas para Trello) hay scripts en `scripts/demo_*.py`
