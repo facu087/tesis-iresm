@@ -64,6 +64,8 @@ Backend mergeado a `develop` (capa de recuperación de evidencia / RAG). Autor: 
 - [x] Scripts de demo EP05: pubmed, orphanet, pharmgkb, rate_limiter (scripts/demo_*.py)
 - [x] Scripts de demo RAG: chromadb, indexacion_pubmed, motor_rag (scripts/demo_*.py)
 - [x] Scripts de demo EP07: modelos_pydantic, reporte_json, endpoint_fastapi (scripts/demo_*.py)
+- [x] Embeddings biomédicos configurables en el RAG (backend/rag/chroma_store.py)
+- [x] Fix: el RAG consultaba PubMed en español — ahora usa `condition_en`
 - [ ] Agente 02 (Especialista Genómica): prompt + llamada LLM + parseo JSON
 - [ ] Agente 04 (Árbitro Verificador): verificación bibliográfica de cada hipótesis
 - [ ] Agente 05 (Navegador de Ensayos): ClinicalTrials.gov + Orphanet
@@ -94,6 +96,30 @@ Backend mergeado a `develop` (capa de recuperación de evidencia / RAG). Autor: 
 > y `pipeline/pdf_exporter.py` referencian al Agente 06 como Sintetizador;
 > `external/pharmgkb.py` referencia al Agente 02 como Especialista Genómica.
 
+### Setup del RAG (Sprint 4)
+
+El modelo de embeddings por defecto necesita `sentence-transformers`:
+
+```bash
+pip install -r backend/requirements.txt
+```
+
+Arrastra torch. Ojo: pip instala la build CUDA por defecto (~5,6 GB de
+librerías NVIDIA que no se usan, porque el código corre en `device="cpu"`).
+Para la build liviana:
+
+```bash
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+```
+
+Sin `sentence-transformers` el RAG **igual funciona**: cae a `all-MiniLM-L6-v2`
+(el default de ChromaDB, dominio general) y avisa por stderr.
+
+Si se cambia de modelo hay que **re-indexar**: `backend/rag/chroma_store.py`
+levanta `EmbeddingModelMismatch` si la colección en disco fue construida con
+otro modelo, porque los vectores no son comparables. La salida es
+`reset_collection()`. `chroma_db/` es descartable (gitignoreada).
+
 ### Verificación / evidencia (scripts de demo)
 Para documentar cada tarea (capturas para Trello) hay scripts en `scripts/demo_*.py`
 que muestran entrada → salida de cada módulo. Cada uno guarda artefactos en `output/`.
@@ -110,6 +136,8 @@ Scripts disponibles:
 - `demo_modelos_pydantic.py` — modelos Pydantic: Report, Hypothesis, ClinicalCase, ClinicalTrial
 - `demo_reporte_json.py` — generación JSON estructurado via report_builder.build_export()
 - `demo_endpoint_fastapi.py` — contrato y ejemplo de respuesta del endpoint POST /api/analyze
+- `demo_embeddings_comparacion.py` — compara el modelo de embeddings biomédico vs el general
+  sobre el caso de prueba (rankings, overlap y dispersión de scores)
 
 También se corrigió un bug del Sprint 2: falsos positivos en el extractor de
 biomarcadores (regex de anticuerpos y de marcadores de lab). Ver commit `e72e004`.
@@ -299,6 +327,13 @@ GOOGLE_API_KEY=         # Gemini Pro — Agente 03
 # APIs científicas
 PUBMED_API_KEY=         # Opcional, aumenta rate limit
 ORPHANET_API_KEY=       # Requiere registro en orphanet.org
+
+# RAG — embeddings (opcional)
+NEXUS_EMBEDDING_MODEL=  # Sobreescribe el modelo de embeddings del RAG.
+                        # Default: NeuML/pubmedbert-base-embeddings (768 dims).
+                        # Requiere sentence-transformers (arrastra torch).
+                        # Sin esa dependencia el RAG cae a all-MiniLM-L6-v2
+                        # y avisa por stderr — funciona, con dominio general.
 
 # Servidor
 ENVIRONMENT=development

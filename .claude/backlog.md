@@ -114,6 +114,8 @@ Suite de tests: **82 tests, 100% passing** (`pytest tests/`)
 | 11 | Priorización de hipótesis por nivel de evidencia EBM (I, II, III) | 📋 Pendiente |
 | 12 | Integrar contexto RAG (búsqueda semántica PubMed) a la Ronda 1 del orquestador | ⚠️ Parcial |
 | 13 | Agente 06 (Sintetizador): reporte final asistido por LLM | 📋 Pendiente |
+| 14 | Embeddings biomédicos configurables en el RAG (elegidos midiendo) | ✅ Hecho |
+| 15 | Fix: el RAG consultaba PubMed en español — ahora usa `condition_en` | ✅ Hecho |
 
 > Nota (12): se integró la búsqueda semántica RAG como contexto bibliográfico en
 > `backend/pipeline/orchestrator.py` (Ronda 1), pero el pipeline todavía **no** invoca
@@ -151,9 +153,31 @@ PharmGKB, rate_limiter, ChromaDB, indexación, motor RAG).
 
 ---
 
+## Hallazgos abiertos (pendientes de decisión)
+
+Cosas detectadas y verificadas, que **no** se arreglaron todavía porque exceden
+el alcance de la tarea en la que aparecieron. Con archivo y línea, para retomar:
+
+| # | Hallazgo | Dónde |
+|---|----------|-------|
+| A | El filtro de relevancia del RAG **no filtra nada**. El score es `1 - distancia/2`, así que `_MIN_RELEVANCE_SCORE = 0.3` equivale a un coseno de −0.4. Medido: 0 de 15 resultados quedaron bajo el umbral. Para PubMedBERT un valor razonable estaría cerca de 0.65, pero hay que medirlo con `scripts/demo_embeddings_comparacion.py`. | `backend/rag/retriever.py:33` |
+| B | Los tests de integración RAG **no son herméticos**: hacen llamadas reales a PubMed y escriben en el `chroma_db/` persistente. 6 tests, ~44 s — es el grueso del tiempo de la suite. Los de `TestIdiomaDeLaQueryRag` sí están mockeados y sirven de patrón. | `tests/test_rag_integration.py::TestEnrichContextWithRag` |
+| C | Ningún modelo de embeddings maneja la **negación**: con "negative CMT panel" en la query, los tres modelos evaluados traen Charcot-Marie-Tooth arriba. El hallazgo negativo llega al agente por `negative_findings`, así que el razonamiento puede corregirlo, pero el recuperador no filtra por él. Limitación conocida, vale documentarla en la tesis. | `backend/rag/chroma_store.py` (docstring) |
+| D | `master` está **62 commits detrás** de `develop`: Sprints 2, 3 y 4 sin liberar. Decisión del equipo: se promueve cuando haya una versión del sistema, no por etapa. | — |
+| E | **OpenSpec**: evaluado, sin decidir. Si se adopta, solo para los 4 agentes que faltan (02, 04, 05, 06) y las reglas de clasificación EBM — sin backfillear los Sprints 1–3. | — |
+
+---
+
 ## Notas importantes
 
 - El caso de prueba base del proyecto es **neuropatía axonal, paciente de 42 años**
 - En producción cada agente usa un modelo distinto; en el prototipo todos usan Groq `gpt-oss-120b`
 - El frontend definitivo será Next.js, no React (decisión del equipo)
-- El tablero tiene una columna **QA** (vacía) para tareas en revisión antes de pasar a Finalizado
+- El tablero tiene una columna **QA** para tareas en revisión antes de pasar a FINALIZADO.
+  Al 2026-09-08 tiene **24 tarjetas** esperando revisión del profesor, y FINALIZADO tiene 1.
+- **Juan Lencina es el profesor evaluador**, no del equipo. Su criterio: cada tarjeta necesita
+  adjunto que compruebe que la tarea funciona (capturas de entrada → salida). Sin eso la
+  manda a RECHAZADO. Para eso existen los `scripts/demo_*.py`.
+- Las 3 tarjetas en **RECHAZADO** (los módulos de ingesta, EP-01) ya tienen la evidencia
+  adjunta desde el 2026-06-15, cinco días después del rechazo, pero nadie las movió de
+  vuelta a QA — así que el profesor nunca las re-revisó.

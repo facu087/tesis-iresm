@@ -23,7 +23,7 @@ Documentos clínicos (PDF / imágenes)
               │
      ┌────────┴────────┐
      │   Motor RAG      │  rag/retriever.py
-     │   SciBERT +      │  Indexa literatura en ChromaDB
+     │   PubMedBERT +   │  Indexa literatura en ChromaDB
      │   ChromaDB       │  Busca por similitud semántica
      └────────┬─────────┘
               │ literatura relevante
