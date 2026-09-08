@@ -47,9 +47,52 @@ hoy instancia el cliente de Groq directamente.
 
 | Componente | Tecnología | Decisión |
 |-----------|-----------|---------|
-| Embeddings | sentence-transformers | Gratuito, sin API key requerida |
-| Modelo base | SciBERT (allenai/scibert_scivocab_uncased) | Pre-entrenado en literatura biomédica |
+| Embeddings | sentence-transformers | Gratuito, sin API key requerida; corre local sin GPU |
+| Modelo base | `NeuML/pubmedbert-base-embeddings` (768 dims) | PubMedBERT afinado para embeddings de oraciones. Elegido midiendo, no por reputación |
+| Modelo de fallback | `all-MiniLM-L6-v2` (384 dims) | Default de ChromaDB. No necesita torch: el RAG sigue andando sin la dependencia |
 | Base vectorial (proto) | ChromaDB | Local, simple, ideal para prototipo |
+
+**Por qué no SciBERT.** `allenai/scibert_scivocab_uncased` fue la elección
+original —y es el modelo con el dominio correcto—, pero es un modelo de lenguaje
+enmascarado, **no** un modelo de embeddings de oraciones. Obtener vectores por
+mean-pooling sin fine-tuning contrastivo rinde peor en similitud semántica que
+un modelo entrenado para la tarea; es el resultado que motivó Sentence-BERT
+(Reimers & Gurevych, 2019). `S-PubMedBert-MS-MARCO` conserva el dominio
+biomédico (PubMedBERT) y agrega el entrenamiento de recuperación que falta,
+que es la combinación que necesita el RAG.
+
+**Por qué no `S-PubMedBert-MS-MARCO`.** Fue el primer candidato —PubMedBERT
+afinado sobre MS MARCO, pensado para recuperación— y se descartó al medirlo: sus
+scores quedan comprimidos entre 0.951 y 0.980, una amplitud de 0.029 sobre el
+corpus de prueba. Ordena de forma razonable, pero el `relevance_score` que el
+retriever expone a los agentes deja de distinguir un artículo central de uno
+tangencial, y el umbral de relevancia se vuelve imposible de calibrar. Es el
+comportamiento esperable de los modelos entrenados sobre MS MARCO: optimizan el
+orden, no la calibración del score.
+
+**Resultado de la comparación** (`scripts/demo_embeddings_comparacion.py`, 8
+artículos, 3 queries clínicas, un artículo fuera de dominio como control):
+
+| | `pubmedbert-base-embeddings` | `all-MiniLM-L6-v2` | `S-PubMedBert-MS-MARCO` |
+|---|---|---|---|
+| Amplitud de scores | 0.218 | 0.235 | **0.029** ❌ |
+| Control fuera de dominio en top-5 | no | no | no |
+| 2º puesto para la query de herencia | Charcot-Marie-Tooth ✅ | déficit de B12 ❌ | Charcot-Marie-Tooth ✅ |
+
+El desempate fue el segundo criterio: para la query de amiloidosis TTR "con
+antecedentes familiares", PubMedBERT ubica segundo a Charcot-Marie-Tooth —la
+neuropatía hereditaria por antonomasia— mientras MiniLM ubica déficit de B12,
+que no es hereditario. PubMedBERT también trae amiloidosis TTR al top-5 de la
+query del caso, donde MiniLM no la trae.
+
+**Limitación medida.** Ningún modelo de embeddings maneja la negación: con la
+query del caso, que incluye "negative CMT panel", los tres traen
+Charcot-Marie-Tooth entre los primeros puestos. El hallazgo negativo llega al
+agente por `negative_findings` de la síntesis PICO, así que el razonamiento
+puede corregirlo, pero el recuperador no lo usa para filtrar.
+
+El modelo se cambia con la variable de entorno `NEXUS_EMBEDDING_MODEL` o por
+argumento del script de comparación, sin tocar código.
 | Base vectorial (prod) | Pinecone / Weaviate | Para entorno de producción escalable |
 | Similitud | Coseno (HNSW) | Estándar para búsqueda semántica en texto |
 

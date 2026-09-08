@@ -69,19 +69,25 @@ async def _enrich_context_with_rag(case: ClinicalCase, base_context: str) -> str
         genes = case.biomarkers.genes[:3]
         drugs = case.biomarkers.drugs[:2]
 
+    # PubMed indexa en inglés, igual que ClinicalTrials.gov: se usa condition_en
+    # y no chief_complaint, que viene en español del documento clínico. Medido
+    # sobre el caso de prueba (scripts/demo_embeddings_comparacion.py), consultar
+    # en español baja el score del mejor resultado de 0.866 a 0.781 y degrada el
+    # orden del diferencial. Mismo criterio que backend/api/router.py.
+    condition_en = ""
     if case.pico:
-        conditions = [case.pico.chief_complaint] if case.pico.chief_complaint else []
+        condition_en = case.pico.condition_en or case.pico.chief_complaint
+        conditions = [condition_en] if condition_en else []
 
     try:
         await index_from_clinical_context(genes=genes, conditions=conditions, drugs=drugs)
     except Exception as exc:
         print(f"[NEXUS][RAG] Indexación omitida: {exc}", file=sys.stderr)
 
-    rag_query = " ".join(filter(None, [
-        case.pico.chief_complaint if case.pico else "",
-        case.pico.primary_outcome if case.pico else "",
-        " ".join(genes),
-    ]))
+    # La query semántica se arma con el término en inglés más los genes, que ya
+    # son símbolos HGNC (idioma-neutros). primary_outcome queda afuera: está en
+    # español y arrastraría la query de vuelta al problema de arriba.
+    rag_query = " ".join(filter(None, [condition_en, " ".join(genes)]))
 
     try:
         retriever = PubMedRetriever()

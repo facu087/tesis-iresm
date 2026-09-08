@@ -36,7 +36,7 @@ Documentos clínicos (PDF / imágenes)
     └───────┬───────┘
             │
      ┌──────┴──────┐
-     │  RAG Engine │  Embeddings biomédicos (SciBERT) + ChromaDB
+     │  RAG Engine │  Embeddings biomédicos (PubMedBERT) + ChromaDB
      └──────┬──────┘
             │ Literatura relevante
             ▼
@@ -93,7 +93,7 @@ Documentos clínicos (PDF / imágenes)
 | Lenguaje | Python 3.11+ |
 | API Framework | FastAPI |
 | LLM principal | Claude Opus (Anthropic API) |
-| Embeddings | SciBERT (sentence-transformers) |
+| Embeddings | PubMedBERT/MS MARCO (sentence-transformers) |
 | Base vectorial | ChromaDB |
 | Extracción PDF | pdfplumber |
 | OCR | Tesseract |

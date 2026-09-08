@@ -18,6 +18,13 @@ python-docx>=1.1.0
 # Base de datos vectorial (Sprint 4)
 chromadb>=0.5.0
 
+# Embeddings biomédicos (Sprint 4)
+# Necesario para el modelo por defecto del RAG (PubMedBERT/MS MARCO, 768 dims).
+# Arrastra torch: ~2 GB en disco. Sin este paquete el RAG sigue funcionando,
+# pero cae al MiniLM ONNX de ChromaDB (dominio general, 384 dims) y avisa por
+# stderr. Ver backend/rag/chroma_store.py.
+sentence-transformers>=3.0.0
+
 # HTTP y APIs externas
 httpx>=0.27.0
 aiohttp>=3.9.0

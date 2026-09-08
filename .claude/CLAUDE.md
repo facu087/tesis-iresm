@@ -110,6 +110,8 @@ Scripts disponibles:
 - `demo_modelos_pydantic.py` — modelos Pydantic: Report, Hypothesis, ClinicalCase, ClinicalTrial
 - `demo_reporte_json.py` — generación JSON estructurado via report_builder.build_export()
 - `demo_endpoint_fastapi.py` — contrato y ejemplo de respuesta del endpoint POST /api/analyze
+- `demo_embeddings_comparacion.py` — compara el modelo de embeddings biomédico vs el general
+  sobre el caso de prueba (rankings, overlap y dispersión de scores)
 
 También se corrigió un bug del Sprint 2: falsos positivos en el extractor de
 biomarcadores (regex de anticuerpos y de marcadores de lab). Ver commit `e72e004`.
