@@ -16,11 +16,13 @@ from ..api.schemas import (
     RankedHypothesis,
     ReportMetadata,
     StructuredReport,
+    VerificationSummary,
 )
 from ..models.case import ClinicalCase
 from ..models.hypothesis import EvidenceLevel, Priority, Source
 from ..models.report import AgentOutput, Report
 from ..models.trial import ClinicalTrial
+from .verification import SourceStatus, SourceVerification, source_key
 
 _VERSION = "0.3.0"
 
@@ -29,10 +31,33 @@ _PRIORITY_WEIGHT = {Priority.HIGH: 0, Priority.MEDIUM: 1, Priority.LOW: 2}
 _EVIDENCE_WEIGHT = {EvidenceLevel.I: 0, EvidenceLevel.II: 1, EvidenceLevel.III: 2}
 
 
-def _rank_hypotheses(report: Report) -> list[RankedHypothesis]:
+def _annotate_source(
+    source: Source, verifications: dict[str, SourceVerification]
+) -> Source:
+    """
+    Devuelve una copia de la fuente con el veredicto de la verificación.
+
+    No modifica la original: el Report interno del pipeline queda intacto.
+    """
+    veredicto = verifications.get(source_key(source))
+    if veredicto is None:
+        return source
+    return source.model_copy(
+        update={
+            "verified": veredicto.is_valid,
+            "verification_status": veredicto.status.value,
+            "actual_title": veredicto.actual_title or None,
+        }
+    )
+
+
+def _rank_hypotheses(
+    report: Report, verifications: dict[str, SourceVerification]
+) -> list[RankedHypothesis]:
     """
     Ordena las hipótesis finales por prioridad y nivel de evidencia,
-    y determina qué agentes las respaldaron en sus outputs de Ronda 1.
+    determina qué agentes las respaldaron en sus outputs de Ronda 1 y las
+    etiqueta según tengan o no respaldo bibliográfico verificable.
     """
     # Índice: texto de hipótesis → agentes que la propusieron (Ronda 1)
     agent_support: dict[str, list[str]] = {}
@@ -57,21 +82,31 @@ def _rank_hypotheses(report: Report) -> list[RankedHypothesis]:
         ),
     )
 
-    return [
-        RankedHypothesis(
-            rank=i + 1,
-            text=h.text,
-            priority=h.priority.value,
-            evidence_level=h.evidence_level.value,
-            rationale=h.rationale,
-            supporting_agents=agent_support.get(h.text, []),
-            sources=h.sources,
+    ranked: list[RankedHypothesis] = []
+    for i, h in enumerate(sorted_hypotheses):
+        sources = [_annotate_source(s, verifications) for s in h.sources]
+        verificadas = sum(1 for s in sources if s.verified)
+        ranked.append(
+            RankedHypothesis(
+                rank=i + 1,
+                text=h.text,
+                priority=h.priority.value,
+                evidence_level=h.evidence_level.value,
+                rationale=h.rationale,
+                supporting_agents=agent_support.get(h.text, []),
+                sources=sources,
+                # Sin ninguna referencia que resista la verificación, la hipótesis
+                # queda como especulativa — pero se conserva y se muestra.
+                status="respaldada" if verificadas else "especulativa",
+                verified_sources=verificadas,
+            )
         )
-        for i, h in enumerate(sorted_hypotheses)
-    ]
+    return ranked
 
 
-def _build_bibliography(report: Report) -> list[Source]:
+def _build_bibliography(
+    report: Report, verifications: dict[str, SourceVerification]
+) -> list[Source]:
     """Consolida todas las fuentes únicas del reporte, ordenadas por PMID."""
     seen: set[str] = set()
     bibliography: list[Source] = []
@@ -80,8 +115,30 @@ def _build_bibliography(report: Report) -> list[Source]:
             key = source.pmid or source.title
             if key and key not in seen:
                 seen.add(key)
-                bibliography.append(source)
+                bibliography.append(_annotate_source(source, verifications))
     return sorted(bibliography, key=lambda s: s.pmid or "")
+
+
+def _build_verification_summary(
+    verifications: dict[str, SourceVerification],
+    hypotheses: list[RankedHypothesis],
+) -> VerificationSummary:
+    """Cuenta el resultado de la verificación bibliográfica para el reporte."""
+    conteo = {status: 0 for status in SourceStatus}
+    for veredicto in verifications.values():
+        conteo[veredicto.status] += 1
+
+    respaldadas = sum(1 for h in hypotheses if h.status == "respaldada")
+    return VerificationSummary(
+        total_fuentes=len(verifications),
+        verificadas=conteo[SourceStatus.VERIFICADA],
+        discordantes=conteo[SourceStatus.DISCORDANTE],
+        inexistentes=conteo[SourceStatus.INEXISTENTE],
+        sin_pmid=conteo[SourceStatus.SIN_PMID],
+        no_verificables=conteo[SourceStatus.NO_VERIFICABLE],
+        hipotesis_respaldadas=respaldadas,
+        hipotesis_especulativas=len(hypotheses) - respaldadas,
+    )
 
 
 def _build_debate_summary(report: Report) -> DebateSummary:
@@ -118,6 +175,7 @@ def build_export(
     report: Report,
     trials: list[ClinicalTrial],
     processing_time: float,
+    verifications: dict[str, SourceVerification] | None = None,
 ) -> StructuredReport:
     """
     Ensambla el StructuredReport de exportación a partir de los outputs del pipeline.
@@ -127,10 +185,16 @@ def build_export(
         report:           Report final del motor de debate (Rondas 1–4).
         trials:           Ensayos clínicos encontrados en ClinicalTrials.gov.
         processing_time:  Tiempo total de procesamiento en segundos.
+        verifications:    Veredictos de verify_report_sources(). Si se omite,
+                          ninguna fuente queda verificada y todas las hipótesis
+                          se etiquetan como especulativas.
 
     Returns:
         StructuredReport listo para serializar a JSON o exportar a PDF.
     """
+    verifications = verifications or {}
+    hypotheses = _rank_hypotheses(report, verifications)
+
     return StructuredReport(
         metadata=ReportMetadata(
             generated_at=datetime.now(timezone.utc),
@@ -138,8 +202,9 @@ def build_export(
             processing_time_seconds=round(processing_time, 2),
         ),
         case_summary=_build_case_summary(case, report),
-        hypotheses=_rank_hypotheses(report),
+        hypotheses=hypotheses,
         debate_summary=_build_debate_summary(report),
         clinical_trials=trials,
-        bibliography=_build_bibliography(report),
+        bibliography=_build_bibliography(report, verifications),
+        verification=_build_verification_summary(verifications, hypotheses),
     )

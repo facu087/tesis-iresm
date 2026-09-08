@@ -17,6 +17,7 @@ from ..models.case import ClinicalCase
 from ..pipeline import debate, orchestrator, pico
 from ..pipeline.pdf_exporter import generate_pdf
 from ..pipeline.report_builder import build_export
+from ..pipeline.verification import verify_report_sources
 from .schemas import StructuredReport
 
 router = APIRouter(prefix="/api", tags=["análisis"])
@@ -101,11 +102,17 @@ async def analyze(
         print(f"[NEXUS] Búsqueda de ensayos clínicos omitida: {exc}", file=sys.stderr)
         trials = []
 
+    # ── 7. Verificación bibliográfica (Agente 04) ─────────────────────────────
+    # Contrasta cada PMID citado contra PubMed. Las hipótesis sin referencia
+    # verificable quedan como "especulativa", no se descartan.
+    verifications = await verify_report_sources(final_report)
+
     return build_export(
         case=case_with_pico,
         report=final_report,
         trials=trials,
         processing_time=time.perf_counter() - start,
+        verifications=verifications,
     )
 
 
