@@ -138,6 +138,8 @@ Scripts disponibles:
 - `demo_endpoint_fastapi.py` — contrato y ejemplo de respuesta del endpoint POST /api/analyze
 - `demo_embeddings_comparacion.py` — compara el modelo de embeddings biomédico vs el general
   sobre el caso de prueba (rankings, overlap y dispersión de scores)
+- `demo_verificacion.py` — verificación bibliográfica: contrasta contra PubMed los PMIDs
+  citados por los agentes y muestra el título real al lado del citado (Agente 04)
 
 También se corrigió un bug del Sprint 2: falsos positivos en el extractor de
 biomarcadores (regex de anticuerpos y de marcadores de lab). Ver commit `e72e004`.

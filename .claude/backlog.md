@@ -109,17 +109,40 @@ Suite de tests: **82 tests, 100% passing** (`pytest tests/`)
 | 6 | Cliente PharmGKB: relaciones fármaco-genómicas | ✅ Hecho |
 | 7 | Gestión de rate limits y fallbacks en APIs externas | ✅ Hecho |
 | 8 | Agente 02 (Especialista Genómica): prompt + llamada GPT-4o + parseo JSON | 📋 Pendiente |
-| 9 | Agente 04 (Árbitro Verificador): síntesis y verificación bibliográfica externa | 📋 Pendiente |
+| 9 | Agente 04 (Árbitro Verificador): síntesis y verificación bibliográfica externa | ⚠️ Parcial |
 | 10 | Agente 05 (Navegador de Ensayos): búsqueda en ClinicalTrials + Orphanet | 📋 Pendiente |
 | 11 | Priorización de hipótesis por nivel de evidencia EBM (I, II, III) | 📋 Pendiente |
 | 12 | Integrar contexto RAG (búsqueda semántica PubMed) a la Ronda 1 del orquestador | ⚠️ Parcial |
 | 13 | Agente 06 (Sintetizador): reporte final asistido por LLM | 📋 Pendiente |
 | 14 | Embeddings biomédicos configurables en el RAG (elegidos midiendo) | ✅ Hecho |
 | 15 | Fix: el RAG consultaba PubMed en español — ahora usa `condition_en` | ✅ Hecho |
+| 16 | Verificación bibliográfica de PMIDs: título real vs. citado (`pipeline/verification.py`) | ✅ Hecho |
+| 17 | Fix: comentarios en línea del `.env.example` se cargaban como valor de la clave | ✅ Hecho |
+| 18 | Vista de reporte: mostrar el estado de verificación de hipótesis y fuentes (EP-08) | 📋 Pendiente |
+| 19 | PDF: incluir el estado de verificación en el reporte exportado (EP-07) | 📋 Pendiente |
 
-> Nota (12): se integró la búsqueda semántica RAG como contexto bibliográfico en
-> `backend/pipeline/orchestrator.py` (Ronda 1), pero el pipeline todavía **no** invoca
-> el verificador de PMIDs de `backend/external/pubmed.py` — falta esa conexión.
+> Nota (12) — **RESUELTA**: se integró la búsqueda semántica RAG como contexto
+> bibliográfico en `backend/pipeline/orchestrator.py` (Ronda 1), y desde la tarea 16
+> el pipeline **sí** verifica los PMIDs citados (paso 7 de `api/router.py`).
+
+> Nota (9): la tarjeta queda **parcial**. Está hecha la mitad de verificación
+> (`backend/pipeline/verification.py`): contrasta cada PMID contra PubMed y compara
+> el título real con el citado. Falta la mitad de **síntesis**: que el árbitro razone
+> sobre el conjunto de hipótesis, no solo valide citas. No mover a QA hasta eso.
+
+> Nota (16) — **por qué hizo falta**: los agentes citaban PMIDs alucinados. No eran
+> números inválidos: existían en PubMed pero apuntaban a otro artículo, así que
+> `verify_pmid()` (chequeo de existencia) los aprobaba a todos. Medido sobre el caso
+> de la tesis en tres corridas: **9 de cada 10 referencias eran discordantes**
+> (ej.: el agente cita "Metformin-associated vitamin B12 deficiency, Diabetes Care"
+> y el PMID 22439958 es "Breeding replacement gilts for organic pig herds").
+> Las hipótesis sin respaldo verificable quedan etiquetadas "especulativa" y **no**
+> se descartan. Evidencia: `scripts/demo_verificacion.py`.
+
+> Nota (18/19): la verificación ya viaja en el JSON (`status`, `verified_sources`,
+> `verification_status`, `actual_title`, sección `verification`), pero **no se
+> muestra** ni en el frontend ni en el PDF. Hoy un lector ve la referencia citada y
+> asume que es buena: la contradicción está en el dato, no en la pantalla.
 
 > Nota (numeración) — **RESUELTA**: la numeración vigente es **04 = Árbitro Verificador**
 > y **06 = Sintetizador**, tal como figura en este backlog, en `.claude/architecture.md`,
@@ -134,6 +157,8 @@ Suite de tests: **82 tests, 100% passing** (`pytest tests/`)
 
 Evidencia/verificación de las tareas 1–7: scripts `scripts/demo_*.py` (PubMed, Orphanet,
 PharmGKB, rate_limiter, ChromaDB, indexación, motor RAG).
+Evidencia de la tarea 16: `scripts/demo_verificacion.py` (consulta PubMed de verdad y
+muestra, por fuente, el título citado contra el real).
 
 ---
 
