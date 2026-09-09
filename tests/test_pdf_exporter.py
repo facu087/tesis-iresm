@@ -9,17 +9,28 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
+import io
+
+import pdfplumber
+
 from backend.api.schemas import (
     CaseSummarySection,
     DebateSummary,
     RankedHypothesis,
     ReportMetadata,
     StructuredReport,
+    VerificationSummary,
 )
 from backend.main import app
 from backend.models.hypothesis import Source
 from backend.models.trial import ClinicalTrial
-from backend.pipeline.pdf_exporter import generate_pdf
+from backend.pipeline.pdf_exporter import _limpiar, generate_pdf
+
+
+def _texto_del_pdf(pdf_bytes: bytes) -> str:
+    """Extrae el texto del PDF para poder afirmar sobre su contenido."""
+    with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+        return "\n".join((p.extract_text() or "") for p in pdf.pages)
 
 
 # ── Fixtures ───────────────────────────────────────────────────────────────────
@@ -169,6 +180,92 @@ class TestGeneratePdf:
         )
         result = generate_pdf(report)
         assert result[:4] == b"%PDF"
+
+
+# ── Tests: saneo de caracteres ────────────────────────────────────────────────
+
+class TestLimpiezaDeCaracteres:
+    """
+    Las fuentes estándar de ReportLab usan WinAnsi y dibujan cualquier letra
+    en lugar de los caracteres que no conocen. Los LLM devuelven el guion no
+    separable a montones: sin traducir, "sensitivo‑motora" salía
+    "sensitivonmotora" en el PDF entregado al médico.
+    """
+
+    def test_traduce_el_guion_no_separable(self):
+        assert _limpiar("sensitivo‑motora") == "sensitivo-motora"
+
+    def test_traduce_rayas_y_comillas_tipograficas(self):
+        assert _limpiar("10–30 ‘x’ “y”") == "10-30 'x' \"y\""
+
+    def test_traduce_espacios_especiales_y_simbolos(self):
+        assert _limpiar("HbA1c ≥8×2") == "HbA1c >=8x2"
+
+    def test_no_toca_los_acentos_del_espanol(self):
+        texto = "Neuropatía axonal sensitivomotora, evolución de 18 meses."
+        assert _limpiar(texto) == texto
+
+    def test_el_pdf_no_arrastra_caracteres_no_dibujables(self):
+        report = _make_report()
+        report.case_summary.narrative = "Neuropatía sensitivo‑motora ≥ 18 meses."
+        assert generate_pdf(report)[:4] == b"%PDF"
+
+
+# ── Tests: verificación bibliográfica en el PDF ───────────────────────────────
+
+class TestVerificacionEnPdf:
+    def _report_verificado(self) -> StructuredReport:
+        discordante = Source(
+            pmid="22439958",
+            title="Metformin-associated vitamin B12 deficiency",
+            journal="Diabetes Care",
+            year=2012,
+            verified=False,
+            verification_status="discordante",
+            actual_title="Breeding replacement gilts for organic pig herds.",
+        )
+        h = RankedHypothesis(
+            rank=1,
+            text="Deficiencia de B12 por metformina.",
+            priority="HIGH",
+            evidence_level="I",
+            rationale="Razonamiento.",
+            supporting_agents=["Consultor Clínico"],
+            sources=[discordante],
+            status="especulativa",
+            verified_sources=0,
+        )
+        report = _make_report(hypotheses=[h])
+        report.bibliography = [discordante]
+        report.verification = VerificationSummary(
+            total_fuentes=1, verificadas=0, discordantes=1,
+            hipotesis_respaldadas=0, hipotesis_especulativas=1,
+        )
+        return report
+
+    def test_genera_pdf_valido_con_verificacion(self):
+        assert generate_pdf(self._report_verificado())[:4] == b"%PDF"
+
+    def test_el_pdf_avisa_de_las_referencias_no_confirmadas(self):
+        texto = _texto_del_pdf(generate_pdf(self._report_verificado()))
+        assert "Advertencia de verificación bibliográfica" in texto
+        assert "Referencias verificadas en PubMed" in texto
+
+    def test_marca_la_fuente_discordante_con_el_titulo_real(self):
+        texto = _texto_del_pdf(generate_pdf(self._report_verificado()))
+        assert "NO CORRESPONDE" in texto
+        assert "En PubMed este PMID es:" in texto
+        assert "Breeding replacement gilts" in texto
+
+    def test_etiqueta_la_hipotesis_como_especulativa(self):
+        assert "ESPECULATIVA" in _texto_del_pdf(generate_pdf(self._report_verificado()))
+
+    def test_sin_verificacion_el_pdf_sigue_saliendo(self):
+        """Compatibilidad: un reporte viejo, sin la sección, no rompe el export."""
+        report = _make_report()
+        report.verification = VerificationSummary()
+        texto = _texto_del_pdf(generate_pdf(report))
+        assert "Advertencia de verificación bibliográfica" not in texto
 
 
 # ── Tests: endpoint /api/report/pdf ───────────────────────────────────────────
