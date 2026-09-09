@@ -10,6 +10,7 @@ import type {
   CaseSummarySection,
   DebateSummary,
   Source,
+  VerificationSummary,
 } from "@/lib/types";
 
 type Tab = "hipotesis" | "caso" | "debate" | "ensayos" | "bibliografia";
@@ -91,7 +92,14 @@ export default function ReportPage() {
           <MetaStat label="Hipótesis" value={String(report.hypotheses.length)} />
           <MetaStat label="Tiempo" value={`${report.metadata.processing_time_seconds.toFixed(1)} s`} />
           <MetaStat label="Ensayos" value={String(report.clinical_trials.length)} />
-          <MetaStat label="Fuentes" value={String(report.bibliography.length)} />
+          <MetaStat
+            label="Fuentes"
+            value={
+              report.verification?.total_fuentes
+                ? `${report.verification.verificadas}/${report.verification.total_fuentes} verificadas`
+                : String(report.bibliography.length)
+            }
+          />
           <MetaStat label="Generado" value={generatedAt} />
           <span className="ml-auto text-xs text-slate-400">
             NEXUS {report.metadata.nexus_version}
@@ -105,6 +113,9 @@ export default function ReportPage() {
           ⚠ {report.metadata.disclaimer}
         </div>
       </div>
+
+      {/* ── Verificación bibliográfica ──────────────────────────────────── */}
+      {report.verification && <VerificationBanner v={report.verification} />}
 
       {/* ── PDF error ───────────────────────────────────────────────────── */}
       {downloadError && (
@@ -190,6 +201,63 @@ const EVIDENCE_BADGE: Record<string, string> = {
   III: "bg-slate-100 text-slate-600 ring-1 ring-slate-200",
 };
 
+/* ── Verificación bibliográfica (Agente 04) ─────────────────────────────── */
+
+const STATUS_BADGE: Record<string, string> = {
+  respaldada:   "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200",
+  especulativa: "bg-amber-100 text-amber-800 ring-1 ring-amber-300",
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  respaldada:   "✓ Respaldada",
+  especulativa: "⚠ Especulativa",
+};
+
+/** Cómo se muestra cada veredicto de fuente. */
+const SOURCE_VERDICT: Record<string, { label: string; color: string; tachado: boolean }> = {
+  verificada:     { label: "verificada",       color: "text-emerald-600", tachado: false },
+  discordante:    { label: "no corresponde",   color: "text-red-600",     tachado: true  },
+  inexistente:    { label: "no existe",        color: "text-red-600",     tachado: true  },
+  sin_pmid:       { label: "sin PMID",         color: "text-slate-400",   tachado: false },
+  no_verificable: { label: "no verificable",   color: "text-slate-400",   tachado: false },
+};
+
+/**
+ * Aviso de cabecera con el resultado de la verificación.
+ *
+ * Sin esto, un lector ve la referencia citada y asume que es buena: la
+ * contradicción queda en el dato y no llega a la pantalla.
+ */
+function VerificationBanner({ v }: { v: VerificationSummary }) {
+  if (!v.total_fuentes) return null;
+
+  const sospechosas = v.discordantes + v.inexistentes;
+  const hayProblema = sospechosas > 0;
+
+  return (
+    <div className={hayProblema ? "bg-red-50 border-b border-red-200" : "bg-emerald-50 border-b border-emerald-200"}>
+      <div className={`mx-auto max-w-5xl px-6 py-2.5 text-xs ${hayProblema ? "text-red-700" : "text-emerald-700"}`}>
+        <span className="font-semibold">Verificación bibliográfica:</span>{" "}
+        {hayProblema ? (
+          <>
+            {sospechosas} de {v.total_fuentes} referencias citadas no se pudieron confirmar
+            contra PubMed{v.discordantes > 0 && <> ({v.discordantes} apuntan a otro artículo)</>}.
+            {" "}{v.hipotesis_especulativas} de{" "}
+            {v.hipotesis_especulativas + v.hipotesis_respaldadas} hipótesis quedan como especulativas.
+          </>
+        ) : (
+          <>
+            {v.verificadas} de {v.total_fuentes} referencias confirmadas contra PubMed.
+          </>
+        )}
+        {v.no_verificables > 0 && (
+          <> {v.no_verificables} no se pudieron consultar (fallo de red): no se invalidan.</>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ── Hipótesis tab ─────────────────────────────────────────────────────── */
 
 function HipotesisTab({ hypotheses }: { hypotheses: RankedHypothesis[] }) {
@@ -213,6 +281,18 @@ function HipotesisTab({ hypotheses }: { hypotheses: RankedHypothesis[] }) {
                 {h.text}
               </p>
               <div className="flex flex-wrap gap-2">
+                {h.status && (
+                  <span
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_BADGE[h.status] ?? ""}`}
+                    title={
+                      h.status === "respaldada"
+                        ? `${h.verified_sources} referencia(s) confirmada(s) contra PubMed`
+                        : "Ninguna de sus referencias se pudo confirmar contra PubMed"
+                    }
+                  >
+                    {STATUS_LABEL[h.status] ?? h.status}
+                  </span>
+                )}
                 <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${PRIORITY_BADGE[h.priority] ?? ""}`}>
                   Prioridad {PRIORITY_LABEL[h.priority] ?? h.priority}
                 </span>
@@ -488,7 +568,30 @@ function BibliografiaTab({ sources }: { sources: Source[] }) {
             {i + 1}
           </span>
           <div className="flex-1 space-y-0.5">
-            <p className="text-sm font-medium text-slate-800">{s.title}</p>
+            <p className="text-sm font-medium text-slate-800">
+              <span
+                className={
+                  s.verification_status && SOURCE_VERDICT[s.verification_status]?.tachado
+                    ? "line-through text-slate-400"
+                    : ""
+                }
+              >
+                {s.title}
+              </span>
+              {s.verification_status && SOURCE_VERDICT[s.verification_status] && (
+                <span
+                  className={`ml-2 text-xs font-semibold ${SOURCE_VERDICT[s.verification_status].color}`}
+                >
+                  ({SOURCE_VERDICT[s.verification_status].label})
+                </span>
+              )}
+            </p>
+            {s.actual_title && (
+              <p className="text-xs text-slate-500">
+                <span className="font-semibold text-red-600">En PubMed este PMID es:</span>{" "}
+                {s.actual_title}
+              </p>
+            )}
             <p className="text-xs text-slate-400">
               {[s.journal, s.year].filter(Boolean).join(" · ")}
               {s.pmid && (
@@ -515,19 +618,39 @@ function BibliografiaTab({ sources }: { sources: Source[] }) {
 /* ── Source row (dentro de hipótesis) ──────────────────────────────────── */
 
 function SourceRow({ source }: { source: Source }) {
+  const veredicto = source.verification_status
+    ? SOURCE_VERDICT[source.verification_status]
+    : undefined;
+
   return (
     <li className="flex items-start gap-2 text-xs text-slate-500">
-      <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" />
+      <span
+        className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${
+          veredicto?.tachado ? "bg-red-400" : source.verified ? "bg-emerald-400" : "bg-slate-300"
+        }`}
+      />
       <span className="flex-1 leading-relaxed">
-        {source.title}
-        {source.journal && (
-          <span className="text-slate-400"> · {source.journal}</span>
+        <span className={veredicto?.tachado ? "line-through text-slate-400" : ""}>
+          {source.title}
+          {source.journal && (
+            <span className="text-slate-400"> · {source.journal}</span>
+          )}
+          {source.year && (
+            <span className="text-slate-400"> · {source.year}</span>
+          )}
+          {source.pmid && (
+            <span className="font-mono text-slate-400"> · PMID: {source.pmid}</span>
+          )}
+        </span>
+        {veredicto && (
+          <span className={`ml-1.5 font-semibold ${veredicto.color}`}>({veredicto.label})</span>
         )}
-        {source.year && (
-          <span className="text-slate-400"> · {source.year}</span>
-        )}
-        {source.pmid && (
-          <span className="font-mono text-slate-400"> · PMID: {source.pmid}</span>
+        {/* El título real es la prueba: el PMID existe, pero es de otra cosa. */}
+        {source.actual_title && (
+          <span className="mt-0.5 block text-slate-500">
+            <span className="font-semibold text-red-600">En PubMed este PMID es:</span>{" "}
+            {source.actual_title}
+          </span>
         )}
       </span>
       {source.url && (

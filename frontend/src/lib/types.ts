@@ -6,12 +6,26 @@
 export type Priority = "HIGH" | "MEDIUM" | "LOW";
 export type EvidenceLevel = "I" | "II" | "III";
 
+/** Veredicto de la verificación bibliográfica (Agente 04). */
+export type VerificationStatus =
+  | "verificada"      // El PMID existe y el título coincide
+  | "discordante"     // Existe pero corresponde a otro artículo
+  | "inexistente"     // No está en PubMed
+  | "sin_pmid"        // La fuente no declaró PMID
+  | "no_verificable"; // Falló la consulta (red, rate limit)
+
+export type HypothesisStatus = "respaldada" | "especulativa";
+
 export interface Source {
   pmid?: string;
   title: string;
   journal?: string;
   year?: number;
   url?: string;
+  verified?: boolean | null;
+  verification_status?: VerificationStatus | null;
+  /** Título real en PubMed, cuando no coincide con el citado. */
+  actual_title?: string | null;
 }
 
 export interface RankedHypothesis {
@@ -22,6 +36,8 @@ export interface RankedHypothesis {
   rationale: string;
   supporting_agents: string[];
   sources: Source[];
+  status: HypothesisStatus;
+  verified_sources: number;
 }
 
 export interface CaseSummarySection {
@@ -66,6 +82,18 @@ export interface ReportMetadata {
   disclaimer: string;
 }
 
+/** Recuento de la verificación bibliográfica sobre todo el reporte. */
+export interface VerificationSummary {
+  total_fuentes: number;
+  verificadas: number;
+  discordantes: number;
+  inexistentes: number;
+  sin_pmid: number;
+  no_verificables: number;
+  hipotesis_respaldadas: number;
+  hipotesis_especulativas: number;
+}
+
 export interface StructuredReport {
   metadata: ReportMetadata;
   case_summary: CaseSummarySection;
@@ -73,6 +101,7 @@ export interface StructuredReport {
   debate_summary: DebateSummary;
   clinical_trials: ClinicalTrial[];
   bibliography: Source[];
+  verification?: VerificationSummary;
 }
 
 /** Error estructurado que devuelve FastAPI */
