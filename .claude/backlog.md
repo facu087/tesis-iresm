@@ -192,8 +192,11 @@ se probaron con una corrida real de `POST /api/analyze` sobre el caso de la tesi
 > descarta. Orden: estado → nivel efectivo → prioridad → fuentes verificadas.
 > Decisiones confirmadas: guías con tope II; nivel antes que prioridad. **Limitación
 > documentada**: revisiones sistemáticas previas a 2019 indexadas solo como "Review"
-> topean en III. Evidencia: `scripts/demo_priorizacion_evidencia.py` (el modo `--pubmed`
-> y la subida de adjuntos a Trello quedan pendientes).
+> topean en III. Evidencia: `scripts/demo_priorizacion_evidencia.py`, incluido el modo
+> `--pubmed` (corrido el 2026-09-15). Cambio OpenSpec archivado en
+> `openspec/changes/archive/2026-09-15-priorizacion-evidencia-ebm/`, spec vigente en
+> `openspec/specs/clasificacion-evidencia-ebm/`. Tarjeta #54 con evidencia adjunta
+> (`priorizacion.txt`, `reporte.json`, `reporte.pdf`, captura de la vista) y en QA.
 
 ## Hallazgos abiertos (pendientes de decisión)
 
@@ -221,8 +224,9 @@ el alcance de la tarea en la que aparecieron. Con archivo y línea, para retomar
 - El tablero tiene una columna **QA** para tareas en revisión antes de pasar a FINALIZADO.
   Al 2026-09-08 tenía **24 tarjetas** esperando revisión del profesor, y FINALIZADO tenía 1.
   El 2026-09-15 se sumaron a QA, con evidencia adjunta, las tarjetas del Sprint 4 cuyo código
-  ya estaba en `develop`: #63 (tarea 12), #64 (16), #65 (17), #66 (14), #67 (15), #69 (18) y
-  #70 (19). La #68 (fix de biomarcadores) tiene evidencia pero no pasó (ver hallazgo F).
+  ya estaba en `develop`: #63 (tarea 12), #64 (16), #65 (17), #66 (14), #67 (15), #69 (18),
+  #70 (19) y #54 (tarea 11, priorización EBM). La #68 (fix de biomarcadores) tiene evidencia
+  pero no pasó (ver hallazgo F).
 - **Juan Lencina es el profesor evaluador**, no del equipo. Su criterio: cada tarjeta necesita
   adjunto que compruebe que la tarea funciona (capturas de entrada → salida). Sin eso la
   manda a RECHAZADO. Para eso existen los `scripts/demo_*.py`.
