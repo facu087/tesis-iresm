@@ -53,7 +53,7 @@ Documentos clínicos (PDF / imágenes)
               │   Árbitro       │  Verifica cada hipótesis
               │   Verificador   │  contra PubMed
               │   Claude Opus   │  Clasifica nivel evidencia
-              └────────┬────────┘  Descarta sin respaldo
+              └────────┬────────┘  Sin respaldo → especulativa (III)
                        │
                        ▼
               ┌─────────────────┐
@@ -232,7 +232,7 @@ este contrato JSON.
 class StructuredReport(BaseModel):
     metadata: ReportMetadata            # incluye el disclaimer obligatorio
     case_summary: CaseSummarySection
-    hypotheses: list[RankedHypothesis]  # ordenadas por priority, luego evidence_level
+    hypotheses: list[RankedHypothesis]  # estado → nivel efectivo → priority (pipeline/evidence.py)
     debate_summary: DebateSummary       # rondas, críticas, divergencias, consenso
     clinical_trials: list[ClinicalTrial]
     bibliography: list[Source]          # fuentes únicas, ordenadas por PMID
@@ -264,25 +264,40 @@ divergió en estos puntos:
 | `ReporteFinal.ensayos_clinicos` | `build_export(trials=...)` | Los ensayos entran en la exportación, no en el `Report` interno |
 | `ReporteFinal.resumen_ejecutivo` | `Report.case_summary` | Renombrado |
 
-### Pendiente — depende del Agente 04 (Árbitro Verificador)
+### Estado de la hipótesis y nivel de evidencia — resuelto (tarea 11, Sprint 4)
 
-Dos elementos del diseño original **todavía no existen en el código**, y son
-justamente los que introduce el árbitro:
+Los dos elementos del diseño original que figuraban como pendientes se resolvieron
+en `backend/pipeline/evidence.py` (cambio OpenSpec `priorizacion-evidencia-ebm`,
+spec en `openspec/changes/priorizacion-evidencia-ebm/specs/clasificacion-evidencia-ebm/`):
 
-1. **`Hypothesis.estado`** (`"pendiente"` | `"verificada"` | `"descartada"` |
-   `"especulativa"`). Hoy no hay campo de estado: toda hipótesis generada llega
-   al reporte. El árbitro necesita este campo para registrar el resultado de la
-   verificación contra PubMed.
+1. **Estado de la hipótesis**: es **derivado**, no un campo persistido en
+   `Hypothesis` (evita estado desactualizado cuando el Árbitro re-verifique).
+   `classify_hypothesis()` lo calcula de los veredictos de `verification.py` y viaja
+   en `RankedHypothesis.status`: `"respaldada"` (≥1 fuente verificada),
+   `"pendiente"` (la verificación no pudo concluir, p. ej. PubMed caído) o
+   `"especulativa"`. **No existe "descartada"**: por regla del proyecto una
+   hipótesis sin referencia verificable queda en nivel III y se muestra.
 
-2. **La separación `hipotesis_verificadas` / `hipotesis_especulativas`** en el
-   reporte. Hoy `Report.hypotheses` y `StructuredReport.hypotheses` son una
-   lista única, ordenada por prioridad y nivel de evidencia, sin distinguir
-   qué se verificó bibliográficamente.
+2. **Separación verificadas / especulativas**: `StructuredReport.hypotheses` sigue
+   siendo una lista única, pero ordenada con el estado como primer criterio, así que
+   cada grupo queda contiguo; la vista de reporte y el PDF la agrupan por `status`.
 
-> Definir estos dos puntos es prerrequisito de las tareas 9 y 11 del Sprint 4
-> (ver `.claude/backlog.md`). Cambiar `Hypothesis` impacta a `report_builder.py`,
-> `pdf_exporter.py`, `api/schemas.py` y a los tipos del frontend
-> (`frontend/src/lib/types.ts`).
+**Nivel efectivo.** `evidence_level` exportado = nivel declarado por el agente,
+topeado por la mejor fuente verificada según los tipos de publicación de PubMed
+(misma consulta `esummary` de la verificación). Nunca sube; sin fuente verificada, III.
+El declarado queda en `declared_evidence_level` y la explicación en `evidence_note`.
+
+| Tope | Tipos de publicación (PubMed) |
+|------|-------------------------------|
+| I | Meta-Analysis, Network Meta-Analysis, Systematic Review, Randomized Controlled Trial |
+| II | Observational Study, Clinical Trial (y fases), Controlled/Pragmatic Clinical Trial, Comparative Study, Multicenter Study, Practice Guideline, Guideline, **o ningún tipo reconocido** (p. ej. solo Journal Article) |
+| III | Case Reports, Review, Scoping Review, Letter, Editorial, Comment, News, Consensus Development Conference; **publicación retractada** (anula cualquier otro tipo) |
+
+**Orden:** estado → nivel efectivo → prioridad → fuentes verificadas → orden original.
+
+> **Limitación documentada:** el tipo `Systematic Review` existe en PubMed desde 2019.
+> Las revisiones sistemáticas anteriores indexadas solo como `Review` topean en III,
+> como una revisión narrativa. No se corrige con heurísticas de título ni abstract.
 
 ---
 
@@ -330,7 +345,8 @@ Ronda 5:  El Árbitro recibe todos los outputs
 
 Verificación final:
           → Árbitro cruza cada hipótesis contra PubMed
-          → Sin soporte = descartada o especulativa
+          → Sin soporte = especulativa (nivel III, no se descarta)
+          → Sin respuesta de PubMed = pendiente (nivel III)
           → Con soporte = verificada (incluida en reporte)
 ```
 

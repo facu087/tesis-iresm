@@ -74,7 +74,7 @@ Backend mergeado a `develop` (capa de recuperación de evidencia / RAG). Autor: 
 - [ ] Agente 04 (Árbitro Verificador): verificación bibliográfica de cada hipótesis
 - [ ] Agente 05 (Navegador de Ensayos): ClinicalTrials.gov + Orphanet
 - [ ] Agente 06 (Sintetizador): reporte final — reemplaza a `pipeline/report_builder.py`
-- [ ] Priorización de hipótesis por nivel de evidencia EBM (I, II, III)
+- [x] Priorización de hipótesis por nivel de evidencia EBM (I, II, III) (backend/pipeline/evidence.py)
 
 > El RAG y el verificador de PMIDs ya corren en el flujo de `POST /api/analyze`:
 > el RAG enriquece el contexto de la Ronda 1 (`pipeline/orchestrator.py`,
@@ -149,6 +149,9 @@ Scripts disponibles:
   sobre el caso de prueba (rankings, overlap y dispersión de scores)
 - `demo_verificacion.py` — verificación bibliográfica: contrasta contra PubMed los PMIDs
   citados por los agentes y muestra el título real al lado del citado (Agente 04)
+- `demo_priorizacion_evidencia.py` — priorización EBM: nivel declarado vs. efectivo, estado
+  y orden del reporte; genera `priorizacion.txt`, `reporte.json` y `reporte.pdf`
+  (`--pubmed` verifica PMIDs reales)
 
 También se corrigió un bug del Sprint 2: falsos positivos en el extractor de
 biomarcadores (regex de anticuerpos y de marcadores de lab). Ver commit `e72e004`.
@@ -196,6 +199,7 @@ tesis-iresm/
 │   │   ├── orchestrator.py     ← distribución paralela asyncio (Ronda 1)
 │   │   ├── debate.py           ← motor de debate adversarial (Rondas 2–4)
 │   │   ├── verification.py     ← verificación de PMIDs citados contra PubMed (S4)
+│   │   ├── evidence.py         ← clasificación EBM: tope de nivel, estado y orden (S4)
 │   │   ├── report_builder.py   ← generación de JSON estructurado del reporte
 │   │   ├── pdf_exporter.py     ← exportación a PDF con ReportLab
 │   │   └── __init__.py

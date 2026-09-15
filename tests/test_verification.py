@@ -129,6 +129,31 @@ class TestVerifyOne:
         assert v.status is SourceStatus.SIN_PMID
         assert not v.is_valid
 
+    def test_verificada_conserva_los_tipos_de_publicacion(self):
+        source = _source("12345678", "Metformin and vitamin B12 deficiency: a meta-analysis")
+        meta = {"12345678": {
+            "title": "Metformin and vitamin B12 deficiency: a meta-analysis",
+            "pubtypes": ["Journal Article", "Meta-Analysis"],
+        }}
+        v = _verify_one(source, meta)
+        assert v.status is SourceStatus.VERIFICADA
+        assert v.publication_types == ["Journal Article", "Meta-Analysis"]
+
+    def test_discordante_no_hereda_los_tipos_del_otro_articulo(self):
+        """Los tipos de un PMID alucinado son de otro paper: no pueden usarse."""
+        source = _source("16512345", "Lead neuropathy: clinical and electrophysiological features")
+        meta = {"16512345": {
+            "title": "The role of GABA in the early neuronal development",
+            "pubtypes": ["Randomized Controlled Trial"],
+        }}
+        v = _verify_one(source, meta)
+        assert v.status is SourceStatus.DISCORDANTE
+        assert v.publication_types == []
+
+    def test_inexistente_y_sin_pmid_quedan_sin_tipos(self):
+        assert _verify_one(_source("99999999", "Estudio inventado"), {}).publication_types == []
+        assert _verify_one(_source(None, "Guía sin PMID"), {}).publication_types == []
+
 
 # ── Verificación del reporte completo ──────────────────────────────────────────
 
@@ -177,6 +202,7 @@ class TestVerifyReportSources:
 
         assert v["11111111"].status is SourceStatus.NO_VERIFICABLE
         assert not v["11111111"].is_valid
+        assert v["11111111"].publication_types == []
 
 
 # ── Integración con el reporte exportado ───────────────────────────────────────
@@ -225,9 +251,44 @@ class TestReporteEtiquetado:
         assert fuente.verification_status == "discordante"
         assert fuente.actual_title == "The role of GABA in early neuronal development"
 
-    def test_sin_verificaciones_todo_queda_especulativo(self):
-        """Compatibilidad: build_export sigue funcionando sin el parámetro nuevo."""
+    def test_sin_verificaciones_queda_pendiente(self):
+        """
+        Compatibilidad: build_export sigue funcionando sin veredictos. Una
+        hipótesis que cita un PMID no verificado queda "pendiente" (no
+        "especulativa": nadie comprobó que la cita falle) y en nivel III.
+        """
         report = _make_report()
         export = build_export(_make_case(), report, [], 1.0)
-        assert all(h.status == "especulativa" for h in export.hypotheses)
+        assert all(h.status == "pendiente" for h in export.hypotheses)
+        assert all(h.evidence_level == "III" for h in export.hypotheses)
         assert export.verification.total_fuentes == 0
+        assert export.verification.hipotesis_pendientes == len(export.hypotheses)
+
+    @pytest.mark.asyncio
+    async def test_caida_de_pubmed_deja_pendiente_y_no_especulativa(self, _fake_pubmed):
+        _fake_pubmed.error = ConnectionError("PubMed caído")
+        hipotesis = _hypothesis_con([_source("11111111", "Estudio A")])
+        report = _make_report(hypotheses=[hipotesis])
+
+        v = await verify_report_sources(report)
+        export = build_export(_make_case(), report, [], 1.0, verifications=v)
+
+        assert export.hypotheses[0].status == "pendiente"
+        assert export.hypotheses[0].evidence_level == "III"
+        assert export.hypotheses[0].declared_evidence_level == "II"
+        assert export.verification.hipotesis_pendientes == 1
+        assert export.verification.hipotesis_especulativas == 0
+
+    @pytest.mark.asyncio
+    async def test_tipos_de_pubmed_topean_el_nivel_de_punta_a_punta(self, _fake_pubmed):
+        """Del esummary (doble) al reporte: un reporte de caso no sostiene nivel II."""
+        _fake_pubmed.metadata = {"11111111": {"title": "Estudio A", "pubtypes": ["Case Reports"]}}
+        hipotesis = _hypothesis_con([_source("11111111", "Estudio A")])
+        report = _make_report(hypotheses=[hipotesis])
+
+        v = await verify_report_sources(report)
+        export = build_export(_make_case(), report, [], 1.0, verifications=v)
+
+        assert export.hypotheses[0].status == "respaldada"
+        assert export.hypotheses[0].evidence_level == "III"
+        assert export.verification.hipotesis_topeadas == 1

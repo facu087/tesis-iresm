@@ -111,7 +111,7 @@ Suite de tests: **82 tests, 100% passing** (`pytest tests/`)
 | 8 | Agente 02 (Especialista Genómica): prompt + llamada GPT-4o + parseo JSON | 📋 Pendiente |
 | 9 | Agente 04 (Árbitro Verificador): síntesis y verificación bibliográfica externa | ⚠️ Parcial |
 | 10 | Agente 05 (Navegador de Ensayos): búsqueda en ClinicalTrials + Orphanet | 📋 Pendiente |
-| 11 | Priorización de hipótesis por nivel de evidencia EBM (I, II, III) | 📋 Pendiente |
+| 11 | Priorización de hipótesis por nivel de evidencia EBM (I, II, III) | ✅ Hecho (`pipeline/evidence.py`) |
 | 12 | Integrar contexto RAG (búsqueda semántica PubMed) a la Ronda 1 del orquestador | ✅ Hecho |
 | 13 | Agente 06 (Sintetizador): reporte final asistido por LLM | 📋 Pendiente |
 | 14 | Embeddings biomédicos configurables en el RAG (elegidos midiendo) | ✅ Hecho |
@@ -183,6 +183,18 @@ se probaron con una corrida real de `POST /api/analyze` sobre el caso de la tesi
 
 ---
 
+> Nota (11) — **priorización EBM** (cambio OpenSpec `priorizacion-evidencia-ebm`):
+> el nivel que autodeclara el LLM se **topea** con los tipos de publicación que PubMed
+> indexa para sus fuentes verificadas (Meta-Analysis/Systematic Review/RCT → I;
+> observacional, ensayo no aleatorizado, guía o solo "Journal Article" → II; Case Reports,
+> Review, carta, editorial o retractada → III). Nunca sube. Sin fuente verificada → III.
+> Estados: respaldada / **pendiente** (PubMed no respondió) / especulativa; ninguna se
+> descarta. Orden: estado → nivel efectivo → prioridad → fuentes verificadas.
+> Decisiones confirmadas: guías con tope II; nivel antes que prioridad. **Limitación
+> documentada**: revisiones sistemáticas previas a 2019 indexadas solo como "Review"
+> topean en III. Evidencia: `scripts/demo_priorizacion_evidencia.py` (el modo `--pubmed`
+> y la subida de adjuntos a Trello quedan pendientes).
+
 ## Hallazgos abiertos (pendientes de decisión)
 
 Cosas detectadas y verificadas, que **no** se arreglaron todavía porque exceden
@@ -196,6 +208,8 @@ el alcance de la tarea en la que aparecieron. Con archivo y línea, para retomar
 | D | `master` está **62 commits detrás** de `develop`: Sprints 2, 3 y 4 sin liberar. Decisión del equipo: se promueve cuando haya una versión del sistema, no por etapa. | — |
 | E | **OpenSpec**: **adoptado** (v1.11.0, rama `chore/s4-openspec`). Alcance: los 4 agentes que faltan (02, 04, 05, 06) y las reglas de clasificación EBM — sin backfillear los Sprints 1–3. Uso en `.claude/CLAUDE.md` § "Spec-driven con OpenSpec". | `openspec/config.yaml` |
 | F | El extractor de biomarcadores devuelve **`genes=['CMT']`** en el caso base: `CMT`, `FAP` y `ATTR` están en `_KNOWN_GENES`, pero son enfermedades o paneles, no genes. Además `tests/test_biomarkers.py` no es un test de pytest (es un script con `main()`, pytest recolecta 0 tests) y exige que `CMT` salga como gen. Por esto la tarjeta #68 no pasó a QA. | `backend/ingestion/biomarker_extractor.py:65-67`, `tests/test_biomarkers.py:63-66` |
+| G | `BaseAgent.parse_hypotheses()` arma `Source(**s)` con lo que manda el LLM, así que acepta `verified`, `verification_status` o `publication_types` autodeclarados. La clasificación EBM y `_annotate_source()` ya los ignoran/limpian, pero conviene sanearlos en el parseo (lo toca el Agente 04). | `backend/agents/base_agent.py:92` |
+| H | Lint del frontend con 1 error y 1 warning **previos** a la priorización EBM: `setState` síncrono en un effect (`report/page.tsx`, `useEffect` de carga del reporte) y un `eslint-disable` sin uso (`analyzing/page.tsx:120`). `next build` no corre lint, así que no bloquea el build. | `frontend/src/app/report/page.tsx`, `frontend/src/app/analyzing/page.tsx:120` |
 
 ---
 

@@ -9,6 +9,7 @@ import type {
   ClinicalTrial,
   CaseSummarySection,
   DebateSummary,
+  HypothesisStatus,
   Source,
   VerificationSummary,
 } from "@/lib/types";
@@ -205,13 +206,43 @@ const EVIDENCE_BADGE: Record<string, string> = {
 
 const STATUS_BADGE: Record<string, string> = {
   respaldada:   "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200",
+  pendiente:    "bg-sky-100 text-sky-700 ring-1 ring-sky-200",
   especulativa: "bg-amber-100 text-amber-800 ring-1 ring-amber-300",
 };
 
 const STATUS_LABEL: Record<string, string> = {
   respaldada:   "✓ Respaldada",
+  pendiente:    "? Pendiente",
   especulativa: "⚠ Especulativa",
 };
+
+const STATUS_TOOLTIP: Record<string, (h: RankedHypothesis) => string> = {
+  respaldada:   (h) => `${h.verified_sources} referencia(s) confirmada(s) contra PubMed`,
+  pendiente:    () => "La verificación contra PubMed no pudo completarse",
+  especulativa: () => "Ninguna de sus referencias se pudo confirmar contra PubMed",
+};
+
+/**
+ * Grupos de la pestaña de hipótesis, en el mismo orden en que las ordena el
+ * backend (backend/pipeline/evidence.py): respaldadas, pendientes, especulativas.
+ */
+const STATUS_GROUPS: { status: HypothesisStatus; title: string; description: string }[] = [
+  {
+    status: "respaldada",
+    title: "Hipótesis respaldadas",
+    description: "Al menos una referencia confirmada contra PubMed.",
+  },
+  {
+    status: "pendiente",
+    title: "Pendientes de verificación",
+    description: "PubMed no respondió: el nivel queda en III hasta poder confirmar las fuentes.",
+  },
+  {
+    status: "especulativa",
+    title: "Hipótesis especulativas",
+    description: "Ninguna referencia resistió la verificación. Se muestran, no se descartan.",
+  },
+];
 
 /** Cómo se muestra cada veredicto de fuente. */
 const SOURCE_VERDICT: Record<string, { label: string; color: string; tachado: boolean }> = {
@@ -233,6 +264,9 @@ function VerificationBanner({ v }: { v: VerificationSummary }) {
 
   const sospechosas = v.discordantes + v.inexistentes;
   const hayProblema = sospechosas > 0;
+  const pendientes = v.hipotesis_pendientes ?? 0;
+  const topeadas = v.hipotesis_topeadas ?? 0;
+  const totalHipotesis = v.hipotesis_respaldadas + pendientes + v.hipotesis_especulativas;
 
   return (
     <div className={hayProblema ? "bg-red-50 border-b border-red-200" : "bg-emerald-50 border-b border-emerald-200"}>
@@ -242,8 +276,7 @@ function VerificationBanner({ v }: { v: VerificationSummary }) {
           <>
             {sospechosas} de {v.total_fuentes} referencias citadas no se pudieron confirmar
             contra PubMed{v.discordantes > 0 && <> ({v.discordantes} apuntan a otro artículo)</>}.
-            {" "}{v.hipotesis_especulativas} de{" "}
-            {v.hipotesis_especulativas + v.hipotesis_respaldadas} hipótesis quedan como especulativas.
+            {" "}{v.hipotesis_especulativas} de {totalHipotesis} hipótesis quedan como especulativas.
           </>
         ) : (
           <>
@@ -253,6 +286,12 @@ function VerificationBanner({ v }: { v: VerificationSummary }) {
         {v.no_verificables > 0 && (
           <> {v.no_verificables} no se pudieron consultar (fallo de red): no se invalidan.</>
         )}
+        {pendientes > 0 && (
+          <> {pendientes} de {totalHipotesis} hipótesis quedan pendientes de verificación.</>
+        )}
+        {topeadas > 0 && (
+          <> A {topeadas} hipótesis se les bajó el nivel de evidencia declarado por el agente.</>
+        )}
       </div>
     </div>
   );
@@ -260,77 +299,117 @@ function VerificationBanner({ v }: { v: VerificationSummary }) {
 
 /* ── Hipótesis tab ─────────────────────────────────────────────────────── */
 
+/** Estado de agrupación: un status desconocido (reporte viejo) va con las especulativas. */
+function groupStatus(h: RankedHypothesis): HypothesisStatus {
+  return STATUS_GROUPS.some((g) => g.status === h.status) ? h.status : "especulativa";
+}
+
 function HipotesisTab({ hypotheses }: { hypotheses: RankedHypothesis[] }) {
   if (!hypotheses.length) {
     return <EmptyState message="No se generaron hipótesis." />;
   }
   return (
-    <div className="space-y-5">
-      {hypotheses.map((h) => (
-        <div
-          key={h.rank}
-          className="rounded-2xl border border-slate-200 bg-white p-6 space-y-4"
-        >
-          {/* Rank + título + badges */}
-          <div className="flex items-start gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-sm font-bold text-white mt-0.5">
-              #{h.rank}
-            </span>
-            <div className="flex-1 space-y-2">
-              <p className="text-base font-semibold text-slate-900 leading-snug">
-                {h.text}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {h.status && (
-                  <span
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_BADGE[h.status] ?? ""}`}
-                    title={
-                      h.status === "respaldada"
-                        ? `${h.verified_sources} referencia(s) confirmada(s) contra PubMed`
-                        : "Ninguna de sus referencias se pudo confirmar contra PubMed"
-                    }
-                  >
-                    {STATUS_LABEL[h.status] ?? h.status}
-                  </span>
-                )}
-                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${PRIORITY_BADGE[h.priority] ?? ""}`}>
-                  Prioridad {PRIORITY_LABEL[h.priority] ?? h.priority}
-                </span>
-                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${EVIDENCE_BADGE[h.evidence_level] ?? ""}`}>
-                  Evidencia nivel {h.evidence_level}
-                </span>
-                {h.supporting_agents.map((ag) => (
-                  <span key={ag} className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-500">
-                    Agente {ag}
-                  </span>
-                ))}
+    <div className="space-y-8">
+      {STATUS_GROUPS.map((group) => {
+        const items = hypotheses.filter((h) => groupStatus(h) === group.status);
+        if (!items.length) return null;
+        return (
+          <section key={group.status} className="space-y-4">
+            <div className="flex items-baseline justify-between gap-3 border-b border-slate-200 pb-2">
+              <div>
+                <h2 className="text-sm font-bold uppercase tracking-wide text-slate-700">
+                  {group.title} <span className="text-slate-400">({items.length})</span>
+                </h2>
+                <p className="text-xs text-slate-500">{group.description}</p>
               </div>
             </div>
-          </div>
-
-          {/* Justificación */}
-          <div className="rounded-xl bg-slate-50 px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">
-              Justificación
-            </p>
-            <p className="text-sm text-slate-700 leading-relaxed">{h.rationale}</p>
-          </div>
-
-          {/* Fuentes de la hipótesis */}
-          {h.sources.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
-                Fuentes
-              </p>
-              <ul className="space-y-1.5">
-                {h.sources.map((s, i) => (
-                  <SourceRow key={s.pmid ?? i} source={s} />
-                ))}
-              </ul>
+            <div className="space-y-5">
+              {items.map((h) => (
+                <HypothesisCard key={h.rank} h={h} />
+              ))}
             </div>
-          )}
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+function HypothesisCard({ h }: { h: RankedHypothesis }) {
+  const topeada =
+    !!h.declared_evidence_level && h.declared_evidence_level !== h.evidence_level;
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-6 space-y-4">
+      {/* Rank + título + badges */}
+      <div className="flex items-start gap-3">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-sm font-bold text-white mt-0.5">
+          #{h.rank}
+        </span>
+        <div className="flex-1 space-y-2">
+          <p className="text-base font-semibold text-slate-900 leading-snug">
+            {h.text}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {h.status && (
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_BADGE[h.status] ?? ""}`}
+                title={STATUS_TOOLTIP[h.status]?.(h)}
+              >
+                {STATUS_LABEL[h.status] ?? h.status}
+              </span>
+            )}
+            <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${PRIORITY_BADGE[h.priority] ?? ""}`}>
+              Prioridad {PRIORITY_LABEL[h.priority] ?? h.priority}
+            </span>
+            <span
+              className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${EVIDENCE_BADGE[h.evidence_level] ?? ""}`}
+              title={h.evidence_note || undefined}
+            >
+              Evidencia nivel {h.evidence_level}
+              {topeada && (
+                <span className="ml-1 font-normal">
+                  (el agente declaró {h.declared_evidence_level})
+                </span>
+              )}
+            </span>
+            {h.supporting_agents.map((ag) => (
+              <span key={ag} className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-500">
+                Agente {ag}
+              </span>
+            ))}
+          </div>
         </div>
-      ))}
+      </div>
+
+      {/* Justificación */}
+      <div className="rounded-xl bg-slate-50 px-4 py-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">
+          Justificación
+        </p>
+        <p className="text-sm text-slate-700 leading-relaxed">{h.rationale}</p>
+      </div>
+
+      {/* Por qué quedó con este nivel de evidencia */}
+      {h.evidence_note && (
+        <p className={`text-xs leading-relaxed ${topeada ? "text-orange-700" : "text-slate-500"}`}>
+          <span className="font-semibold">Nivel de evidencia:</span> {h.evidence_note}
+        </p>
+      )}
+
+      {/* Fuentes de la hipótesis */}
+      {h.sources.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
+            Fuentes
+          </p>
+          <ul className="space-y-1.5">
+            {h.sources.map((s, i) => (
+              <SourceRow key={s.pmid ?? i} source={s} />
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
@@ -644,6 +723,12 @@ function SourceRow({ source }: { source: Source }) {
         </span>
         {veredicto && (
           <span className={`ml-1.5 font-semibold ${veredicto.color}`}>({veredicto.label})</span>
+        )}
+        {/* Tipos de publicación de PubMed: son los que fijan el tope de evidencia. */}
+        {source.verified && !!source.publication_types?.length && (
+          <span className="mt-0.5 block text-slate-400">
+            Tipo en PubMed: {source.publication_types.join(", ")}
+          </span>
         )}
         {/* El título real es la prueba: el PMID existe, pero es de otra cosa. */}
         {source.actual_title && (

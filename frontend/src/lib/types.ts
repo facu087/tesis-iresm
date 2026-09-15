@@ -14,7 +14,11 @@ export type VerificationStatus =
   | "sin_pmid"        // La fuente no declaró PMID
   | "no_verificable"; // Falló la consulta (red, rate limit)
 
-export type HypothesisStatus = "respaldada" | "especulativa";
+/**
+ * Estado bibliográfico de la hipótesis (backend/pipeline/evidence.py).
+ * Ninguna se descarta: "pendiente" = la verificación no pudo concluir.
+ */
+export type HypothesisStatus = "respaldada" | "pendiente" | "especulativa";
 
 export interface Source {
   pmid?: string;
@@ -26,18 +30,25 @@ export interface Source {
   verification_status?: VerificationStatus | null;
   /** Título real en PubMed, cuando no coincide con el citado. */
   actual_title?: string | null;
+  /** Tipos de publicación indexados en PubMed (solo fuentes verificadas). */
+  publication_types?: string[];
 }
 
 export interface RankedHypothesis {
   rank: number;
   text: string;
   priority: Priority;
+  /** Nivel EBM efectivo: el declarado por el agente, topeado por la evidencia verificada. */
   evidence_level: EvidenceLevel;
   rationale: string;
   supporting_agents: string[];
   sources: Source[];
   status: HypothesisStatus;
   verified_sources: number;
+  /** Nivel que declaró el agente (puede ser mejor que el efectivo). */
+  declared_evidence_level?: EvidenceLevel | null;
+  /** Explicación de por qué la hipótesis quedó con su nivel efectivo. */
+  evidence_note?: string;
 }
 
 export interface CaseSummarySection {
@@ -92,6 +103,10 @@ export interface VerificationSummary {
   no_verificables: number;
   hipotesis_respaldadas: number;
   hipotesis_especulativas: number;
+  /** Respaldadas + pendientes + especulativas = total de hipótesis. */
+  hipotesis_pendientes?: number;
+  /** Hipótesis cuyo nivel efectivo quedó por debajo del declarado. */
+  hipotesis_topeadas?: number;
 }
 
 export interface StructuredReport {
