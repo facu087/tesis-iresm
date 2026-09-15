@@ -154,7 +154,13 @@ tesis-iresm/
 │   ├── CLAUDE.md               ← este archivo
 │   ├── architecture.md         ← arquitectura detallada del pipeline
 │   ├── backlog.md              ← estado del backlog / Trello
-│   └── stack.md                ← decisiones tecnológicas
+│   ├── stack.md                ← decisiones tecnológicas
+│   ├── commands/opsx/          ← slash commands de OpenSpec (/opsx:*)
+│   └── skills/openspec-*/      ← skills de OpenSpec (generadas por `openspec init`)
+├── openspec/
+│   ├── config.yaml             ← contexto del proyecto + reglas para los artefactos
+│   ├── specs/                  ← specs vigentes del sistema (por capacidad)
+│   └── changes/                ← cambios en curso; archive/ guarda los cerrados
 ├── .vscode/
 │   ├── extensions.json         ← extensiones recomendadas del equipo
 │   └── settings.json           ← configuración compartida
@@ -250,6 +256,31 @@ git commit -m "feat: descripción"
 git push -u origin feature/s2-nombre-tarea
 # Luego: PR en GitHub base:develop ← compare:feature/...
 ```
+
+---
+
+## Spec-driven con OpenSpec
+
+Los agentes que faltan (02, 04, 05, 06) y las reglas de clasificación EBM se planifican
+con [OpenSpec](https://github.com/Fission-AI/OpenSpec) antes de tocar código. No se
+backfillean los Sprints 1–3. Requiere el CLI: `npm install -g @fission-ai/openspec@latest`.
+
+| Comando | Qué hace |
+|---------|----------|
+| `/opsx:explore` | Pensar un problema o investigar antes de comprometerse a un cambio |
+| `/opsx:propose <idea>` | Crea `openspec/changes/<nombre>/` con proposal, specs, design y tasks. Solo planifica |
+| `/opsx:apply` | Implementa las tareas de un cambio ya propuesto |
+| `/opsx:update` | Ajusta los artefactos de un cambio en curso |
+| `/opsx:sync` | Vuelca las specs delta del cambio a `openspec/specs/` |
+| `/opsx:archive` | Cierra el cambio y lo mueve a `changes/archive/` |
+
+- El contexto del proyecto y las reglas de las tareas (test en `tests/`,
+  `scripts/demo_*.py` como evidencia para Trello) viven en `openspec/config.yaml`.
+  Si cambia una regla de este archivo que afecte cómo se planifica, actualizarla ahí también.
+- Los artefactos se escriben en español; los encabezados estructurales y las
+  palabras SHALL/MUST quedan en inglés (así lo configura `openspec init --language es`).
+- Un cambio de OpenSpec vive en la misma rama de git que su implementación.
+- `openspec validate --all` valida specs y cambios; `openspec list` muestra los cambios abiertos.
 
 ---
 
