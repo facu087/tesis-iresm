@@ -23,7 +23,7 @@ from reportlab.platypus import (
     TableStyle,
 )
 
-from ..api.schemas import StructuredReport
+from ..api.schemas import RankedHypothesis, StructuredReport
 
 # ── Paleta de colores ──────────────────────────────────────────────────────────
 _NEXUS_BLUE = colors.HexColor("#1a3a5c")
@@ -37,9 +37,24 @@ _AMBER = colors.HexColor("#f57f17")
 _EVIDENCE_COLORS = {"I": _GREEN, "II": _ORANGE, "III": _GRAY}
 _PRIORITY_COLORS = {"HIGH": _RED, "MEDIUM": _AMBER, "LOW": _NEXUS_BLUE}
 
-# Verificación bibliográfica (Agente 04)
-_STATUS_COLORS = {"respaldada": _GREEN, "especulativa": _AMBER}
-_STATUS_LABELS = {"respaldada": "RESPALDADA", "especulativa": "ESPECULATIVA"}
+# Verificación bibliográfica (Agente 04) y clasificación EBM (pipeline/evidence.py)
+_SKY = colors.HexColor("#0277bd")
+_STATUS_COLORS = {"respaldada": _GREEN, "pendiente": _SKY, "especulativa": _AMBER}
+_STATUS_LABELS = {
+    "respaldada": "RESPALDADA",
+    "pendiente": "PENDIENTE",
+    "especulativa": "ESPECULATIVA",
+}
+
+# Grupos de hipótesis, en el mismo orden en que las ordena el backend.
+_STATUS_GROUPS = [
+    ("respaldada", "Hipótesis respaldadas",
+     "Al menos una referencia confirmada contra PubMed."),
+    ("pendiente", "Pendientes de verificación",
+     "PubMed no respondió: el nivel queda en III hasta poder confirmar las fuentes."),
+    ("especulativa", "Hipótesis especulativas",
+     "Ninguna referencia resistió la verificación. Se muestran, no se descartan."),
+]
 
 # Cómo se rotula cada veredicto de fuente en el PDF.
 _VERDICT_LABELS = {
@@ -98,6 +113,10 @@ def _source_line(src, indice: str = "") -> str:
     if etiqueta:
         texto, color = etiqueta
         linea += f" <font color='{_hex(color)}'><b>[{texto}]</b></font>"
+
+    # Tipos de publicación de PubMed: son los que fijan el tope de evidencia.
+    if src.verified and src.publication_types:
+        linea += f" <font color='{_hex(_GRAY)}'>(tipo: {', '.join(src.publication_types)})</font>"
 
     if src.actual_title:
         linea += (
@@ -179,6 +198,10 @@ def _cover(report: StructuredReport, s: dict) -> list:
     if v and v.total_fuentes:
         stats.append(["Referencias verificadas en PubMed", f"{v.verificadas} de {v.total_fuentes}"])
         stats.append(["Hipótesis con respaldo verificable", str(v.hipotesis_respaldadas)])
+    if v and v.hipotesis_pendientes:
+        stats.append(["Hipótesis pendientes de verificación", str(v.hipotesis_pendientes)])
+    if v and v.hipotesis_topeadas:
+        stats.append(["Hipótesis con nivel de evidencia topeado", str(v.hipotesis_topeadas)])
     stats += [
         ["Rondas de debate", str(report.debate_summary.rounds_completed)],
         ["Tiempo de procesamiento", f"{report.metadata.processing_time_seconds:.1f} s"],
@@ -202,19 +225,27 @@ def _cover(report: StructuredReport, s: dict) -> list:
     # PubMed, el lector tiene que enterarse en la portada, no en la bibliografía.
     if v and v.total_fuentes:
         sospechosas = v.discordantes + v.inexistentes
-        if sospechosas:
-            aviso = (
-                f"<b>Advertencia de verificación bibliográfica:</b> {sospechosas} de "
-                f"{v.total_fuentes} referencias citadas no se pudieron confirmar contra "
-                f"PubMed"
-            )
-            if v.discordantes:
-                aviso += f" ({v.discordantes} corresponden a otro artículo)"
-            aviso += (
-                f". {v.hipotesis_especulativas} de "
-                f"{v.hipotesis_especulativas + v.hipotesis_respaldadas} hipótesis quedan "
-                f"marcadas como especulativas y deben leerse como tales."
-            )
+        total_hipotesis = (
+            v.hipotesis_respaldadas + v.hipotesis_pendientes + v.hipotesis_especulativas
+        )
+        if sospechosas or v.hipotesis_pendientes:
+            aviso = "<b>Advertencia de verificación bibliográfica:</b>"
+            if sospechosas:
+                aviso += (
+                    f" {sospechosas} de {v.total_fuentes} referencias citadas no se "
+                    f"pudieron confirmar contra PubMed"
+                )
+                if v.discordantes:
+                    aviso += f" ({v.discordantes} corresponden a otro artículo)"
+                aviso += (
+                    f". {v.hipotesis_especulativas} de {total_hipotesis} hipótesis quedan "
+                    f"marcadas como especulativas y deben leerse como tales."
+                )
+            if v.hipotesis_pendientes:
+                aviso += (
+                    f" {v.hipotesis_pendientes} de {total_hipotesis} hipótesis quedan "
+                    f"pendientes: PubMed no respondió y su nivel queda en III."
+                )
             elems.append(_par(f"<font color='{_hex(_RED)}'>{aviso}</font>", s["disclaimer"]))
             elems.append(Spacer(1, 0.5 * cm))
 
@@ -261,6 +292,12 @@ def _case_summary(report: StructuredReport, s: dict) -> list:
     return elems
 
 
+def _group_status(status: str) -> str:
+    """Estado de agrupación: uno desconocido (reporte viejo) va con las especulativas."""
+    conocidos = {estado for estado, _, _ in _STATUS_GROUPS}
+    return status if status in conocidos else "especulativa"
+
+
 def _hypotheses(report: StructuredReport, s: dict) -> list:
     elems = _section("HIPÓTESIS DE INVESTIGACIÓN", s)
 
@@ -268,53 +305,84 @@ def _hypotheses(report: StructuredReport, s: dict) -> list:
         elems.append(_par("No se generaron hipótesis.", s["body"]))
         return elems
 
-    for h in report.hypotheses:
-        ev_color = _EVIDENCE_COLORS.get(h.evidence_level, _GRAY)
-        pr_color = _PRIORITY_COLORS.get(h.priority, _NEXUS_BLUE)
+    for estado, titulo, descripcion in _STATUS_GROUPS:
+        grupo = [h for h in report.hypotheses if _group_status(h.status) == estado]
+        if not grupo:
+            continue
+        color = _STATUS_COLORS[estado]
+        elems.append(Spacer(1, 0.15 * cm))
+        elems.append(_par(
+            f"<font color='{_hex(color)}'><b>{titulo.upper()} ({len(grupo)})</b></font>",
+            s["body"],
+        ))
+        elems.append(_par(descripcion, s["small"]))
+        elems.append(Spacer(1, 0.15 * cm))
+        for h in grupo:
+            elems.extend(_hypothesis_block(h, s))
 
-        st_color = _STATUS_COLORS.get(h.status, _GRAY)
-        st_label = _STATUS_LABELS.get(h.status, h.status.upper())
+    return elems
 
-        # Fila de badges: rango | estado | evidencia | prioridad | agentes
-        badge_row = [[
-            _par(f"<b>#{h.rank}</b>", s["cell"]),
-            _par(
-                f"<font color='{_hex(st_color)}'><b>{st_label}</b></font>",
-                s["cell"],
-            ),
-            _par(
-                f"<font color='#{ev_color.hexval()[2:]}'>Evidencia {h.evidence_level}</font>",
-                s["cell"],
-            ),
-            _par(
-                f"<font color='#{pr_color.hexval()[2:]}'>{h.priority}</font>",
-                s["cell"],
-            ),
-            _par(
-                ", ".join(h.supporting_agents) if h.supporting_agents else "—",
-                s["small"],
-            ),
-        ]]
-        badge_t = Table(badge_row, colWidths=[1.2 * cm, 3.0 * cm, 3.0 * cm, 2.3 * cm, 7.5 * cm])
-        badge_t.setStyle(TableStyle([
-            ("FONTSIZE", (0, 0), (-1, -1), 8),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("LINEBELOW", (0, 0), (-1, 0), 0.5, colors.lightgrey),
-            ("TOPPADDING", (0, 0), (-1, -1), 3),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-        ]))
-        elems.append(badge_t)
-        elems.append(_par(h.text, s["body"]))
-        elems.append(_par(f"<i>Justificación:</i> {h.rationale}", s["small"]))
 
-        if h.sources:
-            elems.append(_par("<i>Fuentes:</i>", s["small"]))
-            # Una fuente por línea: el veredicto y el título real no entran en
-            # una lista separada por puntos.
-            for src in h.sources[:3]:
-                elems.append(_par(_source_line(src, "· "), s["small"]))
+def _hypothesis_block(h: RankedHypothesis, s: dict) -> list:
+    """Bloque de una hipótesis: badges, texto, justificación, nivel y fuentes."""
+    elems: list = []
+    ev_color = _EVIDENCE_COLORS.get(h.evidence_level, _GRAY)
+    pr_color = _PRIORITY_COLORS.get(h.priority, _NEXUS_BLUE)
 
-        elems.append(Spacer(1, 0.3 * cm))
+    st_color = _STATUS_COLORS.get(h.status, _GRAY)
+    st_label = _STATUS_LABELS.get(h.status, h.status.upper())
+
+    topeada = bool(h.declared_evidence_level) and h.declared_evidence_level != h.evidence_level
+    evidencia = f"Evidencia {h.evidence_level}"
+    if topeada:
+        evidencia += f" (declarado {h.declared_evidence_level})"
+
+    # Fila de badges: rango | estado | evidencia | prioridad | agentes
+    badge_row = [[
+        _par(f"<b>#{h.rank}</b>", s["cell"]),
+        _par(
+            f"<font color='{_hex(st_color)}'><b>{st_label}</b></font>",
+            s["cell"],
+        ),
+        _par(
+            f"<font color='#{ev_color.hexval()[2:]}'>{evidencia}</font>",
+            s["cell"],
+        ),
+        _par(
+            f"<font color='#{pr_color.hexval()[2:]}'>{h.priority}</font>",
+            s["cell"],
+        ),
+        _par(
+            ", ".join(h.supporting_agents) if h.supporting_agents else "—",
+            s["small"],
+        ),
+    ]]
+    badge_t = Table(badge_row, colWidths=[1.2 * cm, 2.8 * cm, 3.8 * cm, 2.0 * cm, 7.2 * cm])
+    badge_t.setStyle(TableStyle([
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LINEBELOW", (0, 0), (-1, 0), 0.5, colors.lightgrey),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+    ]))
+    elems.append(badge_t)
+    elems.append(_par(h.text, s["body"]))
+    elems.append(_par(f"<i>Justificación:</i> {h.rationale}", s["small"]))
+    if h.evidence_note:
+        color = _ORANGE if topeada else _GRAY
+        elems.append(_par(
+            f"<font color='{_hex(color)}'><i>Nivel de evidencia:</i> {h.evidence_note}</font>",
+            s["small"],
+        ))
+
+    if h.sources:
+        elems.append(_par("<i>Fuentes:</i>", s["small"]))
+        # Una fuente por línea: el veredicto y el título real no entran en
+        # una lista separada por puntos.
+        for src in h.sources[:3]:
+            elems.append(_par(_source_line(src, "· "), s["small"]))
+
+    elems.append(Spacer(1, 0.3 * cm))
 
     return elems
 
