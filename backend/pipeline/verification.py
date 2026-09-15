@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import sys
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 from ..external.pubmed import PubMedClient
@@ -47,13 +47,20 @@ class SourceStatus(str, Enum):
 
 @dataclass
 class SourceVerification:
-    """Veredicto sobre una fuente citada, con el título real si difiere."""
+    """
+    Veredicto sobre una fuente citada, con el título real si difiere.
+
+    `publication_types` son los tipos que PubMed indexa para el artículo
+    ("Meta-Analysis", "Case Reports", …). Solo se completan cuando la fuente
+    queda VERIFICADA: los de un PMID discordante son de otro artículo.
+    """
 
     pmid: str | None
     status: SourceStatus
     claimed_title: str
     actual_title: str = ""
     match_score: float = 0.0
+    publication_types: list[str] = field(default_factory=list)
 
     @property
     def is_valid(self) -> bool:
@@ -108,12 +115,16 @@ def _verify_one(source: Source, metadata: dict[str, dict]) -> SourceVerification
     status = (
         SourceStatus.VERIFICADA if score >= _MIN_TITLE_MATCH else SourceStatus.DISCORDANTE
     )
+    publication_types = (
+        list(real.get("pubtypes", [])) if status is SourceStatus.VERIFICADA else []
+    )
     return SourceVerification(
         pmid=source.pmid,
         status=status,
         claimed_title=source.title,
         actual_title=actual_title,
         match_score=round(score, 2),
+        publication_types=publication_types,
     )
 
 

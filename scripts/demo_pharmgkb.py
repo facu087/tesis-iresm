@@ -1,166 +1,138 @@
 """
-Demo de verificación — Cliente PharmGKB: relaciones fármaco-genómicas.
+Demo — Cliente PharmGKB/ClinPGx: relaciones fármaco-genómicas.
 
-Muestra cómo el cliente obtiene anotaciones clínicas que relacionan genes
-con fármacos y fenotipos, relevantes para el caso de neuropatía axonal.
-Usa datos simulados basados en la base de datos real de PharmGKB.
+Este script **consulta la API real**. La versión anterior usaba datos
+simulados, y eso tapaba dos problemas a la vez:
+
+1. El cliente apuntaba a `api.pharmgkb.org`, un host que fue dado de baja y
+   hoy no resuelve por DNS. Como atrapaba `except (httpx.HTTPError, Exception)`
+   y devolvía `[]`, nunca falló de forma visible: "funcionaba" sin haber
+   hablado nunca con PharmGKB.
+2. Los datos simulados **contradicen la base real**. Afirmaban que TTR tenía
+   anotaciones de nivel 1A/1B con patisiran, tafamidis e inotersen. La API
+   devuelve 0 anotaciones clínicas para TTR: es un gen de enfermedad, no un
+   farmacogen.
+
+Correrlo necesita conexión. No necesita API key ni GROQ_API_KEY.
+
+    python scripts/demo_pharmgkb.py
 
 Artefactos generados en output/demo_pharmgkb/:
-    1. anotaciones_genes.txt       → relaciones gen→fármaco→fenotipo con nivel de evidencia
-    2. interacciones_farmacos.txt  → fármacos del caso y sus genes asociados
-
-Uso:
-    python scripts/demo_pharmgkb.py
+    1. anotaciones.txt → lo que devuelve la API real, gen por gen
+    2. resumen.json    → el mismo resultado en JSON
 """
 
+import asyncio
+import json
 import sys
+from dataclasses import asdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from backend.external.pharmgkb import GeneAnnotation, DrugGeneInteraction
+# La consola de Windows usa cp1252 y no puede imprimir los caracteres de caja.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 
-_SEP = "═" * 70
+from backend.external.pharmgkb import PharmGKBClient
+from backend.external.rate_limiter import ExternalApiError
+
+_SEP = "═" * 78
 _OUT_DIR = Path(__file__).parent.parent / "output" / "demo_pharmgkb"
 
-# Anotaciones clínicas simuladas (datos reales de PharmGKB)
-_ANOTACIONES_TTR = [
-    GeneAnnotation(
-        gene_symbol="TTR",
-        drug_name="patisiran",
-        phenotype="Efficacy",
-        evidence_level="1A",
-        variant="Val30Met",
-        population="Mixed",
-        url="https://www.pharmgkb.org/clinicalAnnotation/1451244057",
-    ),
-    GeneAnnotation(
-        gene_symbol="TTR",
-        drug_name="tafamidis",
-        phenotype="Efficacy",
-        evidence_level="1B",
-        variant="Val30Met",
-        population="European",
-        url="https://www.pharmgkb.org/clinicalAnnotation/1451244058",
-    ),
-    GeneAnnotation(
-        gene_symbol="TTR",
-        drug_name="inotersen",
-        phenotype="Efficacy",
-        evidence_level="1B",
-        variant="Multiple TTR variants",
-        population="Mixed",
-        url="https://www.pharmgkb.org/clinicalAnnotation/1451244059",
-    ),
-]
+# Los cuatro del traspaso: dos genes del caso (neuropatía), uno de la sospecha
+# diagnóstica (amiloidosis ATTR) y el farmacogén más anotado de la base.
+_GENES = ["PMP22", "MPZ", "TTR", "CYP2D6"]
 
-_ANOTACIONES_CYP2D6 = [
-    GeneAnnotation(
-        gene_symbol="CYP2D6",
-        drug_name="pregabalina",
-        phenotype="Metabolism/PK",
-        evidence_level="2A",
-        variant="*4 (poor metabolizer)",
-        population="European",
-    ),
-    GeneAnnotation(
-        gene_symbol="CYP2D6",
-        drug_name="amitriptilina",
-        phenotype="Toxicity/ADR",
-        evidence_level="1A",
-        variant="*4 (poor metabolizer)",
-        population="Mixed",
-    ),
-]
-
-# El paciente del caso toma pregabalina → verificamos interacción
-_INTERACCION_PREGABALINA = DrugGeneInteraction(
-    drug_name="pregabalina",
-    pharmgkb_id="PA451257",
-    genes=["CYP2D6", "CACNA2D1"],
-    annotations=[
-        GeneAnnotation("CYP2D6", "pregabalina", "Metabolism/PK", "2A", "*4"),
-        GeneAnnotation("CACNA2D1", "pregabalina", "Efficacy", "3", "rs3217"),
-    ],
-)
+_ESCALA = """Escala de evidencia PharmGKB:
+  1A = Variante en label FDA/EMA + estudios replicados
+  1B = Variante en label FDA/EMA
+  2A = Variante conocida + estudio único replicado
+  2B = Variante conocida + estudio único
+  3  = Evidencia limitada
+  4  = Caso reporte / anecdótico"""
 
 
-def main() -> None:
+async def main() -> None:
+    print(_SEP)
+    print("DEMO — Cliente PharmGKB/ClinPGx contra la API REAL")
+    print(_SEP)
+    print(f"\nBase URL: https://api.clinpgx.org/v1/data")
+    print("(el host anterior, api.pharmgkb.org, ya no resuelve por DNS)")
+
+    resultados: dict[str, list[dict]] = {}
+    lineas_txt: list[str] = ["NEXUS — PharmGKB/ClinPGx: consulta a la API real", "=" * 70, ""]
+
+    async with PharmGKBClient() as client:
+        print(f"\n{'─' * 78}\n1. Anotaciones clínicas por gen\n{'─' * 78}")
+        for gen in _GENES:
+            try:
+                anotaciones = await client.get_gene_annotations(gen, max_results=5)
+            except ExternalApiError as exc:
+                print(f"  {gen:8} ERROR: {exc}")
+                lineas_txt.append(f"{gen}: ERROR — {exc}")
+                continue
+
+            resultados[gen] = [asdict(a) for a in anotaciones]
+            if anotaciones:
+                print(f"  {gen:8} {len(anotaciones)} anotaciones:")
+                lineas_txt.append(f"GEN {gen} — {len(anotaciones)} anotaciones:")
+                for a in anotaciones:
+                    print(f"      [{a.evidence_level:2}] {a.drug_name:14} → {a.phenotype[:38]}")
+                    print(f"           variante: {a.variant[:60]}")
+                    lineas_txt.append(f"  [{a.evidence_level}] {a.to_context_str()}")
+                    if a.url:
+                        lineas_txt.append(f"       {a.url}")
+            else:
+                print(f"  {gen:8} sin anotaciones farmacogenómicas")
+                lineas_txt.append(f"GEN {gen} — sin anotaciones farmacogenómicas")
+            lineas_txt.append("")
+
+        print("\n  Ojo con PMP22, MPZ y TTR: 0 anotaciones NO es un fallo. Son genes")
+        print("  de enfermedad, no farmacogenes, y la API lo dice con un 404 que el")
+        print("  cliente traduce a lista vacía. El demo anterior inventaba para TTR")
+        print("  tres anotaciones 1A/1B con patisiran, tafamidis e inotersen.")
+
+        print(f"\n{'─' * 78}\n2. Distinguir 'sin resultados' de 'la API falló'\n{'─' * 78}")
+        vacio = await client.get_gene_annotations("NOEXISTEESTEGEN")
+        print(f"  Gen inexistente     → {vacio} (404, sin excepción)")
+
+        try:
+            await client._request("/clinicalAnnotation", {"pageSize": "1"})
+            print("  Query mal formada   → (no debería llegar acá)")
+        except ExternalApiError as exc:
+            print(f"  Query mal formada   → ExternalApiError, HTTP {exc.status_code}")
+            print(f"                        {str(exc)[:90]}")
+            lineas_txt.append(f"Query mal formada -> {exc}")
+
+        print(f"\n{'─' * 78}\n3. Interacciones de un fármaco\n{'─' * 78}")
+        interaccion = await client.get_drug_interactions("warfarin", max_results=5)
+        if interaccion:
+            print(f"  warfarin  id={interaccion.pharmgkb_id}")
+            print(f"  genes asociados: {', '.join(interaccion.genes[:8])}…")
+            print(f"  {interaccion.summary().splitlines()[1][:95]}")
+            lineas_txt.append("FÁRMACO warfarin:")
+            lineas_txt.append(interaccion.summary())
+            resultados["_warfarin"] = [asdict(a) for a in interaccion.annotations]
+
+        inexistente = await client.get_drug_interactions("NOEXISTEFARMACO")
+        print(f"  Fármaco inexistente → {inexistente} (None, sin excepción)")
+
+    lineas_txt.append("")
+    lineas_txt.append(_ESCALA)
+
     _OUT_DIR.mkdir(parents=True, exist_ok=True)
+    txt = _OUT_DIR / "anotaciones.txt"
+    txt.write_text("\n".join(lineas_txt), encoding="utf-8")
+    resumen = _OUT_DIR / "resumen.json"
+    resumen.write_text(json.dumps(resultados, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    print(_SEP)
-    print("  DEMO — Cliente PharmGKB: relaciones fármaco-genómicas")
-    print(_SEP)
-
-    # 1. Anotaciones del gen TTR
-    print(f"\n  [1/4] Anotaciones clínicas del gen TTR:")
-    print(f"        (relevante: paciente con posible amiloidosis hereditaria)\n")
-    for ann in _ANOTACIONES_TTR:
-        print(f"        {ann.to_context_str()}")
-    print()
-
-    # 2. Anotaciones de CYP2D6 (metabolismo de fármacos)
-    print(f"  [2/4] Anotaciones clínicas del gen CYP2D6:")
-    print(f"        (relevante: metabolismo de pregabalina que toma el paciente)\n")
-    for ann in _ANOTACIONES_CYP2D6:
-        print(f"        {ann.to_context_str()}")
-
-    # 3. Interacciones del fármaco actual del paciente
-    print(f"\n  [3/4] Interacciones fármaco-genómicas de pregabalina:")
-    print(f"        (tratamiento actual del paciente: pregabalina 150 mg/día)\n")
-    print(f"        {_INTERACCION_PREGABALINA.summary()}")
-
-    # 4. Ranking por nivel de evidencia PharmGKB
-    todas = _ANOTACIONES_TTR + _ANOTACIONES_CYP2D6
-    ranking = sorted(todas, key=lambda a: a.evidence_level)
-    print(f"\n  [4/4] Ranking por nivel de evidencia PharmGKB (1A=más fuerte → 4=más débil):")
-    for ann in ranking:
-        print(f"        [{ann.evidence_level}] {ann.gene_symbol} + {ann.drug_name} → {ann.phenotype}")
-
-    # Guardar artefactos
-    ann_txt = _OUT_DIR / "anotaciones_genes.txt"
-    with ann_txt.open("w", encoding="utf-8") as f:
-        f.write("NEXUS — PharmGKB: anotaciones fármaco-genómicas\n")
-        f.write("=" * 60 + "\n\n")
-        f.write("GEN TTR (posible causa de neuropatía):\n")
-        for ann in _ANOTACIONES_TTR:
-            f.write(f"  [{ann.evidence_level}] {ann.to_context_str()}\n")
-            if ann.url:
-                f.write(f"         URL: {ann.url}\n")
-        f.write("\nGEN CYP2D6 (metabolismo del tratamiento actual):\n")
-        for ann in _ANOTACIONES_CYP2D6:
-            f.write(f"  [{ann.evidence_level}] {ann.to_context_str()}\n")
-
-    farm_txt = _OUT_DIR / "interacciones_farmacos.txt"
-    with farm_txt.open("w", encoding="utf-8") as f:
-        f.write("NEXUS — PharmGKB: interacciones fármaco-genómicas del caso clínico\n")
-        f.write("=" * 60 + "\n\n")
-        f.write("Tratamiento actual del paciente: pregabalina 150 mg/día\n\n")
-        f.write(_INTERACCION_PREGABALINA.summary())
-        f.write("\n\nEscala de evidencia PharmGKB:\n")
-        f.write("  1A = Variante en label FDA/EMA + estudios replicados\n")
-        f.write("  1B = Variante en label FDA/EMA\n")
-        f.write("  2A = Variante conocida + estudio único replicado\n")
-        f.write("  2B = Variante conocida + estudio único\n")
-        f.write("  3  = Evidencia limitada\n")
-        f.write("  4  = Caso reporte / anecdótico\n")
-
-    print()
-    print(_SEP)
-    print("  RESULTADO FINAL:")
-    print(_SEP)
-    print(f"  Genes consultados      : TTR, CYP2D6")
-    print(f"  Anotaciones TTR        : {len(_ANOTACIONES_TTR)} (fármacos aprobados para ATTRv)")
-    print(f"  Anotaciones CYP2D6     : {len(_ANOTACIONES_CYP2D6)} (metabolismo de pregabalina)")
-    print(f"  Interacción pregabalina: ✓ genes CYP2D6, CACNA2D1")
-    print(f"  Evidencia más fuerte   : 1A (TTR + patisiran, Val30Met)")
-    print(f"  Consulta multi-gen     : ✓ asyncio.gather (paralelo)")
-    print()
-    print("  ARTEFACTOS GENERADOS (abrir y capturar para Trello):")
-    print(f"    • Anotaciones gen→fármaco  → {ann_txt}")
-    print(f"    • Interacciones fármacos   → {farm_txt}")
+    print(f"\n{_SEP}")
+    print("Artefactos:")
+    print(f"  • {txt}")
+    print(f"  • {resumen}")
     print(_SEP)
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

@@ -19,16 +19,13 @@ from ..api.schemas import (
     VerificationSummary,
 )
 from ..models.case import ClinicalCase
-from ..models.hypothesis import EvidenceLevel, Priority, Source
-from ..models.report import AgentOutput, Report
+from ..models.hypothesis import Source
+from ..models.report import Report
 from ..models.trial import ClinicalTrial
+from .evidence import HypothesisStatus, prioritize
 from .verification import SourceStatus, SourceVerification, source_key
 
 _VERSION = "0.3.0"
-
-# Pesos para ordenar hipótesis por relevancia
-_PRIORITY_WEIGHT = {Priority.HIGH: 0, Priority.MEDIUM: 1, Priority.LOW: 2}
-_EVIDENCE_WEIGHT = {EvidenceLevel.I: 0, EvidenceLevel.II: 1, EvidenceLevel.III: 2}
 
 
 def _annotate_source(
@@ -37,16 +34,30 @@ def _annotate_source(
     """
     Devuelve una copia de la fuente con el veredicto de la verificación.
 
-    No modifica la original: el Report interno del pipeline queda intacto.
+    Los campos de verificación salen solo del veredicto: si la fuente no tiene
+    veredicto se limpian, porque un LLM puede haberlos escrito en su JSON
+    (p. ej. `verified: true`). Los tipos de publicación se exportan solo para
+    fuentes verificadas. No modifica la original: el Report interno queda intacto.
     """
-    veredicto = verifications.get(source_key(source))
+    clave = source_key(source)
+    veredicto = verifications.get(clave) if clave else None
     if veredicto is None:
-        return source
+        return source.model_copy(
+            update={
+                "verified": None,
+                "verification_status": None,
+                "actual_title": None,
+                "publication_types": [],
+            }
+        )
     return source.model_copy(
         update={
             "verified": veredicto.is_valid,
             "verification_status": veredicto.status.value,
             "actual_title": veredicto.actual_title or None,
+            "publication_types": (
+                list(veredicto.publication_types) if veredicto.is_valid else []
+            ),
         }
     )
 
@@ -55,9 +66,10 @@ def _rank_hypotheses(
     report: Report, verifications: dict[str, SourceVerification]
 ) -> list[RankedHypothesis]:
     """
-    Ordena las hipótesis finales por prioridad y nivel de evidencia,
-    determina qué agentes las respaldaron en sus outputs de Ronda 1 y las
-    etiqueta según tengan o no respaldo bibliográfico verificable.
+    Clasifica y ordena las hipótesis finales con las reglas EBM de
+    `evidence.prioritize()` (estado → nivel efectivo → prioridad → fuentes
+    verificadas) y determina qué agentes las respaldaron en Ronda 1 y en la
+    última ronda del debate.
     """
     # Índice: texto de hipótesis → agentes que la propusieron (Ronda 1)
     agent_support: dict[str, list[str]] = {}
@@ -74,31 +86,25 @@ def _rank_hypotheses(
                 if output.agent_name not in existing:
                     agent_support.setdefault(h.text, []).append(output.agent_name)
 
-    sorted_hypotheses = sorted(
-        report.hypotheses,
-        key=lambda h: (
-            _PRIORITY_WEIGHT.get(h.priority, 9),
-            _EVIDENCE_WEIGHT.get(h.evidence_level, 9),
-        ),
-    )
-
     ranked: list[RankedHypothesis] = []
-    for i, h in enumerate(sorted_hypotheses):
-        sources = [_annotate_source(s, verifications) for s in h.sources]
-        verificadas = sum(1 for s in sources if s.verified)
+    for i, (h, evaluacion) in enumerate(prioritize(report.hypotheses, verifications)):
         ranked.append(
             RankedHypothesis(
                 rank=i + 1,
                 text=h.text,
                 priority=h.priority.value,
-                evidence_level=h.evidence_level.value,
+                # Nivel efectivo: el declarado, topeado por la evidencia verificada.
+                evidence_level=evaluacion.effective_level.value,
                 rationale=h.rationale,
                 supporting_agents=agent_support.get(h.text, []),
-                sources=sources,
-                # Sin ninguna referencia que resista la verificación, la hipótesis
-                # queda como especulativa — pero se conserva y se muestra.
-                status="respaldada" if verificadas else "especulativa",
-                verified_sources=verificadas,
+                sources=[_annotate_source(s, verifications) for s in h.sources],
+                # Sin ninguna referencia que resista la verificación la hipótesis
+                # queda especulativa (o pendiente si PubMed no respondió), pero
+                # se conserva y se muestra.
+                status=evaluacion.status.value,
+                verified_sources=evaluacion.verified_sources,
+                declared_evidence_level=evaluacion.declared_level.value,
+                evidence_note=evaluacion.note,
             )
         )
     return ranked
@@ -128,7 +134,14 @@ def _build_verification_summary(
     for veredicto in verifications.values():
         conteo[veredicto.status] += 1
 
-    respaldadas = sum(1 for h in hypotheses if h.status == "respaldada")
+    por_estado = {status: 0 for status in HypothesisStatus}
+    for h in hypotheses:
+        por_estado[HypothesisStatus(h.status)] += 1
+
+    topeadas = sum(
+        1 for h in hypotheses
+        if h.declared_evidence_level and h.evidence_level != h.declared_evidence_level
+    )
     return VerificationSummary(
         total_fuentes=len(verifications),
         verificadas=conteo[SourceStatus.VERIFICADA],
@@ -136,8 +149,10 @@ def _build_verification_summary(
         inexistentes=conteo[SourceStatus.INEXISTENTE],
         sin_pmid=conteo[SourceStatus.SIN_PMID],
         no_verificables=conteo[SourceStatus.NO_VERIFICABLE],
-        hipotesis_respaldadas=respaldadas,
-        hipotesis_especulativas=len(hypotheses) - respaldadas,
+        hipotesis_respaldadas=por_estado[HypothesisStatus.RESPALDADA],
+        hipotesis_pendientes=por_estado[HypothesisStatus.PENDIENTE],
+        hipotesis_especulativas=por_estado[HypothesisStatus.ESPECULATIVA],
+        hipotesis_topeadas=topeadas,
     )
 
 
