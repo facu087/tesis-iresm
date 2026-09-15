@@ -13,25 +13,32 @@ texto, prioridad, nivel de evidencia y un estado opcional, más los datos del ca
 necesarios para buscar (condición en inglés, genes, anticuerpos y fármacos INN) y el
 perfil clínico estructurado de la síntesis PICO. El agente MUST NOT depender de si las
 hipótesis provienen del reporte final del debate o del consenso del Árbitro (Agente 04).
-Las candidatas con estado `descartada` MUST excluirse. De las restantes, el agente SHALL
-tomar como máximo 3, ordenadas por prioridad (HIGH, MEDIUM, LOW) y luego por nivel de
-evidencia (I, II, III), sin repetir textos idénticos.
+Ninguna candidata MUST excluirse por su estado: la clasificación EBM (#54, ya mergeada)
+define los estados `respaldada`, `pendiente` y `especulativa`, y **ninguno de ellos
+descarta** una hipótesis. El agente SHALL tomar como máximo 3, ordenadas por estado
+(`respaldada` → `pendiente` → `especulativa`), luego por prioridad (HIGH, MEDIUM, LOW) y
+luego por nivel de evidencia (I, II, III), sin repetir textos idénticos. Las candidatas sin
+estado SHALL ordenarse solo por prioridad y nivel.
 
 #### Scenario: Hipótesis del debate sin estado
 - **WHEN** el pipeline entrega las 5 hipótesis del reporte final del debate, ninguna con estado
 - **THEN** el agente considera las 3 primeras según prioridad y nivel de evidencia
 
-#### Scenario: Consenso del Árbitro con una hipótesis descartada
-- **WHEN** la entrada trae 3 hipótesis y una tiene estado `descartada`
-- **THEN** el agente explora solo las 2 restantes y no emite consultas por la descartada
+#### Scenario: Consenso del Árbitro con estados mezclados
+- **WHEN** la entrada trae 4 hipótesis: dos `especulativa`, una `respaldada` y una `pendiente`
+- **THEN** el agente explora la `respaldada`, la `pendiente` y la primera `especulativa`, en ese orden
+
+#### Scenario: Todas las hipótesis son especulativas
+- **WHEN** las 3 candidatas tienen estado `especulativa`
+- **THEN** el agente las explora igual: una hipótesis sin respaldo bibliográfico sigue siendo una ruta a investigar
 
 #### Scenario: Sin hipótesis elegibles
-- **WHEN** todas las candidatas están descartadas o la lista está vacía
+- **WHEN** la lista de candidatas está vacía
 - **THEN** el agente omite la planificación, informa `planificacion: "sin_candidatas"` y ejecuta igual la búsqueda base
 
 ### Requirement: Búsqueda base sin regresión
-El Agente 05 SHALL ejecutar siempre una búsqueda base de ensayos en estado RECRUITING
-equivalente a la vigente antes de este cambio: condición en inglés (`condition_en`) como
+El Agente 05 SHALL ejecutar siempre una búsqueda base de ensayos en estado RECRUITING o
+NOT_YET_RECRUITING, equivalente por lo demás a la vigente antes de este cambio: condición en inglés (`condition_en`) como
 condición y hasta 5 términos de biomarcadores (genes, anticuerpos, fármacos) como palabras
 clave, reintentando solo con la condición si la combinación no devuelve resultados. La
 búsqueda base MUST NOT usar el motivo de consulta en español como condición de reemplazo.
@@ -48,8 +55,8 @@ búsqueda base MUST NOT usar el motivo de consulta en español como condición d
 El Agente 05 SHALL pedir al LLM, una única vez por análisis, un término de condición en
 inglés médico y hasta 2 sinónimos por cada hipótesis candidata. Cada término MUST pasar la
 regla de saneamiento antes de usarse. Por cada candidata con término válido, el agente SHALL
-consultar ensayos RECRUITING con el término principal y, si no hay resultados, con cada
-sinónimo en orden hasta obtener alguno. Si la llamada al LLM falla o no produce ningún
+consultar ensayos RECRUITING o NOT_YET_RECRUITING con el término principal y, si no hay
+resultados, con cada sinónimo en orden hasta obtener alguno. Si la llamada al LLM falla o no produce ningún
 término válido, el agente SHALL continuar solo con la búsqueda base e informar
 `planificacion: "fallback"`.
 
@@ -89,8 +96,8 @@ corregirse ni truncarse.
 El Agente 05 SHALL unificar los ensayos por NCT ID. Cada ensayo MUST registrar en
 `matched_terms` los términos que lo encontraron y en `related_hypotheses` los textos de las
 hipótesis candidatas cuyas consultas lo devolvieron (vacío si solo lo trajo la búsqueda base).
-El resultado SHALL contener como máximo 10 ensayos, priorizando el orden de descubrimiento:
-primero la búsqueda base y luego las candidatas en su orden.
+El resultado SHALL contener como máximo 10 ensayos. El orden final del reporte queda
+definido en el requisito "Orden del reporte de ensayos".
 
 #### Scenario: Ensayo encontrado por dos consultas
 - **WHEN** `NCT04000001` aparece en la búsqueda base y en la consulta de la hipótesis de amiloidosis
@@ -99,6 +106,46 @@ primero la búsqueda base y luego las candidatas en su orden.
 #### Scenario: Más de 10 ensayos únicos
 - **WHEN** las consultas suman 17 ensayos únicos tras los filtros
 - **THEN** el resultado conserva los 10 primeros según el orden de descubrimiento
+
+### Requirement: Ensayos aún no reclutando, incluidos y etiquetados
+La búsqueda SHALL incluir los ensayos en estado `NOT_YET_RECRUITING` además de los
+`RECRUITING`. Para un paciente con enfermedad rara y sin tratamiento aprobado, un ensayo que
+abre en meses es información accionable. El reporte MUST distinguirlos de los que reclutan
+hoy, y la evaluación de compatibilidad MUST NOT afirmar disponibilidad inmediata de un
+ensayo que todavía no abrió.
+
+#### Scenario: Ensayo que aún no abrió reclutamiento
+- **WHEN** la búsqueda devuelve un ensayo con `status: "NOT_YET_RECRUITING"` compatible con el perfil
+- **THEN** el ensayo aparece en el reporte con su estado visible y por debajo de los `RECRUITING` de igual compatibilidad
+
+### Requirement: Ensayos con sede en Argentina primero
+El reporte SHALL ordenar hacia arriba los ensayos que tienen al menos una sede en Argentina,
+**sin excluir** ninguno por su ubicación. La preferencia SHALL resolverse sobre las sedes que
+el cliente ya devuelve, MUST NOT enviarse como filtro a la API externa y MUST NOT derivarse
+de ningún dato del paciente: es una preferencia de despliegue del sistema.
+
+#### Scenario: Ensayo local y ensayo extranjero con la misma compatibilidad
+- **WHEN** dos ensayos tienen compatibilidad `alta` y solo uno tiene una sede en Argentina
+- **THEN** el que tiene sede en Argentina aparece primero, y el otro aparece igual en el reporte
+
+#### Scenario: La cercanía no supera a la compatibilidad
+- **WHEN** un ensayo con sede en Argentina tiene compatibilidad `baja` y otro sin sede local tiene `alta`
+- **THEN** el de compatibilidad `alta` aparece primero
+
+#### Scenario: Ningún ensayo tiene sede local
+- **WHEN** ninguno de los ensayos encontrados tiene sede en Argentina
+- **THEN** el orden queda determinado por los demás criterios y el reporte no lo señala como una carencia
+
+### Requirement: Orden del reporte de ensayos
+Los ensayos SHALL ordenarse por compatibilidad (`alta`, `media`, `baja`, `sin_evaluar`),
+luego por estado de reclutamiento (`RECRUITING` antes que `NOT_YET_RECRUITING`), luego por
+sede en Argentina, y finalmente por orden de descubrimiento: primero la búsqueda base y
+luego las candidatas en su orden.
+
+#### Scenario: Desempate completo
+- **WHEN** hay dos ensayos `alta` y `RECRUITING`, uno con sede en Argentina encontrado por una candidata y otro sin sede local encontrado por la búsqueda base
+- **THEN** el que tiene sede en Argentina aparece primero, porque la sede desempata antes que el orden de descubrimiento
+
 
 ### Requirement: Filtros duros deterministas por edad y sexo
 El Agente 05 SHALL obtener la edad en años y el sexo del paciente del perfil de la síntesis

@@ -36,18 +36,19 @@ error de API externa y MUST NOT devolverse como lista vacía. Solo los errores t
 - **THEN** la búsqueda señala un error de API externa en lugar de devolver una lista vacía
 
 #### Scenario: Servicio caído
-- **WHEN** Orphanet responde 503 en todos los intentos
-- **THEN** la búsqueda señala un error de API externa después de agotar los reintentos
+- **WHEN** Orphanet responde 503
+- **THEN** la búsqueda señala un error de API externa, que el Agente 05 traduce a `estado_orphanet`
 
-### Requirement: Credencial obligatoria desde el entorno
-El sistema SHALL leer la credencial de Orphanet solo de la variable de entorno
-`ORPHANET_API_KEY`. Si la variable no está definida, el Agente 05 MUST NOT consultar Orphanet
-y SHALL informar `estado_orphanet: "sin_configurar"`, sin que la búsqueda de ensayos se vea
-afectada.
+### Requirement: La credencial es opcional y no condiciona la consulta
+Orphanet SHALL consultarse siempre, haya o no credencial configurada: medido contra la API
+real, responde sin ninguna clave. El sistema SHALL leer `ORPHANET_API_KEY` del entorno cuando
+esté definida y, si no lo está, SHALL enviar igual el header con el valor público de
+desarrollo que la API acepta. La ausencia de la variable MUST NOT impedir la consulta ni
+producir un estado propio.
 
 #### Scenario: Entorno sin credencial
-- **WHEN** `ORPHANET_API_KEY` no está definida
-- **THEN** no se realiza ninguna consulta a Orphanet, `rare_diseases` queda vacío y los ensayos se buscan igual
+- **WHEN** `ORPHANET_API_KEY` no está definida y Orphanet responde con resultados
+- **THEN** la consulta se realiza igual, las coincidencias exactas se marcan y `estado_orphanet` vale `ok`
 
 ### Requirement: Coincidencia exacta para marcar una enfermedad rara
 El Agente 05 SHALL consultar Orphanet con el término principal de cada hipótesis candidata y,
@@ -72,8 +73,8 @@ una vez.
 
 ### Requirement: Orphanet no bloquea la búsqueda de ensayos
 Una falla de Orphanet MUST NOT impedir ni retrasar indefinidamente la búsqueda y evaluación de
-ensayos. El Agente 05 SHALL informar `estado_orphanet` como `ok`, `parcial`, `no_disponible`,
-`sin_configurar` o `sin_consulta` (sin términos válidos para consultar).
+ensayos. El Agente 05 SHALL informar `estado_orphanet` como `ok`, `parcial`, `no_disponible`
+o `sin_consulta` (sin términos válidos para consultar).
 
 #### Scenario: Orphanet caído con ClinicalTrials.gov disponible
 - **WHEN** todas las consultas a Orphanet fallan y ClinicalTrials.gov responde

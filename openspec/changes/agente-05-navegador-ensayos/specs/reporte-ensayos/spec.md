@@ -11,7 +11,9 @@ la búsqueda, manteniendo compatible el contrato que ya consumen el frontend y e
 vigentes. Cada ensayo SHALL sumar campos opcionales con valor por defecto: `compatibility`
 (`alta` | `media` | `baja` | `sin_evaluar`, por defecto `sin_evaluar`),
 `compatibility_rationale` (texto o nulo), `criteria_to_verify` (lista, por defecto vacía),
-`related_hypotheses` (lista, por defecto vacía) y `matched_terms` (lista, por defecto vacía).
+`related_hypotheses` (lista, por defecto vacía), `matched_terms` (lista, por defecto vacía)
+y `has_local_site` (booleano, por defecto `false`, verdadero si el ensayo tiene al menos una
+sede en Argentina).
 Un reporte generado antes de este cambio MUST seguir siendo aceptado por `POST /api/report/pdf`.
 El reporte SHALL conservar el orden de ensayos que entrega el Agente 05.
 
@@ -44,12 +46,30 @@ rara catalogada", nunca como diagnóstico del paciente.
 reportes generados antes de este cambio `trial_search` MUST poder estar ausente o ser nulo.
 
 #### Scenario: Reporte con búsqueda completa
-- **WHEN** el Agente 05 termina con ClinicalTrials.gov disponible y Orphanet sin configurar
-- **THEN** `trial_search` informa `estado_clinicaltrials: "ok"`, `estado_orphanet: "sin_configurar"` y los términos consultados
+- **WHEN** el Agente 05 termina con ClinicalTrials.gov disponible y Orphanet respondiendo
+- **THEN** `trial_search` informa `estado_clinicaltrials: "ok"`, `estado_orphanet: "ok"` y los términos consultados
+
+#### Scenario: Reporte con Orphanet caído
+- **WHEN** el Agente 05 termina con ClinicalTrials.gov disponible y Orphanet sin responder
+- **THEN** `trial_search` informa `estado_clinicaltrials: "ok"` y `estado_orphanet: "no_disponible"`, y los ensayos aparecen igual
 
 #### Scenario: Reporte previo sin estado de búsqueda
 - **WHEN** un reporte no trae `trial_search`
 - **THEN** el reporte se valida igual y `trial_search` queda nulo
+
+### Requirement: Estado de reclutamiento y sede local visibles
+El frontend y el PDF SHALL mostrar, por ensayo, si todavía no abrió reclutamiento
+(`NOT_YET_RECRUITING`) y si tiene sede en Argentina. Un ensayo que aún no recluta MUST
+mostrarse de forma que no se confunda con uno abierto, y el texto MUST NOT afirmar que el
+paciente puede inscribirse hoy.
+
+#### Scenario: Ensayo que aún no recluta
+- **WHEN** un ensayo tiene `status: "NOT_YET_RECRUITING"`
+- **THEN** el reporte lo muestra con una marca explícita de que aún no abrió reclutamiento
+
+#### Scenario: Ensayo con sede en Argentina
+- **WHEN** un ensayo tiene `has_local_site: true`
+- **THEN** el reporte lo señala, y el ensayo aparece antes que otros de igual compatibilidad y estado
 
 ### Requirement: Vista de ensayos en el frontend
 La tab "Ensayos clínicos" SHALL mostrar, por ensayo, una etiqueta de compatibilidad, el

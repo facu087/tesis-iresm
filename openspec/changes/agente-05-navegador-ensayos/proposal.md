@@ -6,11 +6,12 @@ hipótesis que produjo el debate, no mira si el ensayo admite la edad o el sexo 
 paciente y, si la API falla, devuelve `[]` sin que el reporte lo diga. El médico
 recibe una lista de ensayos "relacionados con la condición", no ensayos
 **compatibles con el perfil del paciente**, que es lo que pide la tarjeta #53.
-Orphanet tiene cliente (`external/orphanet.py`) pero no está conectado, y al
-probarlo contra la API real (2026-09-15) su búsqueda **nunca devuelve resultados**:
-usa un endpoint inexistente (`/approximatelymatching` → HTTP 404) y se traga el
-error. Es el momento de cerrar las dos cosas con un agente dedicado, antes de que
-el Árbitro (04) y el Sintetizador (06) se apoyen sobre este paso.
+Orphanet tiene cliente (`external/orphanet.py`) pero **no está conectado al pipeline**.
+Su búsqueda nunca devolvía resultados —usaba el endpoint inexistente
+`/approximatelymatching`— pero eso ya quedó arreglado en F1 (PR #11), que es
+prerrequisito de este cambio: acá solo hay que conectarlo. Es el momento de cerrar las
+dos cosas con un agente dedicado, antes de que el Árbitro (04) y el Sintetizador (06) se
+apoyen sobre este paso.
 
 ## What Changes
 
@@ -36,10 +37,10 @@ el Árbitro (04) y el Sintetizador (06) se apoyen sobre este paso.
 - Privacidad: a ClinicalTrials.gov y Orphanet solo viajan términos saneados en inglés
   (condición, sinónimos, genes, fármacos INN); edad y sexo se filtran localmente; los
   logs registran tipo de excepción y conteos, nunca texto clínico ni respuestas del LLM.
-- `external/orphanet.py`: `search()` pasa al endpoint real `ApproximateName/{name}`,
-  parsea `ORPHAcode`, distingue "sin coincidencias" de "API caída" y deja de silenciar
-  errores. **BREAKING (interno)**: ante falla de red/HTTP, `search()` lanza
-  `ExternalApiError` en lugar de devolver `[]`; el fallback pasa al agente.
+- `external/orphanet.py`: **sin cambios en este PR**. F1 ya lo dejó funcionando contra el
+  endpoint real, parseando `ORPHAcode` y levantando `ExternalApiError` ante un fallo real
+  en lugar de devolver `[]`. Este cambio consume ese contrato y decide el fallback en el
+  agente. `ORPHANET_API_KEY` es opcional: medido, la API responde sin clave.
 - `api/router.py`: el paso 6 deja de llamar a `search_by_biomarkers` y ejecuta el
   Agente 05 en paralelo con la verificación bibliográfica (paso 7).
 - Contrato de exportación **aditivo** (mismo precedente que `Source.verified`):
@@ -47,9 +48,17 @@ el Árbitro (04) y el Sintetizador (06) se apoyen sobre este paso.
     `compatibility_rationale`, `criteria_to_verify`, `related_hypotheses`, `matched_terms`.
   - `StructuredReport` suma `rare_diseases: list[RareDiseaseMatch] = []` y
     `trial_search: TrialSearchSummary` (qué se consultó, qué falló, cuántos se excluyeron).
+- **Ensayos `NOT_YET_RECRUITING` incluidos y etiquetados**: la búsqueda deja de limitarse a
+  `RECRUITING`. Para un paciente con enfermedad rara sin tratamiento aprobado, un ensayo que
+  abre en meses es accionable; el reporte lo distingue de los que reclutan hoy y nunca
+  afirma disponibilidad inmediata.
+- **Ensayos con sede en Argentina primero**: el reporte los ordena hacia arriba dentro de
+  cada nivel de compatibilidad, **sin filtrar** por ubicación. Se resuelve sobre las sedes
+  que el cliente ya devuelve; no viaja nada a la API ni deriva de un dato del paciente.
+  `ClinicalTrial` suma `has_local_site`.
 - Frontend (tab "Ensayos clínicos") y PDF muestran compatibilidad, criterios a
-  verificar, enfermedades raras de Orphanet y el estado de la búsqueda, con la
-  aclaración de que la compatibilidad es orientativa.
+  verificar, enfermedades raras de Orphanet, estado de reclutamiento, sede local y el
+  estado de la búsqueda, con la aclaración de que la compatibilidad es orientativa.
 
 ## Capabilities
 
@@ -72,18 +81,24 @@ el Árbitro (04) y el Sintetizador (06) se apoyen sobre este paso.
 - **Código nuevo**: `backend/agents/agent_05_trials.py`, `backend/pipeline/trial_matching.py`
   (adaptador de entrada y helpers deterministas), `tests/test_agent_05_trials.py`,
   `tests/test_trial_matching.py`, `scripts/demo_agente05.py`.
-- **Código modificado**: `backend/models/trial.py`, `backend/external/orphanet.py`,
-  `backend/api/router.py`, `backend/api/schemas.py`, `backend/pipeline/report_builder.py`,
-  `backend/pipeline/pdf_exporter.py`, `frontend/src/lib/types.ts`,
-  `frontend/src/app/report/page.tsx`, `frontend/src/app/analyzing/page.tsx`,
-  `tests/test_api.py`, `tests/test_orphanet.py`, `tests/test_report_builder.py`,
-  `tests/test_pdf_exporter.py`, `scripts/demo_orphanet.py`.
-- **APIs externas**: ClinicalTrials.gov (hasta 10 consultas por análisis en vez de 1–2),
-  Orphanet (nueva en el pipeline, requiere `ORPHANET_API_KEY`; sin ella se omite y el
-  reporte lo informa), Groq (+2 llamadas por análisis, sujetas al límite de 12k TPM).
+- **Código modificado**: `backend/models/trial.py`, `backend/external/clinical_trials.py`
+  (estados de reclutamiento), `backend/api/router.py`, `backend/api/schemas.py`,
+  `backend/pipeline/report_builder.py`, `backend/pipeline/pdf_exporter.py`,
+  `frontend/src/lib/types.ts`, `frontend/src/app/report/page.tsx`,
+  `frontend/src/app/analyzing/page.tsx`, `tests/test_api.py`,
+  `tests/test_clinical_trials.py`, `tests/test_report_builder.py`,
+  `tests/test_pdf_exporter.py`.
+  **Ya no se toca** `backend/external/orphanet.py`, `tests/test_orphanet.py` ni
+  `scripts/demo_orphanet.py`: los cerró F1.
+- **APIs externas**: ClinicalTrials.gov (hasta 10 consultas por análisis en vez de 1–2, y
+  ahora también estados `NOT_YET_RECRUITING`), Orphanet (nueva en el pipeline, sin
+  credencial obligatoria), Groq (+2 llamadas por análisis, sujetas al límite de 12k TPM).
 - **Contrato JSON**: solo aditivo; clientes que ignoren los campos nuevos siguen andando.
-- **Cambios en paralelo**: #54 (EBM) toca `schemas.py` y `report_builder.py`; este cambio
-  agrega campos y un parámetro al final, sin tocar `_rank_hypotheses` ni `RankedHypothesis`.
-  #51 (Agente 02) toca `orchestrator.py`/`debate.py`, que este cambio no modifica.
-- **Documentación**: `.claude/CLAUDE.md`, `.claude/backlog.md` (tarea 10 y hallazgo del
-  cliente Orphanet), `.claude/architecture.md` (flujo y APIs) y `.env.example`.
+- **Cambios ya mergeados que este toma como base**: #54 (EBM) dejó
+  `backend/pipeline/evidence.py`, el parámetro `verifications` en `build_export()` y los
+  estados `respaldada` / `pendiente` / `especulativa` — **no existe `descartada`**, así que
+  el agente no descarta candidatas por estado. F1 dejó el cliente Orphanet funcionando.
+  Este cambio agrega campos y un parámetro al final, sin tocar `_rank_hypotheses` ni
+  `RankedHypothesis`. #51 (Agente 02) toca `orchestrator.py`/`debate.py`, que no se modifican.
+- **Documentación**: `.claude/CLAUDE.md`, `.claude/backlog.md` (tarea 10),
+  `.claude/architecture.md` (flujo, APIs y estados de reclutamiento).
