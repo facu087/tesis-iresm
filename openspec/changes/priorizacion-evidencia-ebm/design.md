@@ -83,19 +83,22 @@ experto.
 - *Alternativa descartada — tope III*: más conservador, pero degrada sistemáticamente la
   evidencia observacional, que es la mayoría de lo citable en el caso base.
 
-### D4. Guías (`Practice Guideline`, `Guideline`) → tope **II** — *a confirmar en la revisión*
+### D4. Guías (`Practice Guideline`, `Guideline`) → tope **II** (confirmado por el usuario)
 El prompt del Agente 03 grada las guías (A → I, B/C → II), pero PubMed no informa el grado de
 recomendación. Tope II no impide que una guía respalde la hipótesis; solo evita que el grado A
 autodeclarado pase sin control.
 
-- *Alternativa — tope I*: respetaría la gradación del Agente 03 (el tope nunca sube lo
-  declarado), a costa de aceptar el grado que declara el LLM. Si el usuario la prefiere, cambia
-  una línea de la tabla y un escenario de la spec.
+- *Alternativa descartada — tope I*: respetaría la gradación del Agente 03 (el tope nunca sube
+  lo declarado), a costa de aceptar sin control el grado que declara el LLM.
 
 ### D5. `Review` (narrativa) → tope III; retractada → III con prioridad sobre todo
 Revisión narrativa = opinión de experto en la jerarquía EBM. Una publicación retractada no
-puede sostener nivel I aunque además sea un RCT. Ver riesgo sobre revisiones sistemáticas
-anteriores a 2019.
+puede sostener nivel I aunque además sea un RCT.
+
+**Limitación documentada (confirmada por el usuario):** el tipo `Systematic Review` existe en
+PubMed desde 2019; las revisiones sistemáticas anteriores suelen estar indexadas solo como
+`Review` y por lo tanto topean en III. Se acepta como limitación conocida del criterio, no se
+corrige con heurísticas (ver D2), y queda escrita en la spec y en `.claude/architecture.md`.
 
 ### D6. El estado es **derivado**, no un campo persistido en `Hypothesis`
 `architecture.md` pedía `Hypothesis.estado`. Se resuelve con una función pura que recibe la
@@ -130,16 +133,15 @@ sigue siendo consecutivo. El frontend y el PDF agrupan por `status`.
   del LLM. Con esta decisión los consumidores viejos muestran, sin tocarlos, el valor
   conservador. El tipo del campo no cambia.
 
-### D10. Orden: estado → nivel efectivo → prioridad → fuentes verificadas → orden original — *a confirmar*
+### D10. Orden: estado → nivel efectivo → prioridad → fuentes verificadas → orden original (confirmado por el usuario)
 El nivel efectivo quedó anclado en evidencia externa; la prioridad sigue siendo opinión del
 LLM. Lo anclado pesa más. Dado que toda hipótesis no respaldada tiene nivel III, "estado
 primero" y "nivel primero" solo difieren en empates, y "estado primero" garantiza grupos
 contiguos.
 
-- *Alternativa — mantener prioridad primero* (orden actual): preserva la regla clínica del
-  Agente 03 de "descartar primero lo tratable", pero contradice el título de la tarjeta
-  ("priorización por nivel de evidencia"). Si el usuario la prefiere, cambia la clave de orden
-  y dos escenarios de la spec.
+- *Alternativa descartada — mantener prioridad primero* (orden actual): preserva la regla
+  clínica del Agente 03 de "descartar primero lo tratable", pero contradice el título de la
+  tarjeta ("priorización por nivel de evidencia"). La prioridad queda como tercer criterio.
 
 ### D11. Solo cuentan los veredictos de `verification.py`
 La clasificación lee el dict de veredictos, nunca `Source.verified` ni
@@ -190,9 +192,9 @@ def prioritize(
   `Journal Article`] → un RCT nuevo topea en II, no en III (D3); `evidence_note` explica el
   tope y el nivel declarado queda visible.
 - [Revisiones sistemáticas anteriores a 2019 indexadas solo como `Review`, antes de que
-  existiera el tipo `Systematic Review`] → topean en III. Se documenta como limitación en la
-  tesis; el demo con PMIDs reales tiene que mostrar al menos un caso para medir el impacto. El
-  refinamiento por MeSH (D2) lo resolvería sin cambiar la interfaz.
+  existiera el tipo `Systematic Review`] → topean en III. Aceptado como limitación documentada
+  (D5): figura en la spec, en `.claude/architecture.md` y en la nota de la tarjeta. El
+  refinamiento por MeSH (D2) lo resolvería a futuro sin cambiar la interfaz.
 - [La verificación confirma identidad del artículo, no pertinencia] → un meta-análisis
   verificado pero tangencial habilita tope I. Acotado por D1 (nunca sube lo declarado); la
   pertinencia la juzga el Árbitro (#52).

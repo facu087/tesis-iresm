@@ -29,6 +29,10 @@ sus tipos figura en la tabla (por ejemplo, solo `Journal Article`), el tope SHAL
 La comparación de tipos de publicación MUST ser insensible a mayúsculas y espacios
 circundantes.
 
+**Limitación conocida:** el tipo `Systematic Review` existe en PubMed desde 2019. Una revisión
+sistemática anterior indexada solo como `Review` SHALL topear en III como cualquier revisión
+narrativa; el sistema MUST NOT intentar reconocerla por otros medios (título, abstract o MeSH).
+
 #### Scenario: Meta-análisis verificado habilita nivel I
 - **WHEN** una fuente verificada tiene los tipos `Journal Article` y `Meta-Analysis`
 - **THEN** su tope de evidencia es I
@@ -43,6 +47,14 @@ circundantes.
 
 #### Scenario: Reporte de caso topea en III
 - **WHEN** una fuente verificada tiene los tipos `Case Reports` y `Journal Article`
+- **THEN** su tope de evidencia es III
+
+#### Scenario: Guía de práctica clínica topea en II
+- **WHEN** una fuente verificada tiene los tipos `Practice Guideline` y `Journal Article`
+- **THEN** su tope de evidencia es II
+
+#### Scenario: Revisión sistemática previa a 2019 indexada como Review (limitación)
+- **WHEN** una fuente verificada es una revisión sistemática publicada antes de 2019 cuyos tipos son `Journal Article` y `Review`
 - **THEN** su tope de evidencia es III
 
 #### Scenario: Mezcla de tipos toma el mejor
