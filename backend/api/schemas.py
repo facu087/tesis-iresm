@@ -38,16 +38,24 @@ class RankedHypothesis(BaseModel):
     rank: int
     text: str
     priority: str            # HIGH | MEDIUM | LOW
-    evidence_level: str      # I | II | III
+    # Nivel EBM efectivo (I | II | III): el declarado por el agente, topeado
+    # por la evidencia verificada (backend/pipeline/evidence.py).
+    evidence_level: str
     rationale: str
     supporting_agents: list[str]
     sources: list[Source]
 
-    # Estado bibliográfico (Agente 04). "respaldada" = al menos una fuente
-    # verificada contra PubMed; "especulativa" = ninguna. Las especulativas
-    # NO se descartan: se muestran etiquetadas para el médico responsable.
+    # Estado bibliográfico (Agente 04):
+    #   "respaldada"   = al menos una fuente verificada contra PubMed;
+    #   "pendiente"    = la verificación no pudo concluir (p. ej. PubMed caído);
+    #   "especulativa" = ninguna fuente resiste la verificación.
+    # Ninguna se descarta: se muestran etiquetadas para el médico responsable.
     status: str = "especulativa"
     verified_sources: int = 0
+
+    # Trazabilidad del nivel: lo que declaró el agente y por qué quedó así.
+    declared_evidence_level: str | None = None  # I | II | III
+    evidence_note: str = ""
 
 
 class DebateSummary(BaseModel):
@@ -63,6 +71,10 @@ class VerificationSummary(BaseModel):
 
     `discordantes` son PMIDs que existen pero corresponden a otro artículo:
     el caso típico de alucinación de un LLM.
+
+    Respaldadas + pendientes + especulativas = total de hipótesis.
+    `hipotesis_topeadas` cuenta las que quedaron con nivel efectivo por debajo
+    del declarado por el agente.
     """
     total_fuentes: int = 0
     verificadas: int = 0
@@ -72,6 +84,8 @@ class VerificationSummary(BaseModel):
     no_verificables: int = 0
     hipotesis_respaldadas: int = 0
     hipotesis_especulativas: int = 0
+    hipotesis_pendientes: int = 0
+    hipotesis_topeadas: int = 0
 
 
 class StructuredReport(BaseModel):

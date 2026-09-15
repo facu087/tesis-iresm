@@ -146,13 +146,18 @@ class PubMedClient:
     @retry(**_RETRY_KWARGS)
     async def _esummary(self, pmids: list[str]) -> dict[str, dict]:
         """
-        Trae metadatos (título, revista, año, autores) de una lista de PMIDs.
+        Trae metadatos (título, revista, año, autores, tipos de publicación)
+        de una lista de PMIDs.
+
+        Los tipos de publicación (`pubtype`: "Meta-Analysis", "Case Reports",
+        etc.) vienen en la misma respuesta: usarlos no agrega consultas. Los
+        consume la clasificación de evidencia (backend/pipeline/evidence.py).
 
         Args:
             pmids: Lista de PMIDs
 
         Returns:
-            Dict {pmid: {title, journal, year, authors}}
+            Dict {pmid: {title, journal, year, authors, pubtypes}}
         """
         assert self._client is not None, "Usar dentro de un bloque async with"
         if not pmids:
@@ -181,6 +186,7 @@ class PubMedClient:
                 "journal": doc.get("fulljournalname", doc.get("source", "")),
                 "year": doc.get("pubdate", "")[:4],
                 "authors": authors,
+                "pubtypes": [str(t) for t in doc.get("pubtype", []) if t],
             }
         return result
 
@@ -276,8 +282,8 @@ class PubMedClient:
             pmids: Lista de PMIDs a consultar
 
         Returns:
-            Dict {pmid: {title, journal, year, authors}}. Los PMIDs que no
-            existen simplemente no aparecen en el dict devuelto.
+            Dict {pmid: {title, journal, year, authors, pubtypes}}. Los PMIDs
+            que no existen simplemente no aparecen en el dict devuelto.
         """
         return await self._esummary(pmids)
 

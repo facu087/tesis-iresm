@@ -268,6 +268,78 @@ class TestVerificacionEnPdf:
         assert "Advertencia de verificación bibliográfica" not in texto
 
 
+# ── Tests: priorización por evidencia EBM en el PDF ───────────────────────────
+
+class TestPriorizacionEnPdf:
+    def _report_priorizado(self) -> StructuredReport:
+        verificada = Source(
+            pmid="30000002", title="Metformin use and B12 deficiency: a cohort",
+            verified=True, verification_status="verificada",
+            publication_types=["Journal Article", "Observational Study"],
+        )
+        respaldada = RankedHypothesis(
+            rank=1, text="Déficit de B12 por metformina.", priority="HIGH",
+            evidence_level="II", declared_evidence_level="I",
+            evidence_note="El agente declaró nivel I; queda topeado en II.",
+            rationale="Razonamiento.", supporting_agents=["Consultor Clínico"],
+            sources=[verificada], status="respaldada", verified_sources=1,
+        )
+        pendiente = RankedHypothesis(
+            rank=2, text="Polineuropatía desmielinizante inflamatoria crónica.", priority="MEDIUM",
+            evidence_level="III", declared_evidence_level="II",
+            evidence_note="Verificación bibliográfica no disponible.",
+            rationale="Razonamiento.", supporting_agents=[],
+            sources=[Source(pmid="30000003", title="CIDP", verification_status="no_verificable")],
+            status="pendiente",
+        )
+        especulativa = RankedHypothesis(
+            rank=3, text="Amiloidosis TTR hereditaria.", priority="HIGH",
+            evidence_level="III", declared_evidence_level="III",
+            rationale="Razonamiento.", supporting_agents=[], sources=[],
+            status="especulativa",
+        )
+        report = _make_report(hypotheses=[respaldada, pendiente, especulativa])
+        report.verification = VerificationSummary(
+            total_fuentes=2, verificadas=1, no_verificables=1,
+            hipotesis_respaldadas=1, hipotesis_pendientes=1, hipotesis_especulativas=1,
+            hipotesis_topeadas=2,
+        )
+        return report
+
+    def test_agrupa_por_estado_con_encabezados_en_orden(self):
+        texto = _texto_del_pdf(generate_pdf(self._report_priorizado()))
+        i_resp = texto.index("HIPÓTESIS RESPALDADAS (1)")
+        i_pend = texto.index("PENDIENTES DE VERIFICACIÓN (1)")
+        i_espe = texto.index("HIPÓTESIS ESPECULATIVAS (1)")
+        assert i_resp < i_pend < i_espe
+
+    def test_omite_grupos_vacios(self):
+        report = self._report_priorizado()
+        report.hypotheses = [report.hypotheses[0], report.hypotheses[2]]
+        texto = _texto_del_pdf(generate_pdf(report))
+        assert "PENDIENTES DE VERIFICACIÓN" not in texto
+        assert "HIPÓTESIS ESPECULATIVAS (1)" in texto
+
+    def test_etiqueta_pendiente(self):
+        assert "PENDIENTE" in _texto_del_pdf(generate_pdf(self._report_priorizado()))
+
+    def test_muestra_el_nivel_declarado_cuando_fue_topeado(self):
+        texto = _texto_del_pdf(generate_pdf(self._report_priorizado()))
+        assert "Evidencia II (declarado I)" in texto
+        assert "queda topeado en II" in texto
+        # La especulativa declaró III y quedó en III: no muestra "declarado".
+        assert "(declarado III)" not in texto
+
+    def test_portada_con_pendientes_y_topeadas(self):
+        texto = _texto_del_pdf(generate_pdf(self._report_priorizado()))
+        assert "Hipótesis pendientes de verificación" in texto
+        assert "Hipótesis con nivel de evidencia topeado" in texto
+
+    def test_fuente_verificada_muestra_su_tipo_de_publicacion(self):
+        texto = _texto_del_pdf(generate_pdf(self._report_priorizado()))
+        assert "Observational Study" in texto
+
+
 # ── Tests: endpoint /api/report/pdf ───────────────────────────────────────────
 
 class TestExportPdfEndpoint:
@@ -295,6 +367,25 @@ class TestExportPdfEndpoint:
     def test_body_es_pdf_valido(self):
         with TestClient(app) as client:
             response = client.post("/api/report/pdf", json=self._report_json())
+        assert response.content[:4] == b"%PDF"
+
+    def test_reporte_previo_a_la_priorizacion_ebm_sigue_siendo_valido(self):
+        """Contrato aditivo: un JSON sin los campos nuevos se acepta y exporta."""
+        viejo = self._report_json()
+        for h in viejo["hypotheses"]:
+            h.pop("declared_evidence_level", None)
+            h.pop("evidence_note", None)
+            for s in h["sources"]:
+                s.pop("publication_types", None)
+        for s in viejo["bibliography"]:
+            s.pop("publication_types", None)
+        viejo["verification"].pop("hipotesis_pendientes", None)
+        viejo["verification"].pop("hipotesis_topeadas", None)
+
+        StructuredReport.model_validate(viejo)
+        with TestClient(app) as client:
+            response = client.post("/api/report/pdf", json=viejo)
+        assert response.status_code == 200
         assert response.content[:4] == b"%PDF"
 
     def test_body_invalido_devuelve_422(self):

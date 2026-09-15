@@ -1,38 +1,56 @@
 """
-Cliente para PharmGKB API.
+Cliente para la API de PharmGKB (hoy ClinPGx).
 
-Documentación oficial: https://api.pharmgkb.org/v1/
-Base URL: https://api.pharmgkb.org/v1
-Autenticación: ninguna (API pública con rate limit generoso)
+PharmGKB se rebrandeó a ClinPGx y el host de la API anterior,
+`api.pharmgkb.org`, **fue dado de baja**: no resuelve por DNS (NXDOMAIN,
+confirmado contra 8.8.8.8 y no solo contra el resolver local). El sitio web sí
+redirige con 301 de `www.pharmgkb.org` a `www.clinpgx.org`, así que navegando
+no se nota nada — pero el cliente moría en la resolución de nombres.
 
-PharmGKB relaciona genes, variantes genéticas, fármacos y fenotipos clínicos.
-Es clave para el Agente 02 (Especialista Genómica) cuando el caso tiene genes alterados.
+Base URL: https://api.clinpgx.org/v1/data
+Autenticación: ninguna (API pública)
 
-Endpoints usados:
-  - /gene?symbol={symbol}             → busca un gen por símbolo (ej: TTR, CYP2D6)
-  - /chemical?name={name}             → busca un fármaco por nombre
-  - /clinicalAnnotation?gene={id}     → anotaciones clínicas por gen
-  - /variantAnnotation?gene={id}      → anotaciones de variantes por gen
+PharmGKB relaciona genes, variantes, fármacos y fenotipos clínicos. Es la
+fuente del Agente 02 (Especialista Genómica) cuando el caso tiene genes
+alterados.
+
+Endpoints usados (verificados contra la API real):
+  - /gene?symbol={symbol}                            → gen por símbolo
+  - /chemical?name={name}                            → fármaco por nombre
+  - /clinicalAnnotation?location.genes.symbol={sym}  → anotaciones por gen
+  - /clinicalAnnotation?relatedChemicals.name={name} → anotaciones por fármaco
+
+Códigos de respuesta, y por qué importan:
+  - 200 → resultados en `data`
+  - 404 + "No results matching criteria." → **sin resultados, no es un error**
+  - 400 + "No such property: 'x'"          → query mal formada: es un bug nuestro
+  - 429 / 5xx / red                        → la API falló
+
+Esa distinción es la que faltaba. La versión anterior atrapaba
+`except (httpx.HTTPError, Exception)` y devolvía `[]` en todos los casos, así
+que un host inexistente y un gen sin anotaciones eran indistinguibles: el
+cliente "funcionaba" sin haber hablado nunca con PharmGKB.
 """
 
 from __future__ import annotations
 
-import os
+import asyncio
+import sys
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Any, Optional
 
 import httpx
-from tenacity import retry, stop_after_attempt, wait_exponential
 
-_BASE_URL = "https://api.pharmgkb.org/v1"
-_PHARMGKB_GENE_URL = "https://www.pharmgkb.org/gene/{id}"
-_PHARMGKB_DRUG_URL = "https://www.pharmgkb.org/chemical/{id}"
+from .rate_limiter import ExternalApiError, pharmgkb_limiter
 
-_RETRY_KWARGS = dict(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=2, min=2, max=8),
-    reraise=True,
-)
+_API_NAME = "PharmGKB/ClinPGx"
+_BASE_URL = "https://api.clinpgx.org/v1/data"
+_GENE_URL = "https://www.clinpgx.org/gene/{id}"
+_DRUG_URL = "https://www.clinpgx.org/chemical/{id}"
+_ANNOTATION_URL = "https://www.clinpgx.org/clinicalAnnotation/{id}"
+
+# Escala de evidencia de PharmGKB, de más fuerte a más débil.
+_EVIDENCE_ORDER = {"1A": 0, "1B": 1, "2A": 2, "2B": 3, "3": 4, "4": 5}
 
 
 @dataclass
@@ -42,7 +60,7 @@ class GeneAnnotation:
     gene_symbol: str
     drug_name: str
     phenotype: str
-    evidence_level: str        # 1A, 1B, 2A, 2B, 3, 4 (PharmGKB scale)
+    evidence_level: str        # 1A, 1B, 2A, 2B, 3, 4 (escala PharmGKB)
     variant: str = ""
     population: str = ""
     url: str = ""
@@ -51,9 +69,9 @@ class GeneAnnotation:
         """Formatea la anotación para incluir en el contexto de un agente."""
         return (
             f"Gen {self.gene_symbol} + {self.drug_name}: "
-            f"{self.phenotype} "
+            f"{self.phenotype or 'fenotipo no especificado'} "
             f"(Variante: {self.variant or 'no especificada'}, "
-            f"Evidencia PharmGKB: {self.evidence_level})"
+            f"Evidencia PharmGKB: {self.evidence_level or 'sin nivel'})"
         )
 
 
@@ -69,7 +87,7 @@ class DrugGeneInteraction:
 
     def __post_init__(self) -> None:
         if not self.url and self.pharmgkb_id:
-            self.url = _PHARMGKB_DRUG_URL.format(id=self.pharmgkb_id)
+            self.url = _DRUG_URL.format(id=self.pharmgkb_id)
 
     def summary(self) -> str:
         """Resumen de interacciones para el contexto de un agente."""
@@ -81,14 +99,61 @@ class DrugGeneInteraction:
         return "\n".join(lines)
 
 
+def _sort_key(annotation: GeneAnnotation) -> int:
+    """Ordena por fuerza de evidencia; los niveles desconocidos van al final."""
+    return _EVIDENCE_ORDER.get(annotation.evidence_level, len(_EVIDENCE_ORDER))
+
+
+def _parse_annotation(item: dict[str, Any], gene_symbol: str = "") -> GeneAnnotation:
+    """
+    Construye un GeneAnnotation desde un registro de /clinicalAnnotation.
+
+    Los nombres de campo están verificados contra la API real. La versión
+    anterior leía `evidenceLevel`, `phenotypeCategories`, `variant` y `url`, y
+    ninguno de los cuatro existe en la respuesta: todas las anotaciones habrían
+    salido vacías incluso si el host hubiera resuelto.
+    """
+    location = item.get("location") or {}
+    genes = location.get("genes") or []
+    simbolo = gene_symbol or (genes[0].get("symbol", "") if genes else "")
+
+    chemicals = item.get("relatedChemicals") or []
+    diseases = item.get("relatedDiseases") or []
+    accession = item.get("accessionId", "")
+
+    return GeneAnnotation(
+        gene_symbol=simbolo,
+        drug_name=chemicals[0].get("name", "") if chemicals else "",
+        phenotype=", ".join(d.get("name", "") for d in diseases if d.get("name")),
+        evidence_level=(item.get("levelOfEvidence") or {}).get("term", ""),
+        variant=location.get("displayName") or "",
+        url=_ANNOTATION_URL.format(id=accession) if accession else "",
+    )
+
+
+def _extract_error(response: httpx.Response) -> str:
+    """Saca el mensaje de error del cuerpo JSON de la API, si lo trae."""
+    try:
+        errores = response.json().get("data", {}).get("errors", [])
+        if errores:
+            return str(errores[0].get("message", ""))
+    except ValueError:
+        pass
+    return response.text[:120]
+
+
 class PharmGKBClient:
     """
-    Cliente asíncrono para PharmGKB API.
+    Cliente asíncrono para la API de PharmGKB/ClinPGx.
+
+    A diferencia de la versión anterior, **no** silencia los errores: un fallo
+    real de la API levanta ExternalApiError. "Sin resultados" se distingue de
+    "falló" y devuelve una lista vacía.
 
     Uso básico:
         async with PharmGKBClient() as client:
-            interactions = await client.get_drug_interactions("patisiran")
-            annotations = await client.get_gene_annotations("TTR")
+            annotations = await client.get_gene_annotations("CYP2D6")
+            interactions = await client.get_drug_interactions("warfarin")
     """
 
     def __init__(self) -> None:
@@ -105,177 +170,158 @@ class PharmGKBClient:
         if self._client:
             await self._client.aclose()
 
-    @retry(**_RETRY_KWARGS)
-    async def _get_gene_id(self, symbol: str) -> Optional[str]:
+    async def _request(self, path: str, params: dict[str, str]) -> list[dict[str, Any]]:
         """
-        Resuelve el símbolo de un gen a su ID interno de PharmGKB.
+        Hace una consulta y devuelve la lista `data`, o [] si no hubo resultados.
 
-        Args:
-            symbol: Símbolo del gen (ej: "TTR", "CYP2D6")
-
-        Returns:
-            PharmGKB Accession ID o None
+        Raises:
+            ExternalApiError: ante un fallo real de la API (400, 429, 5xx, red).
+                              Un 404 NO es un fallo: significa "sin resultados".
         """
         assert self._client is not None, "Usar dentro de un bloque async with"
 
-        try:
-            response = await self._client.get(
-                f"{_BASE_URL}/gene",
-                params={"symbol": symbol, "view": "base"},
-            )
-            response.raise_for_status()
-            data = response.json()
-            items = data.get("data", [])
-            if items:
-                return items[0].get("id")
-        except (httpx.HTTPError, Exception):
-            pass
-        return None
+        # Limitador compartido de rate_limiter.py, no uno propio: así el límite
+        # se respeta aunque haya varios PharmGKBClient en vuelo a la vez.
+        await pharmgkb_limiter.acquire()
 
-    @retry(**_RETRY_KWARGS)
+        try:
+            response = await self._client.get(f"{_BASE_URL}{path}", params=params)
+        except httpx.HTTPError as exc:
+            # Incluye el caso del host inexistente: httpx.ConnectError por DNS.
+            raise ExternalApiError(
+                _API_NAME, f"No se pudo consultar {path}: {exc}"
+            ) from exc
+
+        if response.status_code == 404:
+            return []
+
+        if response.status_code != 200:
+            raise ExternalApiError(
+                _API_NAME,
+                f"{path} devolvió: {_extract_error(response)}",
+                status_code=response.status_code,
+            )
+
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise ExternalApiError(
+                _API_NAME, f"{path} devolvió un cuerpo que no es JSON"
+            ) from exc
+
+        data = payload.get("data")
+        return data if isinstance(data, list) else []
+
     async def get_gene_annotations(
         self,
         gene_symbol: str,
         max_results: int = 10,
     ) -> list[GeneAnnotation]:
         """
-        Trae anotaciones clínicas para un gen (relaciones gen-fármaco-fenotipo).
+        Trae anotaciones clínicas de un gen (relaciones gen-fármaco-fenotipo).
 
         Args:
-            gene_symbol: Símbolo del gen (ej: "TTR", "CYP2D6", "BRCA1")
-            max_results: Cantidad máxima de anotaciones
+            gene_symbol: Símbolo del gen (ej: "TTR", "CYP2D6")
+            max_results: Máximo de anotaciones a devolver. La API no pagina del
+                         lado del servidor (`pageSize` da HTTP 400), así que el
+                         recorte se hace acá, después de ordenar por evidencia.
 
         Returns:
-            Lista de GeneAnnotation ordenadas por nivel de evidencia
+            Lista ordenada por fuerza de evidencia. Vacía si el gen no tiene
+            anotaciones, que no es lo mismo que un fallo: eso levanta excepción.
         """
-        assert self._client is not None, "Usar dentro de un bloque async with"
+        items = await self._request(
+            "/clinicalAnnotation",
+            {"location.genes.symbol": gene_symbol, "view": "max"},
+        )
+        annotations = [_parse_annotation(item, gene_symbol) for item in items]
+        annotations.sort(key=_sort_key)
+        return annotations[:max_results]
 
-        gene_id = await self._get_gene_id(gene_symbol)
-        if not gene_id:
-            return []
-
-        try:
-            response = await self._client.get(
-                f"{_BASE_URL}/clinicalAnnotation",
-                params={
-                    "gene": gene_id,
-                    "view": "base",
-                    "pageSize": str(max_results),
-                },
-            )
-            response.raise_for_status()
-            data = response.json()
-        except (httpx.HTTPError, Exception):
-            return []
-
-        annotations: list[GeneAnnotation] = []
-        for item in data.get("data", []):
-            drug = item.get("relatedChemicals", [{}])[0]
-            drug_name = drug.get("name", "")
-            phenotype_cats = item.get("phenotypeCategories", [])
-            phenotype = ", ".join(phenotype_cats) if phenotype_cats else ""
-
-            annotations.append(GeneAnnotation(
-                gene_symbol=gene_symbol,
-                drug_name=drug_name,
-                phenotype=phenotype,
-                evidence_level=item.get("evidenceLevel", ""),
-                variant=item.get("variant", {}).get("name", "") if item.get("variant") else "",
-                population=item.get("population", ""),
-                url=item.get("url", ""),
-            ))
-
-        # Ordenar: evidencias 1A y 1B primero
-        annotations.sort(key=lambda a: a.evidence_level)
-        return annotations
-
-    @retry(**_RETRY_KWARGS)
-    async def get_drug_interactions(self, drug_name: str) -> Optional[DrugGeneInteraction]:
+    async def get_drug_interactions(
+        self,
+        drug_name: str,
+        max_results: int = 10,
+    ) -> Optional[DrugGeneInteraction]:
         """
         Busca un fármaco y devuelve sus interacciones farmacogenómicas.
 
         Args:
-            drug_name: Nombre INN del fármaco (ej: "patisiran", "tafamidis")
+            drug_name: Nombre INN del fármaco (ej: "warfarin", "patisiran")
+            max_results: Máximo de anotaciones a incluir.
 
         Returns:
-            DrugGeneInteraction o None si no se encontró
+            DrugGeneInteraction, o None si el fármaco no está en PharmGKB.
+
+        Raises:
+            ExternalApiError: ante un fallo real de la API.
         """
-        assert self._client is not None, "Usar dentro de un bloque async with"
-
-        # 1. Buscar el fármaco
-        try:
-            response = await self._client.get(
-                f"{_BASE_URL}/chemical",
-                params={"name": drug_name, "view": "base"},
-            )
-            response.raise_for_status()
-            data = response.json()
-            items = data.get("data", [])
-        except (httpx.HTTPError, Exception):
+        chemicals = await self._request("/chemical", {"name": drug_name, "view": "base"})
+        if not chemicals:
             return None
 
-        if not items:
-            return None
+        drug_id = chemicals[0].get("id", "")
 
-        drug = items[0]
-        drug_id = drug.get("id", "")
-
-        # 2. Buscar anotaciones clínicas del fármaco
-        try:
-            ann_response = await self._client.get(
-                f"{_BASE_URL}/clinicalAnnotation",
-                params={"chemical": drug_id, "view": "base", "pageSize": "10"},
-            )
-            ann_response.raise_for_status()
-            ann_data = ann_response.json()
-        except (httpx.HTTPError, Exception):
-            ann_data = {"data": []}
+        items = await self._request(
+            "/clinicalAnnotation",
+            {"relatedChemicals.name": drug_name, "view": "max"},
+        )
 
         annotations: list[GeneAnnotation] = []
         genes_seen: set[str] = set()
+        for item in items:
+            annotation = _parse_annotation(item)
+            if annotation.gene_symbol:
+                genes_seen.add(annotation.gene_symbol)
+            # El nombre con el que se consultó manda si la cita no trae ninguno.
+            annotation.drug_name = annotation.drug_name or drug_name
+            annotations.append(annotation)
 
-        for item in ann_data.get("data", []):
-            gene_list = item.get("relatedGenes", [])
-            for gene in gene_list:
-                symbol = gene.get("symbol", "")
-                if symbol:
-                    genes_seen.add(symbol)
-
-            phenotype_cats = item.get("phenotypeCategories", [])
-            phenotype = ", ".join(phenotype_cats) if phenotype_cats else ""
-            gene_symbol = gene_list[0].get("symbol", "") if gene_list else ""
-
-            annotations.append(GeneAnnotation(
-                gene_symbol=gene_symbol,
-                drug_name=drug_name,
-                phenotype=phenotype,
-                evidence_level=item.get("evidenceLevel", ""),
-                variant=item.get("variant", {}).get("name", "") if item.get("variant") else "",
-            ))
+        annotations.sort(key=_sort_key)
 
         return DrugGeneInteraction(
             drug_name=drug_name,
             pharmgkb_id=drug_id,
-            genes=list(genes_seen),
-            annotations=annotations,
+            genes=sorted(genes_seen),
+            annotations=annotations[:max_results],
         )
+
+    async def get_gene_id(self, symbol: str) -> Optional[str]:
+        """
+        Resuelve el símbolo de un gen a su Accession ID de PharmGKB.
+
+        Args:
+            symbol: Símbolo del gen (ej: "TTR", "CYP2D6")
+
+        Returns:
+            El ID (ej: "PA128" para CYP2D6), o None si el gen no existe.
+
+        Raises:
+            ExternalApiError: ante un fallo real de la API.
+        """
+        genes = await self._request("/gene", {"symbol": symbol, "view": "base"})
+        return genes[0].get("id") if genes else None
+
+    async def get_gene_url(self, symbol: str) -> Optional[str]:
+        """Devuelve la URL pública del gen en ClinPGx, o None si no existe."""
+        gene_id = await self.get_gene_id(symbol)
+        return _GENE_URL.format(id=gene_id) if gene_id else None
 
     async def get_multi_gene_annotations(
         self,
         gene_symbols: list[str],
     ) -> dict[str, list[GeneAnnotation]]:
         """
-        Trae anotaciones para múltiples genes en paralelo.
-        Útil para el Agente 02 cuando el caso tiene varios genes alterados.
+        Trae anotaciones de varios genes en paralelo.
 
-        Args:
-            gene_symbols: Lista de símbolos de genes
+        Útil para el Agente 02 cuando el caso tiene varios genes alterados. Acá
+        sí interesa el resultado parcial: un gen que falla no tumba a los demás,
+        queda con lista vacía y el error se reporta por stderr. Es la única
+        excepción a "los fallos se propagan", y es deliberada.
 
         Returns:
             Dict {símbolo: [anotaciones]}
         """
-        import asyncio
-
         results = await asyncio.gather(
             *[self.get_gene_annotations(sym) for sym in gene_symbols],
             return_exceptions=True,
@@ -283,9 +329,12 @@ class PharmGKBClient:
 
         output: dict[str, list[GeneAnnotation]] = {}
         for symbol, result in zip(gene_symbols, results):
-            if isinstance(result, list):
-                output[symbol] = result
-            else:
+            if isinstance(result, BaseException):
+                print(
+                    f"[NEXUS][PharmGKB] Anotaciones de {symbol} no disponibles: {result}",
+                    file=sys.stderr,
+                )
                 output[symbol] = []
-
+            else:
+                output[symbol] = result
         return output

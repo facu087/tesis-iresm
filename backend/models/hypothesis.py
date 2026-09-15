@@ -26,6 +26,9 @@ class Source(BaseModel):
     verified: bool | None = None
     verification_status: str | None = None  # ver SourceStatus
     actual_title: str | None = None  # título real en PubMed, si no coincide
+    # Tipos de publicación que indexa PubMed ("Meta-Analysis", "Case Reports"…).
+    # Solo se completan para fuentes verificadas (backend/pipeline/evidence.py).
+    publication_types: list[str] = []
 
 
 class Hypothesis(BaseModel):

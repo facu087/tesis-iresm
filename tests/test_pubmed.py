@@ -250,3 +250,50 @@ async def test_verify_pmid_inexistente():
 
         exists = await client.verify_pmid("00000000")
         assert exists is False
+
+
+# ---------------------------------------------------------------------------
+# Tipos de publicación (clasificación de evidencia EBM)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_fetch_metadata_incluye_tipos_de_publicacion_en_una_sola_consulta():
+    """esummary ya trae `pubtype`: se exponen como `pubtypes` sin requests extra."""
+    respuesta = {
+        "result": {
+            "uids": ["30000001", "30000002"],
+            "30000001": {
+                "title": "Metformin and vitamin B12 deficiency: a meta-analysis",
+                "fulljournalname": "Diabetes Care",
+                "pubdate": "2021 Feb",
+                "authors": [],
+                "pubtype": ["Journal Article", "Meta-Analysis"],
+            },
+            # Sin campo pubtype: debe devolver lista vacía, no romper.
+            "30000002": {
+                "title": "Axonal neuropathy in a 42-year-old man",
+                "fulljournalname": "Neurology",
+                "pubdate": "2020",
+                "authors": [],
+            },
+        }
+    }
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json = MagicMock(return_value=respuesta)
+
+    urls: list[str] = []
+
+    async def mock_get(url, params=None):
+        urls.append(url)
+        return mock_response
+
+    client = PubMedClient()
+    client._client = AsyncMock()
+    client._client.get = mock_get
+
+    result = await client.fetch_metadata(["30000001", "30000002"])
+
+    assert len(urls) == 1
+    assert result["30000001"]["pubtypes"] == ["Journal Article", "Meta-Analysis"]
+    assert result["30000002"]["pubtypes"] == []
