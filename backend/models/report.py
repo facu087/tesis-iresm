@@ -34,3 +34,8 @@ class Report(BaseModel):
     debate_rounds: list[DebateRound] = []  # rondas 2-4
     divergences: list[str] = []
     sources_summary: dict[str, int] = {}
+
+    # Agentes que no produjeron output en la Ronda 1 y por lo tanto quedaron
+    # fuera del debate. Se deja constancia para que el reporte no presente como
+    # deliberación de N agentes lo que en realidad discutieron menos.
+    absent_agents: list[str] = []

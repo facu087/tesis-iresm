@@ -169,12 +169,53 @@ async def run_debate(case: ClinicalCase, round_1_report: Report) -> Report:
         raise ValueError("round_1_report no tiene agent_outputs — ejecutar Ronda 1 primero.")
 
     context = pico.format_for_agents(case.pico)
-    agents: list[BaseAgent] = [LiteratureAnalystAgent(), ClinicalConsultantAgent()]
+    all_agents: list[BaseAgent] = [LiteratureAnalystAgent(), ClinicalConsultantAgent()]
 
     # Indexar outputs de Ronda 1 por agent_id
     outputs_by_id: dict[str, AgentOutput] = {
         o.agent_id: o for o in round_1_report.agent_outputs
     }
+
+    # El debate corre SOLO con los agentes que produjeron output en la Ronda 1.
+    # run_round_1() deja afuera a los que fallaron, así que la lista completa de
+    # agentes y las claves de outputs_by_id no tienen por qué coincidir: indexar
+    # por AGENT_ID sin filtrar levantaba KeyError y tumbaba /api/analyze entero.
+    agents = [a for a in all_agents if a.AGENT_ID in outputs_by_id]
+    absent_agents = [
+        f"{a.AGENT_NAME} (ID:{a.AGENT_ID})" for a in all_agents if a.AGENT_ID not in outputs_by_id
+    ]
+
+    if absent_agents:
+        print(
+            f"[NEXUS] Debate sin {', '.join(absent_agents)}: "
+            f"no produjeron hipótesis en la Ronda 1.",
+            file=sys.stderr,
+        )
+
+    if not agents:
+        raise RuntimeError(
+            "Ningún agente del debate coincide con los outputs de la Ronda 1 "
+            f"(IDs recibidos: {sorted(outputs_by_id)}). Revisá la numeración de agentes."
+        )
+
+    # Con un solo agente no hay debate adversarial posible: nadie a quien criticar
+    # ni críticas que responder. Se devuelve la Ronda 1 con la constancia, en vez
+    # de simular tres rondas vacías y reportar un consenso que nunca se debatió.
+    if len(agents) < 2:
+        print(
+            "[NEXUS] Debate omitido: se necesitan al menos 2 agentes y quedó "
+            f"{len(agents)}. Se devuelven las hipótesis de la Ronda 1.",
+            file=sys.stderr,
+        )
+        return Report(
+            case_summary=round_1_report.case_summary,
+            hypotheses=round_1_report.hypotheses,
+            agent_outputs=round_1_report.agent_outputs,
+            debate_rounds=[],
+            divergences=[],
+            sources_summary=round_1_report.sources_summary,
+            absent_agents=absent_agents,
+        )
 
     # ── Ronda 2: críticas ─────────────────────────────────────────
     round_2 = await _round_2(agents, context, outputs_by_id)
@@ -205,4 +246,5 @@ async def run_debate(case: ClinicalCase, round_1_report: Report) -> Report:
         debate_rounds=[round_2, round_3, round_4],
         divergences=divergences,
         sources_summary=sources_summary,
+        absent_agents=absent_agents,
     )
