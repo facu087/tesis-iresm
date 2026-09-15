@@ -1,157 +1,135 @@
 """
-Demo de verificación — Cliente Orphanet API: búsqueda de enfermedades raras.
+Demo — Cliente Orphanet: búsqueda de enfermedades raras.
 
-Muestra cómo el cliente busca enfermedades raras por nombre y devuelve
-información estructurada incluyendo código ORPHA, definición y genes asociados.
-Usa datos simulados del caso clínico (neuropatía axonal, 42 años).
+Este script **consulta la API real**. La versión anterior usaba datos
+simulados, y eso tapaba dos cosas:
+
+1. `search()` apuntaba a `/approximatelymatching`, un endpoint que no existe:
+   devuelve 404. Como el cliente atrapaba `except (httpx.HTTPError, Exception)`
+   y devolvía `[]`, nunca falló de forma visible. Nunca trajo un resultado real.
+2. Los códigos ORPHA simulados no son los que devuelve Orphanet. El demo
+   afirmaba ORPHA:85163 para la amiloidosis ATTR hereditaria; el código real
+   es **ORPHA:271861**.
+
+Los genes no se consultan acá: la ORPHAcodes API no expone ese dato (32 rutas,
+ninguna de genes). Ver el docstring de `backend/external/orphanet.py`.
+
+Correrlo necesita conexión. No necesita GROQ_API_KEY.
+
+    python scripts/demo_orphanet.py
 
 Artefactos generados en output/demo_orphanet/:
-    1. enfermedades_encontradas.txt → enfermedades con código ORPHA, genes y definición
-    2. genes_asociados.txt          → genes por enfermedad (para el Agente 02)
-
-Uso:
-    python scripts/demo_orphanet.py
+    1. enfermedades.txt → lo que devuelve la API real, término por término
+    2. resumen.json     → el mismo resultado en JSON
 """
 
+import asyncio
+import json
 import sys
+from dataclasses import asdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from backend.external.orphanet import RareDisease
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 
-_SEP = "═" * 70
+from backend.external.orphanet import (
+    OrphanetClient,
+    OrphanetGenesNoDisponibles,
+)
+from backend.external.rate_limiter import ExternalApiError
+
+_SEP = "═" * 78
 _OUT_DIR = Path(__file__).parent.parent / "output" / "demo_orphanet"
 
-# Enfermedades raras simuladas relevantes para el caso (neuropatía axonal)
-_ENFERMEDADES = [
-    RareDisease(
-        orpha_code="85163",
-        name="Hereditary transthyretin amyloidosis",
-        definition=(
-            "Hereditary ATTR (ATTRv) amyloidosis is a progressive, fatal systemic disease "
-            "caused by mutations in the TTR gene encoding transthyretin. It manifests mainly "
-            "as peripheral neuropathy and/or cardiomyopathy, with onset typically in adulthood."
-        ),
-        genes=["TTR"],
-        synonyms=["Familial amyloid polyneuropathy", "hATTR amyloidosis", "ATTRv amyloidosis"],
-    ),
-    RareDisease(
-        orpha_code="642",
-        name="Charcot-Marie-Tooth disease type 1A",
-        definition=(
-            "CMT1A is the most common inherited peripheral neuropathy caused by duplication of "
-            "the PMP22 gene on chromosome 17p11.2. It presents with distal muscle weakness, "
-            "areflexia and sensory loss with slow nerve conduction velocities."
-        ),
-        genes=["PMP22"],
-        synonyms=["CMT1A", "HMSN Ia", "Hereditary motor and sensory neuropathy type Ia"],
-    ),
-    RareDisease(
-        orpha_code="98878",
-        name="Acute hepatic porphyria",
-        definition=(
-            "Acute hepatic porphyria encompasses four disorders caused by deficiencies in heme "
-            "biosynthesis enzymes. AHP presents with acute neurovisceral attacks, abdominal pain "
-            "and peripheral neuropathy. ALAS1 overexpression drives pathogenesis."
-        ),
-        genes=["HMBS", "CPOX", "PPOX", "ALAD"],
-        synonyms=["AHP", "Acute porphyria"],
-    ),
-    RareDisease(
-        orpha_code="251908",
-        name="Autoimmune autonomic ganglionopathy",
-        definition=(
-            "AAG is an acquired autoimmune neuropathy caused by antibodies against ganglionic "
-            "nicotinic acetylcholine receptors. It presents with subacute autonomic failure "
-            "affecting both sympathetic and parasympathetic systems."
-        ),
-        genes=[],
-        synonyms=["AAG", "Autoimmune dysautonomia"],
-    ),
+# Términos en inglés médico, que es como indexa Orphanet. El caso de la tesis
+# (neuropatía axonal sensitivomotora, varón de 42 años) y su sospecha principal.
+_TERMINOS = [
+    "hereditary transthyretin amyloidosis",
+    "axonal sensorimotor polyneuropathy",
+    "Charcot-Marie-Tooth",
 ]
 
 
-def main() -> None:
+async def main() -> None:
+    print(_SEP)
+    print("DEMO — Cliente Orphanet contra la API REAL")
+    print(_SEP)
+    print("\nBase URL: https://api.orphacode.org/EN/ClinicalEntity")
+    print("(el endpoint anterior, /approximatelymatching, no existe: 404)")
+
+    resultados: dict[str, list[dict]] = {}
+    lineas: list[str] = ["NEXUS — Orphanet: consulta a la API real", "=" * 70, ""]
+
+    async with OrphanetClient() as client:
+        print(f"\n{'─' * 78}\n1. Búsqueda por nombre aproximado\n{'─' * 78}")
+        for termino in _TERMINOS:
+            try:
+                encontradas = await client.search(termino, max_results=3)
+            except ExternalApiError as exc:
+                print(f"  '{termino}' → ERROR: {exc}")
+                lineas.append(f"{termino}: ERROR — {exc}")
+                continue
+
+            resultados[termino] = [asdict(d) for d in encontradas]
+            print(f"\n  '{termino}' → {len(encontradas)} resultados")
+            lineas.append(f"TÉRMINO: {termino} ({len(encontradas)} resultados)")
+            for d in encontradas:
+                print(f"      ORPHA:{d.orpha_code:<8} {d.name[:56]}")
+                lineas.append(f"  ORPHA:{d.orpha_code}  {d.name}")
+                lineas.append(f"       {d.url}")
+            lineas.append("")
+
+        print(f"\n{'─' * 78}\n2. Detalle por código: definición y sinónimos\n{'─' * 78}")
+        print("  ApproximateName solo devuelve ORPHAcode y 'Preferred term'.")
+        print("  La definición y los sinónimos exigen una segunda llamada.\n")
+        try:
+            detalle = await client.get_by_code("271861")
+        except ExternalApiError as exc:
+            # El demo no se cae por un fallo de red: lo reporta, que es
+            # precisamente lo que el cliente ahora sabe distinguir.
+            print(f"  La API falló: {exc}")
+            lineas.append(f"DETALLE ORPHA:271861 — la API falló: {exc}")
+            detalle = None
+
+        if detalle:
+            print(f"  ORPHA:{detalle.orpha_code} — {detalle.name}")
+            print(f"  sinónimos: {', '.join(detalle.synonyms[:4]) or '(ninguno)'}")
+            print(f"  definición: {(detalle.definition or '(no disponible)')[:90]}")
+            lineas.append(f"DETALLE ORPHA:{detalle.orpha_code} — {detalle.name}")
+            lineas.append(f"  Sinónimos: {', '.join(detalle.synonyms)}")
+            lineas.append(f"  Definición: {detalle.definition or '(no disponible)'}")
+            resultados["_detalle_271861"] = [asdict(detalle)]
+
+        print(f"\n{'─' * 78}\n3. Distinguir 'sin resultados' de 'la API falló'\n{'─' * 78}")
+        vacio = await client.search("zzzzzznoexisteestaenfermedad")
+        print(f"  Término inexistente → {vacio}  (404 'Query not found', sin excepción)")
+        print(f"  Código inexistente  → {await client.get_by_code('99999999')}")
+
+        print(f"\n{'─' * 78}\n4. Genes: esta API no los tiene\n{'─' * 78}")
+        try:
+            await client.get_genes("271861")
+        except OrphanetGenesNoDisponibles as exc:
+            print(f"  OrphanetGenesNoDisponibles:")
+            for linea in str(exc).split(". "):
+                print(f"      {linea.strip()}")
+            lineas.append(f"GENES: {exc}")
+        print("\n  Antes devolvía [] en silencio, que se lee como 'esta enfermedad")
+        print("  no tiene genes asociados' — y es falso: el dato está en otra API.")
+
     _OUT_DIR.mkdir(parents=True, exist_ok=True)
+    txt = _OUT_DIR / "enfermedades.txt"
+    txt.write_text("\n".join(lineas), encoding="utf-8")
+    resumen = _OUT_DIR / "resumen.json"
+    resumen.write_text(json.dumps(resultados, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    print(_SEP)
-    print("  DEMO — Cliente Orphanet API: búsqueda de enfermedades raras")
-    print(_SEP)
-
-    # 1. Búsqueda por nombre
-    print(f"\n  [1/4] Búsqueda simulada: 'neuropathy hereditary axonal'")
-    print(f"        Resultados: {len(_ENFERMEDADES)} enfermedades raras\n")
-    for i, e in enumerate(_ENFERMEDADES, 1):
-        genes_str = ", ".join(e.genes) if e.genes else "—"
-        print(f"        [{i}] ORPHA:{e.orpha_code} — {e.name}")
-        print(f"             Genes : {genes_str}")
-        print(f"             URL   : {e.url}")
-        print()
-
-    # 2. Detalle de enfermedad con código ORPHA
-    print(f"  [2/4] Detalle por código ORPHA ('85163' → ATTRv amyloidosis):")
-    attr = _ENFERMEDADES[0]
-    print(f"        Nombre      : {attr.name}")
-    print(f"        Código ORPHA: {attr.orpha_code}")
-    print(f"        Genes       : {', '.join(attr.genes)}")
-    print(f"        Sinónimos   : {', '.join(attr.synonyms[:2])}")
-    print(f"        Definición  : {attr.definition[:120]}...")
-
-    # 3. Summary formateado para contexto de agente
-    print(f"\n  [3/4] Summary formateado para el contexto de un agente:")
-    for e in _ENFERMEDADES[:2]:
-        print(f"        → {e.summary()}")
-        print()
-
-    # 4. Genes únicos extraídos (para el Agente 02 — Especialista Genómica)
-    todos_los_genes = sorted({g for e in _ENFERMEDADES for g in e.genes})
-    print(f"  [4/4] Genes únicos asociados a enfermedades encontradas:")
-    print(f"        {', '.join(todos_los_genes) if todos_los_genes else '(ninguno para AAG)'}")
-
-    # Guardar artefactos
-    enf_txt = _OUT_DIR / "enfermedades_encontradas.txt"
-    with enf_txt.open("w", encoding="utf-8") as f:
-        f.write("NEXUS — Cliente Orphanet: enfermedades raras encontradas\n")
-        f.write("=" * 60 + "\n")
-        f.write("Query: 'neuropathy hereditary axonal'\n\n")
-        for i, e in enumerate(_ENFERMEDADES, 1):
-            f.write(f"[{i}] ORPHA:{e.orpha_code} — {e.name}\n")
-            f.write(f"     Genes     : {', '.join(e.genes) if e.genes else '(no asociados)'}\n")
-            f.write(f"     Sinónimos : {', '.join(e.synonyms)}\n")
-            f.write(f"     URL       : {e.url}\n")
-            f.write(f"     Definición: {e.definition}\n\n")
-
-    genes_txt = _OUT_DIR / "genes_asociados.txt"
-    with genes_txt.open("w", encoding="utf-8") as f:
-        f.write("NEXUS — Genes asociados a enfermedades raras (para Agente 02)\n")
-        f.write("=" * 60 + "\n\n")
-        for e in _ENFERMEDADES:
-            f.write(f"ORPHA:{e.orpha_code} — {e.name}\n")
-            if e.genes:
-                for g in e.genes:
-                    f.write(f"  → Gen: {g}\n")
-            else:
-                f.write(f"  → Sin genes asociados (enfermedad autoinmune adquirida)\n")
-            f.write("\n")
-        f.write(f"Total genes únicos: {len(todos_los_genes)}\n")
-        f.write(f"Genes: {', '.join(todos_los_genes)}\n")
-
-    print()
-    print(_SEP)
-    print("  RESULTADO FINAL:")
-    print(_SEP)
-    print(f"  Enfermedades encontradas : {len(_ENFERMEDADES)}")
-    print(f"  Genes únicos asociados   : {len(todos_los_genes)} ({', '.join(todos_los_genes)})")
-    print(f"  Summary para agentes     : ✓ generado para cada enfermedad")
-    print(f"  Autenticación            : header apiKey (ORPHANET_API_KEY en .env)")
-    print(f"  Fallback si no responde  : ✓ lista vacía (no bloquea pipeline)")
-    print()
-    print("  ARTEFACTOS GENERADOS (abrir y capturar para Trello):")
-    print(f"    • Enfermedades encontradas → {enf_txt}")
-    print(f"    • Genes asociados          → {genes_txt}")
+    print(f"\n{_SEP}")
+    print("Artefactos:")
+    print(f"  • {txt}")
+    print(f"  • {resumen}")
     print(_SEP)
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
