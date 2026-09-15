@@ -189,7 +189,7 @@ el alcance de la tarea en la que aparecieron. Con archivo y línea, para retomar
 | B | Los tests de integración RAG **no son herméticos**: hacen llamadas reales a PubMed y escriben en el `chroma_db/` persistente. 6 tests, ~44 s — es el grueso del tiempo de la suite. Los de `TestIdiomaDeLaQueryRag` sí están mockeados y sirven de patrón. | `tests/test_rag_integration.py::TestEnrichContextWithRag` |
 | C | Ningún modelo de embeddings maneja la **negación**: con "negative CMT panel" en la query, los tres modelos evaluados traen Charcot-Marie-Tooth arriba. El hallazgo negativo llega al agente por `negative_findings`, así que el razonamiento puede corregirlo, pero el recuperador no filtra por él. Limitación conocida, vale documentarla en la tesis. | `backend/rag/chroma_store.py` (docstring) |
 | D | `master` está **62 commits detrás** de `develop`: Sprints 2, 3 y 4 sin liberar. Decisión del equipo: se promueve cuando haya una versión del sistema, no por etapa. | — |
-| E | **OpenSpec**: evaluado, sin decidir. Si se adopta, solo para los 4 agentes que faltan (02, 04, 05, 06) y las reglas de clasificación EBM — sin backfillear los Sprints 1–3. | — |
+| E | **OpenSpec**: **adoptado** (v1.11.0, rama `chore/s4-openspec`). Alcance: los 4 agentes que faltan (02, 04, 05, 06) y las reglas de clasificación EBM — sin backfillear los Sprints 1–3. Uso en `.claude/CLAUDE.md` § "Spec-driven con OpenSpec". | `openspec/config.yaml` |
 
 ---
 

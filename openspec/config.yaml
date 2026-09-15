@@ -1,0 +1,51 @@
+schema: spec-driven
+
+context: |
+  Language: es
+  All artifacts must be written in es.
+  Keep OpenSpec structural headings and SHALL/MUST keywords in English.
+
+  Proyecto: NEXUS, sistema multi-agente de soporte investigativo clínico
+  (Tesis Final, Analista en Sistemas, IRESM). Recibe documentos clínicos,
+  los procesa con 6 agentes de IA que debaten en rondas adversariales y genera
+  un reporte con hipótesis de investigación priorizadas por nivel de evidencia
+  (EBM I, II, III) y respaldadas por referencias de PubMed verificables.
+  NEXUS NO emite diagnósticos: genera hipótesis para el médico responsable.
+
+  Fuentes de verdad (leerlas antes de proponer):
+  - .claude/architecture.md: flujo del pipeline y numeración canónica de agentes
+    (01 Literatura, 02 Genómica, 03 Clínico, 04 Árbitro Verificador,
+    05 Navegador de Ensayos, 06 Sintetizador).
+  - .claude/backlog.md: estado del Trello y tareas pendientes.
+  - .claude/stack.md: decisiones tecnológicas.
+
+  Stack: backend Python 3.11+ con FastAPI, Pydantic, asyncio, ChromaDB (RAG),
+  clientes PubMed / ClinicalTrials.gov / Orphanet / PharmGKB. Frontend Next.js
+  con TypeScript. LLM actual: Groq (openai/gpt-oss-120b y gpt-oss-20b).
+
+  Restricciones de diseño:
+  - Todo agente hereda de BaseAgent y llama al LLM solo vía BaseAgent._call_llm();
+    nunca instancia el cliente de Groq por su cuenta (el swap de proveedor se hace
+    en ese único método).
+  - Tipado estático en todas las funciones, Pydantic para modelos de datos,
+    docstrings en español.
+  - Llamadas a APIs externas siempre en try/except con fallback explícito;
+    nunca `except: pass`.
+  - Hipótesis sin referencia verificable -> evidence_level "III", no se descarta.
+  - Datos clínicos: nunca en logs en texto plano, anonimizar antes de enviarlos
+    a APIs externas, no persistir más allá de la sesión.
+  - API keys solo desde .env.
+
+  Workflow de git: rama por tarea desde develop, naming
+  {feature|fix|docs|chore}/s{sprint}-{descripcion-corta}, PR a develop.
+  Nunca commitear directo a master ni develop.
+
+rules:
+  tasks:
+    - Cada módulo nuevo lleva su test en tests/; el caso de prueba base es la
+      neuropatía axonal sensitivomotora, paciente masculino de 42 años.
+    - Cada tarea que cierra una tarjeta de Trello incluye un script
+      scripts/demo_<nombre>.py que muestre entrada -> salida y guarde artefactos
+      en output/; sin evidencia la tarjeta se rechaza.
+    - Incluir una tarea final para actualizar .claude/CLAUDE.md y
+      .claude/backlog.md con el nuevo estado.
