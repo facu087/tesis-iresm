@@ -392,6 +392,8 @@ SESSION_TTL_MINUTES=60
 
 ## Documentación de referencia
 
+- **Ver `.claude/traspaso.md` para retomar el trabajo**: modo orquestador con OpenSpec,
+  decisiones tomadas el 2026-09-15, pendientes en orden y cómo levantar la demo
 - Ver `.claude/architecture.md` para el flujo detallado del pipeline
 - Ver `.claude/backlog.md` para el estado actual del Trello y próximas tareas
 - Ver `.claude/stack.md` para las decisiones tecnológicas y sus justificaciones
