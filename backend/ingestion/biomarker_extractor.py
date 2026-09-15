@@ -36,6 +36,12 @@ _NON_GENE_TERMS = {
     "LCR", "EMG", "TAC", "RMN", "MRI", "PCR", "EEG", "ECG", "EKG",
     "VCN", "PET", "SPECT", "RX", "UCI", "UTI", "ACV", "TEC",
     "INN", "OMS", "WHO", "FDA", "EMA", "NCCN", "ESMO",
+    # Siglas de ENFERMEDAD, no de gen. Se venían reportando como genes
+    # identificados porque _GENE_PATTERN matchea cualquier sigla de 2-6
+    # mayúsculas y este set es su único filtro: sacarlas de _KNOWN_GENES no
+    # alcanzaba. El gen de FAP y ATTR es TTR; el de CMT depende del subtipo
+    # (PMP22, MPZ, GJB1, MFN2…). Todos ellos siguen en _KNOWN_GENES.
+    "CMT", "FAP", "ATTR", "CIDP", "GBS", "ELA", "ALS",
 }
 
 # Anticuerpos anti-X. El separador (guion o espacio) es OBLIGATORIO para no
@@ -62,9 +68,9 @@ _VARIANT_PATTERN = re.compile(
 
 # Genes conocidos en neuropatías y enfermedades raras (complementa regex)
 _KNOWN_GENES = {
-    "CMT", "PMP22", "MPZ", "GJB1", "MFN2", "GDAP1", "NEFL", "LITAF",
+    "PMP22", "MPZ", "GJB1", "MFN2", "GDAP1", "NEFL", "LITAF",
     "EGR2", "PRPS1", "SH3TC2", "NDRG1", "FIG4", "MTMR2", "SETX",
-    "TTR", "FAP", "ATTR", "TRPV4", "GARS", "YARS", "AARS",
+    "TTR", "TRPV4", "GARS", "YARS", "AARS",
     "ATM", "BRCA1", "BRCA2", "TP53", "PTEN", "VHL", "RET",
     "KCNA1", "KCNQ2", "SCN1A", "SCN9A", "HBA1", "HBA2", "HBB",
     "HMBS", "ALAD", "CPOX", "PPOX", "FECH", "UROS", "UROD",
@@ -192,13 +198,23 @@ def _merge_results(regex_results: dict, llm_results: dict) -> BiomarkerProfile:
                     result.append(item.strip())
         return result
 
+    def solo_genes(nombres: list[str]) -> list[str]:
+        """
+        Descarta siglas de enfermedad que el LLM devuelve como genes.
+
+        La capa regex ya filtra por _NON_GENE_TERMS, pero el LLM es la otra
+        mitad de la extracción y puede reintroducir "CMT" o "ATTR" por su
+        cuenta. Sin esto, limpiar solo el diccionario no arregla el síntoma.
+        """
+        return [n for n in nombres if n.strip().upper() not in _NON_GENE_TERMS]
+
     therapeutic = llm_results.get("therapeutic_history", {})
 
     return BiomarkerProfile(
-        genes=merge_lists(
+        genes=solo_genes(merge_lists(
             regex_results.get("genes_regex", []),
             llm_results.get("genes", [])
-        ),
+        )),
         antibodies=merge_lists(
             regex_results.get("antibodies_regex", []),
             llm_results.get("antibodies", [])
