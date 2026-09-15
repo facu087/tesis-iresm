@@ -268,7 +268,8 @@ divergió en estos puntos:
 
 Los dos elementos del diseño original que figuraban como pendientes se resolvieron
 en `backend/pipeline/evidence.py` (cambio OpenSpec `priorizacion-evidencia-ebm`,
-spec en `openspec/changes/priorizacion-evidencia-ebm/specs/clasificacion-evidencia-ebm/`):
+archivado en `openspec/changes/archive/2026-09-15-priorizacion-evidencia-ebm/`,
+spec vigente en `openspec/specs/clasificacion-evidencia-ebm/`):
 
 1. **Estado de la hipótesis**: es **derivado**, no un campo persistido en
    `Hypothesis` (evita estado desactualizado cuando el Árbitro re-verifique).

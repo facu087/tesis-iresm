@@ -26,7 +26,7 @@
 ## 5. Evidencia para Trello (tarjeta #54)
 
 - [x] 5.1 Crear `scripts/demo_priorizacion_evidencia.py` (modo por defecto, sin red): hipótesis del caso base con veredictos fijos que cubran cada regla (meta-análisis que conserva I, observacional que topea I→II, reporte de caso en III, PMID alucinado → especulativa, PubMed caído → pendiente, sin fuentes, retractada); imprimir entrada (nivel declarado, fuentes, veredicto, tipos) → salida (tope, nivel efectivo, estado, nota, rank) y guardar en `output/demo_priorizacion_evidencia/` `priorizacion.txt`, `reporte.json` (StructuredReport) y `reporte.pdf`; verificar corriendo `python3 scripts/demo_priorizacion_evidencia.py` y comprobando los tres archivos
-- [ ] 5.2 (implementado; falta correrlo con red) Agregar el modo `--pubmed` que verifica contra PubMed real un conjunto de PMIDs elegidos y confirmados durante la implementación (al menos un meta-análisis o revisión sistemática, un RCT, un observacional indexado solo como `Journal Article`, un reporte de caso y uno alucinado), dejando registrados en `priorizacion.txt` los tipos reales devueltos; verificar corriéndolo con red y revisando que los topes coinciden con la tabla de la spec
+- [x] 5.2 Agregar el modo `--pubmed` que verifica contra PubMed real un conjunto de PMIDs elegidos y confirmados durante la implementación (al menos un meta-análisis o revisión sistemática, un RCT, un observacional indexado solo como `Journal Article`, un reporte de caso y uno alucinado), dejando registrados en `priorizacion.txt` los tipos reales devueltos; verificar corriéndolo con red y revisando que los topes coinciden con la tabla de la spec
 
 ## 6. Documentación
 
