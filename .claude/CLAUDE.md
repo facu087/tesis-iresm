@@ -66,15 +66,20 @@ Backend mergeado a `develop` (capa de recuperación de evidencia / RAG). Autor: 
 - [x] Scripts de demo EP07: modelos_pydantic, reporte_json, endpoint_fastapi (scripts/demo_*.py)
 - [x] Embeddings biomédicos configurables en el RAG (backend/rag/chroma_store.py)
 - [x] Fix: el RAG consultaba PubMed en español — ahora usa `condition_en`
+- [x] **Integrar** RAG + verificador de PMIDs en el flujo del pipeline (router/orchestrator)
+- [x] Verificación bibliográfica de PMIDs: título real vs. citado (backend/pipeline/verification.py)
+- [x] Vista de reporte: estado de verificación de hipótesis y fuentes (frontend/src/app/report/page.tsx)
+- [x] PDF: estado de verificación en el reporte exportado (backend/pipeline/pdf_exporter.py)
 - [ ] Agente 02 (Especialista Genómica): prompt + llamada LLM + parseo JSON
 - [ ] Agente 04 (Árbitro Verificador): verificación bibliográfica de cada hipótesis
 - [ ] Agente 05 (Navegador de Ensayos): ClinicalTrials.gov + Orphanet
 - [ ] Agente 06 (Sintetizador): reporte final — reemplaza a `pipeline/report_builder.py`
 - [ ] Priorización de hipótesis por nivel de evidencia EBM (I, II, III)
-- [ ] **Integrar** RAG + verificador de PMIDs en el flujo del pipeline (router/orchestrator)
 
-> ⚠ Los módulos del Sprint 4 ya están en `develop` pero todavía NO están conectados
-> al pipeline principal. Próximo paso: integrarlos.
+> El RAG y el verificador de PMIDs ya corren en el flujo de `POST /api/analyze`:
+> el RAG enriquece el contexto de la Ronda 1 (`pipeline/orchestrator.py`,
+> `_enrich_context_with_rag`) y la verificación es el paso 7 de `api/router.py`.
+> Falta la parte de **síntesis** del Agente 04 y los agentes 02, 05 y 06.
 
 #### Numeración de agentes (canónica)
 
@@ -124,6 +129,10 @@ otro modelo, porque los vectores no son comparables. La salida es
 Para documentar cada tarea (capturas para Trello) hay scripts en `scripts/demo_*.py`
 que muestran entrada → salida de cada módulo. Cada uno guarda artefactos en `output/`.
 Correr con: `python3 scripts/demo_<nombre>.py`
+
+La evidencia que se sube a cada tarjeta (PNG de entrada → salida + `.txt` con la
+salida completa + `.json` resumen) se genera en `output/evidencia/<nro-tarjeta>/`,
+que es local e ignorada por git. Lo que queda es el adjunto en Trello.
 
 Scripts disponibles:
 - `demo_pubmed.py` — cliente PubMed E-utilities (búsqueda + verificación PMIDs)
@@ -186,6 +195,7 @@ tesis-iresm/
 │   │   ├── pico.py             ← build() síntesis PICO + format_for_agents()
 │   │   ├── orchestrator.py     ← distribución paralela asyncio (Ronda 1)
 │   │   ├── debate.py           ← motor de debate adversarial (Rondas 2–4)
+│   │   ├── verification.py     ← verificación de PMIDs citados contra PubMed (S4)
 │   │   ├── report_builder.py   ← generación de JSON estructurado del reporte
 │   │   ├── pdf_exporter.py     ← exportación a PDF con ReportLab
 │   │   └── __init__.py
