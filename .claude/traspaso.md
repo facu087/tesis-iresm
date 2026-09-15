@@ -89,18 +89,27 @@ Lecciones prácticas:
 2. **Trello #65**: borrar el adjunto duplicado y corrupto `6aa969ab55bd2b7b4a9caec5` (PNG de 7,4 KB sin preview).
 3. **Trello #63**: renombrar el PNG sin extensión `analyze__RAG_en_Ronda_1_y_verificacion_en_paso_7`.
 
-### 3.2 Cerrar #54 (Priorización EBM)
+### 3.2 Cerrar #54 (Priorización EBM) — CERRADO 2026-09-15
 Mergeado en `develop` (PR #4): `backend/pipeline/evidence.py`, vista y PDF agrupados por
-estado, "Evidencia II (el agente declaró I)". Tests: 316 pasados. Queda:
-1. Tarea 5.2: correr `python3 scripts/demo_priorizacion_evidencia.py --pubmed` (está
-   implementado con PMIDs reales, nunca se corrió) y marcarla en `tasks.md`.
-2. Abrir la vista de reporte en el navegador con `output/demo_priorizacion_evidencia/reporte.json`
-   (se verificó con build y tipos, no a ojo).
-3. Archivar el cambio (`/opsx:archive`) en una rama nueva y actualizar la referencia de
-   `.claude/architecture.md`, que hoy apunta a la spec dentro de `openspec/changes/`.
-4. Trello #54 (`6a1f68caeea3d35c92c9f576`): adjuntar `priorizacion.txt`, `reporte.json`,
-   `reporte.pdf` + PNG de la salida, actualizar descripción (tabla de topes, limitación
-   pre-2019) y mover a QA.
+estado, "Evidencia II (el agente declaró I)". Tests: 316 pasados. Se completó todo lo que
+quedaba pendiente:
+1. ✅ Tarea 5.2: se corrió `python3 scripts/demo_priorizacion_evidencia.py --pubmed`
+   (7 hipótesis, PMIDs reales) y quedó marcada en `tasks.md`.
+2. ✅ Se abrió la vista de reporte en Chrome con `output/demo_priorizacion_evidencia/reporte.json`
+   (inyectado a `sessionStorage` vía consola, ver captura en la tarjeta). Se vio bien: agrupado
+   por estado, badge "declarado N", nota del tope, discordancia de PMID 22439958 con título real.
+3. ✅ Archivado (`chore/s4-archiva-priorizacion-ebm`, PR #6, mergeado a `develop`):
+   `openspec/changes/archive/2026-09-15-priorizacion-evidencia-ebm/`, spec vigente en
+   `openspec/specs/clasificacion-evidencia-ebm/`, `.claude/architecture.md` actualizado.
+4. ✅ Trello #54 (`6a1f68caeea3d35c92c9f576`): adjuntos `priorizacion.txt`, `reporte.json`,
+   `reporte.pdf` y una captura de la vista (comprimida a JPEG ~13KB por límite de tamaño de
+   contexto — quedó subida con extensión `.png` por defecto del server MCP, que no
+   permite renombrar; no afecta la vista previa de Trello). Descripción actualizada con la
+   tabla de topes y la limitación pre-2019. Movida a QA.
+
+Nota de sesión: la cuenta de `gh` logueada al arrancar (`lussofacundo-iresm`) no tenía permiso
+de push al repo — hubo que `gh auth login`/`gh auth switch` a `facu087` para poder pushear y
+mergear el PR #6.
 
 Efecto visible a tener en cuenta: en reportes nuevos el orden cambia (el nivel pesa más
 que la prioridad) y `evidence_level` es el nivel final, no el declarado.
