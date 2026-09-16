@@ -39,54 +39,131 @@ def _make_case(with_biomarkers: bool = True) -> ClinicalCase:
     return case
 
 
+# Bloque que devuelve el recuperador cuando la búsqueda funciona. El PMID es
+# inventado a propósito: si aparece en el resultado, solo pudo venir de acá.
+_LITERATURA_OK = (
+    "LITERATURA CIENTÍFICA RELEVANTE (fuente: PubMed):\n"
+    "--- Referencia 1 ---\n"
+    "PMID: 99999901\n"
+    "Título: Hereditary transthyretin amyloidosis presenting as axonal neuropathy\n"
+    "\nINSTRUCCIÓN: Cuando cites estas referencias, usá el PMID exacto provisto."
+)
+
+
+class _RagFalso:
+    """
+    Sustituye la indexación y la búsqueda del RAG sin tocar la red.
+
+    La versión anterior de estos tests llamaba a PubMed y cargaba PubMedBERT de
+    verdad: medido con la red bloqueada, 89 intentos de conexión (39 a
+    eutils.ncbi.nlm.nih.gov y 50 a huggingface.co) y 165 s en lugar de 4. Y
+    pasaba igual con la red caída, porque el texto de fallback del orquestador
+    también dice "LITERATURA CIENTÍFICA" y "evidence_level": las aserciones no
+    distinguían un RAG que funciona de uno que no.
+    """
+
+    def __init__(self, indexacion_falla: bool = False, busqueda_falla: bool = False) -> None:
+        self.indexacion_falla = indexacion_falla
+        self.busqueda_falla = busqueda_falla
+        self.indexado_con: dict | None = None
+        self.query: str | None = None
+
+    def instalar(self, monkeypatch) -> "_RagFalso":
+        rag = self
+
+        async def fake_index(genes, conditions, drugs):
+            rag.indexado_con = {"genes": genes, "conditions": conditions, "drugs": drugs}
+            if rag.indexacion_falla:
+                raise ConnectionError("PubMed no disponible (simulado)")
+            return {}
+
+        class FakeRetriever:
+            def get_context_for_agent(self, query, max_results=5):
+                rag.query = query
+                if rag.busqueda_falla:
+                    raise ConnectionError("ChromaDB no disponible (simulado)")
+                return _LITERATURA_OK
+
+        monkeypatch.setattr(
+            "backend.pipeline.orchestrator.index_from_clinical_context", fake_index
+        )
+        monkeypatch.setattr(
+            "backend.pipeline.orchestrator.PubMedRetriever", lambda: FakeRetriever()
+        )
+        return self
+
+
 class TestEnrichContextWithRag:
-    """Tests para _enrich_context_with_rag()."""
+    """
+    Tests para _enrich_context_with_rag(). Herméticos: no tocan PubMed, ChromaDB
+    ni HuggingFace.
 
-    def test_retorna_string_con_contexto_base(self) -> None:
-        """El contexto enriquecido siempre contiene el contexto PICO base."""
-        case = _make_case()
+    Cada test distingue el camino feliz del fallback. El marcador que lo permite
+    es el PMID inventado de _LITERATURA_OK: solo puede estar en el resultado si
+    la búsqueda funcionó.
+    """
+
+    def test_conserva_el_contexto_base(self, monkeypatch) -> None:
+        _RagFalso().instalar(monkeypatch)
         base = "CONTEXTO PICO BASE de prueba"
-        result = asyncio.run(_enrich_context_with_rag(case, base))
-        assert isinstance(result, str)
-        assert base in result
 
-    def test_agrega_seccion_literatura(self) -> None:
-        """El contexto enriquecido incluye una sección de literatura científica."""
-        case = _make_case()
-        base = "CONTEXTO PICO BASE"
-        result = asyncio.run(_enrich_context_with_rag(case, base))
-        assert "LITERATURA CIENTÍFICA" in result
+        result = asyncio.run(_enrich_context_with_rag(_make_case(), base))
 
-    def test_resiliente_sin_biomarkers(self) -> None:
-        """Funciona aunque el caso no tenga biomarkers extraídos."""
-        case = _make_case(with_biomarkers=False)
-        base = "CONTEXTO BASE SIN BIOMARCADORES"
-        result = asyncio.run(_enrich_context_with_rag(case, base))
-        assert isinstance(result, str)
-        assert base in result
+        assert result.startswith(base)
 
-    def test_resiliente_sin_pico(self) -> None:
-        """Si case.pico es None, devuelve el contexto base sin crashear."""
-        case = ClinicalCase(raw_text="texto plano")
-        base = "CONTEXTO BASE SIN PICO"
-        result = asyncio.run(_enrich_context_with_rag(case, base))
-        assert isinstance(result, str)
-        assert base in result
+    def test_agrega_la_literatura_recuperada(self, monkeypatch) -> None:
+        """Con la búsqueda funcionando, la literatura recuperada llega al agente."""
+        _RagFalso().instalar(monkeypatch)
 
-    def test_contexto_enriquecido_es_mas_largo(self) -> None:
-        """El contexto enriquecido es siempre más largo que el base."""
-        case = _make_case()
-        base = "CONTEXTO PICO BASE"
-        result = asyncio.run(_enrich_context_with_rag(case, base))
-        assert len(result) > len(base)
+        result = asyncio.run(_enrich_context_with_rag(_make_case(), "BASE"))
 
-    def test_instruccion_pmid_incluida(self) -> None:
-        """El contexto incluye instrucción sobre el uso de PMIDs o fallback de evidence_level."""
-        case = _make_case()
+        assert "PMID: 99999901" in result
+        assert "No se pudo acceder" not in result
+
+    def test_indexacion_caida_no_impide_buscar(self, monkeypatch) -> None:
+        """Si falla indexar, se busca igual sobre lo que ya hay en la base local."""
+        rag = _RagFalso(indexacion_falla=True).instalar(monkeypatch)
+
+        result = asyncio.run(_enrich_context_with_rag(_make_case(), "BASE"))
+
+        assert rag.query is not None
+        assert "PMID: 99999901" in result
+
+    def test_busqueda_caida_devuelve_fallback_explicito(self, monkeypatch) -> None:
+        """
+        Si falla la búsqueda, el agente recibe el aviso y la instrucción de usar
+        evidencia III — y ninguna referencia, porque no hay ninguna verificada.
+        """
+        _RagFalso(busqueda_falla=True).instalar(monkeypatch)
         base = "CONTEXTO BASE"
-        result = asyncio.run(_enrich_context_with_rag(case, base))
-        tiene_instruccion = "PMID" in result or "evidence_level" in result
-        assert tiene_instruccion
+
+        result = asyncio.run(_enrich_context_with_rag(_make_case(), base))
+
+        assert result.startswith(base)
+        assert "No se pudo acceder a la base local de PubMed" in result
+        assert "evidence_level: 'III'" in result
+        assert "PMID: 99999901" not in result
+
+    def test_sin_biomarkers_indexa_solo_la_condicion(self, monkeypatch) -> None:
+        rag = _RagFalso().instalar(monkeypatch)
+        case = _make_case(with_biomarkers=False)
+        case.pico.condition_en = "axonal neuropathy"
+
+        asyncio.run(_enrich_context_with_rag(case, "BASE"))
+
+        assert rag.indexado_con == {
+            "genes": [], "conditions": ["axonal neuropathy"], "drugs": []
+        }
+
+    def test_sin_pico_no_rompe_ni_inventa_condicion(self, monkeypatch) -> None:
+        """Sin síntesis PICO no hay condición que buscar, pero el pipeline sigue."""
+        rag = _RagFalso().instalar(monkeypatch)
+        base = "CONTEXTO BASE SIN PICO"
+
+        result = asyncio.run(_enrich_context_with_rag(ClinicalCase(raw_text="texto plano"), base))
+
+        assert result.startswith(base)
+        assert rag.indexado_con["conditions"] == []
 
 
 class TestIdiomaDeLaQueryRag:
