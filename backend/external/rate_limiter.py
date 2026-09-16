@@ -70,7 +70,10 @@ class RateLimiter:
     PUBMED_NO_KEY = 3      # req/s sin API key
     PUBMED_WITH_KEY = 10   # req/s con API key
     ORPHANET = 5           # req/s (estimado, no documentado)
-    PHARMGKB = 5           # req/s (estimado, no documentado)
+    # PharmGKB/ClinPGx no documenta su límite y está detrás de Cloudflare.
+    # Medido el 2026-09-15: 3 req/s con burst devuelve HTTP 429; 1 y 2 req/s
+    # secuenciales pasan sin problema. Se deja en 2 y sin burst.
+    PHARMGKB = 2           # req/s (medido, ver arriba)
     CLINICAL_TRIALS = 10   # req/s (estimado)
 
     def __init__(self, requests_per_second: float, burst: Optional[int] = None) -> None:

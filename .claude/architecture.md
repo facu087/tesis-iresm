@@ -53,14 +53,14 @@ Documentos clínicos (PDF / imágenes)
               │   Árbitro       │  Verifica cada hipótesis
               │   Verificador   │  contra PubMed
               │   Claude Opus   │  Clasifica nivel evidencia
-              └────────┬────────┘  Descarta sin respaldo
+              └────────┬────────┘  Sin respaldo → especulativa (III)
                        │
                        ▼
               ┌─────────────────┐
-              │   Agente 05     │
-              │   Navegador de  │  ClinicalTrials.gov API v2
-              │   Ensayos       │  Orphanet API
-              └────────┬────────┘
+              │   Agente 05     │  ClinicalTrials.gov API v2
+              │   Navegador de  │  (RECRUITING + NOT_YET_RECRUITING)
+              │   Ensayos       │  Orphanet API (coincidencia exacta)
+              └────────┬────────┘  Compatibilidad orientativa, nunca excluye
                        │
                        ▼
               ┌─────────────────┐
@@ -69,6 +69,15 @@ Documentos clínicos (PDF / imágenes)
               │   Claude Opus   │  PDF / DOCX para el médico
               └─────────────────┘
 ```
+
+> **Estado real del flujo (Sprint 4).** El Agente 04 todavía no existe como agente:
+> su mitad de verificación corre en `pipeline/verification.py`. Hasta que exista,
+> el Agente 05 **no** va después del Árbitro sino **en paralelo con la verificación**
+> (`asyncio.gather` en `api/router.py`): ambos dependen solo del reporte final del
+> debate y usan APIs distintas (ClinicalTrials.gov/Orphanet vs. PubMed). Cuando el
+> Árbitro exista, el orden pasa a ser `árbitro → navigate(consenso)` cambiando solo
+> el adaptador de entrada (`pipeline/trial_matching.build_navigation_input`), no el
+> agente. El Agente 06 sigue siendo `pipeline/report_builder.py` + `pdf_exporter.py`.
 
 ---
 
@@ -219,8 +228,27 @@ class ClinicalTrial(BaseModel):
     locations: list[str] = []
     url: str = ""
 
+    # Agente 05 — aditivos, con default: un JSON previo valida igual
+    compatibility: str = "sin_evaluar"        # alta | media | baja | sin_evaluar
+    compatibility_rationale: str | None = None
+    criteria_to_verify: list[str] = []        # qué debe verificar el médico
+    related_hypotheses: list[str] = []        # hipótesis cuyas consultas lo trajeron
+    matched_terms: list[str] = []             # términos en inglés que lo encontraron
+
     def summary_line(self) -> str: ...
 ```
+
+El mismo módulo define el contrato del Agente 05: `TrialCandidate`,
+`PatientDemographics`, `TrialNavigationInput`, `TrialNavigationResult`,
+`RareDiseaseMatch` y `TrialSearchSummary` (`estado_clinicaltrials`,
+`estado_orphanet`, `planificacion`, `evaluacion`, `terminos_consultados`,
+`encontrados`, `excluidos_por_edad`, `excluidos_por_sexo`,
+`evaluaciones_descartadas`).
+
+**Orden de los ensayos** (`pipeline/trial_matching.sort_trials`):
+compatibilidad → sede en Argentina → ya reclutando → orden de descubrimiento.
+La sede y el estado de reclutamiento ordenan, **nunca** excluyen; la ubicación
+del paciente no se usa como criterio.
 
 ### StructuredReport — `backend/api/schemas.py`
 Contrato de **exportación**: lo consume el frontend y el generador de PDF.
@@ -232,11 +260,20 @@ este contrato JSON.
 class StructuredReport(BaseModel):
     metadata: ReportMetadata            # incluye el disclaimer obligatorio
     case_summary: CaseSummarySection
-    hypotheses: list[RankedHypothesis]  # ordenadas por priority, luego evidence_level
+    hypotheses: list[RankedHypothesis]  # estado → nivel efectivo → priority (pipeline/evidence.py)
     debate_summary: DebateSummary       # rondas, críticas, divergencias, consenso
-    clinical_trials: list[ClinicalTrial]
+    clinical_trials: list[ClinicalTrial]  # orden del Agente 05, con compatibilidad
     bibliography: list[Source]          # fuentes únicas, ordenadas por PMID
+    verification: VerificationSummary   # recuento de la verificación (Agente 04)
+    # Agente 05 — aditivos
+    rare_diseases: list[RareDiseaseMatch] = []
+    trial_search: TrialSearchSummary | None = None  # None = reporte previo al 05
 ```
+
+`trial_search` es **nullable** a propósito, a diferencia de `verification`: nulo
+significa "reporte anterior al Agente 05", y es la señal que usan el frontend y el
+PDF para renderizar la sección de ensayos como antes. Un default con estados en
+`sin_consulta` haría que un reporte viejo con ensayos afirme que no se consultó nada.
 
 `RankedHypothesis` agrega `rank` y `supporting_agents` sobre `Hypothesis`.
 La atribución por agente **no** se guarda en `Hypothesis`: se reconstruye en
@@ -264,25 +301,41 @@ divergió en estos puntos:
 | `ReporteFinal.ensayos_clinicos` | `build_export(trials=...)` | Los ensayos entran en la exportación, no en el `Report` interno |
 | `ReporteFinal.resumen_ejecutivo` | `Report.case_summary` | Renombrado |
 
-### Pendiente — depende del Agente 04 (Árbitro Verificador)
+### Estado de la hipótesis y nivel de evidencia — resuelto (tarea 11, Sprint 4)
 
-Dos elementos del diseño original **todavía no existen en el código**, y son
-justamente los que introduce el árbitro:
+Los dos elementos del diseño original que figuraban como pendientes se resolvieron
+en `backend/pipeline/evidence.py` (cambio OpenSpec `priorizacion-evidencia-ebm`,
+archivado en `openspec/changes/archive/2026-09-15-priorizacion-evidencia-ebm/`,
+spec vigente en `openspec/specs/clasificacion-evidencia-ebm/`):
 
-1. **`Hypothesis.estado`** (`"pendiente"` | `"verificada"` | `"descartada"` |
-   `"especulativa"`). Hoy no hay campo de estado: toda hipótesis generada llega
-   al reporte. El árbitro necesita este campo para registrar el resultado de la
-   verificación contra PubMed.
+1. **Estado de la hipótesis**: es **derivado**, no un campo persistido en
+   `Hypothesis` (evita estado desactualizado cuando el Árbitro re-verifique).
+   `classify_hypothesis()` lo calcula de los veredictos de `verification.py` y viaja
+   en `RankedHypothesis.status`: `"respaldada"` (≥1 fuente verificada),
+   `"pendiente"` (la verificación no pudo concluir, p. ej. PubMed caído) o
+   `"especulativa"`. **No existe "descartada"**: por regla del proyecto una
+   hipótesis sin referencia verificable queda en nivel III y se muestra.
 
-2. **La separación `hipotesis_verificadas` / `hipotesis_especulativas`** en el
-   reporte. Hoy `Report.hypotheses` y `StructuredReport.hypotheses` son una
-   lista única, ordenada por prioridad y nivel de evidencia, sin distinguir
-   qué se verificó bibliográficamente.
+2. **Separación verificadas / especulativas**: `StructuredReport.hypotheses` sigue
+   siendo una lista única, pero ordenada con el estado como primer criterio, así que
+   cada grupo queda contiguo; la vista de reporte y el PDF la agrupan por `status`.
 
-> Definir estos dos puntos es prerrequisito de las tareas 9 y 11 del Sprint 4
-> (ver `.claude/backlog.md`). Cambiar `Hypothesis` impacta a `report_builder.py`,
-> `pdf_exporter.py`, `api/schemas.py` y a los tipos del frontend
-> (`frontend/src/lib/types.ts`).
+**Nivel efectivo.** `evidence_level` exportado = nivel declarado por el agente,
+topeado por la mejor fuente verificada según los tipos de publicación de PubMed
+(misma consulta `esummary` de la verificación). Nunca sube; sin fuente verificada, III.
+El declarado queda en `declared_evidence_level` y la explicación en `evidence_note`.
+
+| Tope | Tipos de publicación (PubMed) |
+|------|-------------------------------|
+| I | Meta-Analysis, Network Meta-Analysis, Systematic Review, Randomized Controlled Trial |
+| II | Observational Study, Clinical Trial (y fases), Controlled/Pragmatic Clinical Trial, Comparative Study, Multicenter Study, Practice Guideline, Guideline, **o ningún tipo reconocido** (p. ej. solo Journal Article) |
+| III | Case Reports, Review, Scoping Review, Letter, Editorial, Comment, News, Consensus Development Conference; **publicación retractada** (anula cualquier otro tipo) |
+
+**Orden:** estado → nivel efectivo → prioridad → fuentes verificadas → orden original.
+
+> **Limitación documentada:** el tipo `Systematic Review` existe en PubMed desde 2019.
+> Las revisiones sistemáticas anteriores indexadas solo como `Review` topean en III,
+> como una revisión narrativa. No se corrige con heurísticas de título ni abstract.
 
 ---
 
@@ -294,7 +347,7 @@ justamente los que introduce el árbitro:
 | agente_02 | Especialista Genómica | GPT-4o | Groq `gpt-oss-120b` | PharmGKB, ClinVar |
 | agente_03 | Consultor Clínico | Gemini Pro | Groq `gpt-oss-120b` | NCCN Guidelines |
 | agente_04 | Árbitro Verificador | Claude Opus | Groq `gpt-oss-120b` | PubMed, ESMO, EMA |
-| agente_05 | Navegador de Ensayos | Dedicado | Groq `gpt-oss-120b` | ClinicalTrials.gov, Orphanet |
+| agente_05 | Navegador de Ensayos ✅ | Dedicado | Groq `gpt-oss-120b` | ClinicalTrials.gov, Orphanet |
 | agente_06 | Sintetizador | Claude Opus | Groq `gpt-oss-120b` | ReportLab, python-docx |
 
 > En el prototipo todos los agentes corren sobre Groq (`openai/gpt-oss-120b`,
@@ -305,6 +358,12 @@ justamente los que introduce el árbitro:
 > **proveedor** está fijo en `BaseAgent._call_llm()`, que instancia el cliente de
 > Groq directamente: el swap a la columna de producción se hace ahí, agregando
 > despacho por proveedor.
+>
+> El **Agente 05 no participa del debate**: hereda de `BaseAgent` por las utilidades
+> de LLM (`_call_llm`, `extract_json`), expone `navigate(TrialNavigationInput)` y su
+> `run()` levanta `NotImplementedError`. Separar `BaseAgent` en una base de LLM y un
+> `DebateAgent` es el diseño correcto cuando existan 04, 05 y 06 —ninguno debate— y
+> quedó diferido a un refactor propio que no altera este contrato.
 
 ---
 
@@ -330,7 +389,8 @@ Ronda 5:  El Árbitro recibe todos los outputs
 
 Verificación final:
           → Árbitro cruza cada hipótesis contra PubMed
-          → Sin soporte = descartada o especulativa
+          → Sin soporte = especulativa (nivel III, no se descarta)
+          → Sin respuesta de PubMed = pendiente (nivel III)
           → Con soporte = verificada (incluida en reporte)
 ```
 
@@ -352,13 +412,28 @@ agentes están de acuerdo entre sí. Las divergencias irresolubles se documentan
 
 ### ClinicalTrials.gov API v2
 - Base URL: `https://clinicaltrials.gov/api/v2/studies`
-- Filtro clave: `filter.overallStatus=RECRUITING`
+- Filtro clave: `filter.overallStatus`, con los estados separados por `|`.
+  Default de `clinical_trials.search()`: `RECRUITING`. El Agente 05 pide
+  `RECRUITING|NOT_YET_RECRUITING`: un ensayo que abre en tres meses es accionable
+  y se etiqueta "aún no recluta" en la vista y el PDF.
 - Autenticación: ninguna (público)
 - Retorno: JSON
+- Presupuesto por análisis (Agente 05): ≤ 1 búsqueda base + 3 candidatas × 3 términos,
+  con `clinical_trials_limiter` (10 req/s) y `clinical_trials_breaker`
 
-### Orphanet API
-- Requiere registro gratuito
-- Usado por Agente 05 para enfermedades raras
+### Orphanet API (ORPHAcodes — nomenclatura)
+- Base URL: `https://api.orphacode.org/EN/ClinicalEntity`
+- Endpoint usado: `/ApproximateName/{label}` (el término va en el path, escapado)
+- Credencial **opcional**: responde 200 sin `apiKey` (medido el 2026-09-15, 10 de 10).
+  El cliente manda `ORPHANET_API_KEY` si está definida y un valor por defecto si no.
+  El Agente 05 la consulta siempre.
+- 404 con cuerpo `"Query not found"` = sin coincidencias, **no** es error; cualquier
+  otro 404, 401, 5xx o timeout → `ExternalApiError` y `estado_orphanet` degradado
+- Usada por el Agente 05: marca una hipótesis como enfermedad rara solo ante
+  **coincidencia exacta** normalizada con el nombre preferido (tomar el primer
+  resultado etiquetaba una neuropatía axonal del adulto como enfermedad neonatal letal)
+- **No expone genes**: `get_genes()` levanta `OrphanetGenesNoDisponibles`. Están en
+  Orphadata (`api.orphadata.com/rd-associated-genes/orphacodes/{code}`), tarjeta aparte
 
 ### PharmGKB
 - Gratuito para uso académico

@@ -271,3 +271,110 @@ class TestRunDebate:
         ronda2 = report.debate_rounds[0]
         assert ronda2.round_number == 2
         assert len(ronda2.critiques) == 2  # Agente 02 excluido (sin output en Ronda 1)
+
+
+# ── Tests: el debate cuando un agente se cayó en la Ronda 1 ────────────────────
+
+class TestDebateConAgenteCaido:
+    """
+    run_round_1() deja fuera de agent_outputs a los agentes que fallaron, así que
+    el debate recibe menos outputs que agentes instanciados. Antes se indexaba
+    outputs_by_id[agent.AGENT_ID] sin filtrar y saltaba KeyError, que tumbaba
+    /api/analyze entero.
+    """
+
+    def _solo_agente_01(self) -> Report:
+        """Ronda 1 en la que los Agentes 02 y 03 fallaron y no dejaron output."""
+        return Report(
+            case_summary="Narrativa de prueba.",
+            hypotheses=[_hypothesis("hipótesis literatura A")],
+            agent_outputs=[_output("01", "Analista de Literatura", ["hipótesis literatura A"])],
+            sources_summary={"I": 0, "II": 1, "III": 0},
+        )
+
+    def _mock_ambos(self, M01, M03):
+        a01 = MagicMock()
+        a01.AGENT_ID = "01"
+        a01.AGENT_NAME = "Analista de Literatura"
+        a01.critique.return_value = []
+        a01.revise.return_value = _output("01", "A01", ["revisada 01"])
+        M01.return_value = a01
+
+        a03 = MagicMock()
+        a03.AGENT_ID = "03"
+        a03.AGENT_NAME = "Consultor Clínico"
+        a03.critique.return_value = []
+        a03.revise.return_value = _output("03", "A03", ["revisada 03"])
+        M03.return_value = a03
+        return a01, a03
+
+    def test_no_levanta_keyerror_si_falta_un_agente(self):
+        case = ClinicalCase(raw_text="texto", pico=_make_pico())
+        with patch("backend.pipeline.debate.LiteratureAnalystAgent") as M01, \
+             patch("backend.pipeline.debate.ClinicalConsultantAgent") as M03:
+            self._mock_ambos(M01, M03)
+            report = asyncio.run(run_debate(case, self._solo_agente_01()))
+        assert isinstance(report, Report)
+
+    def test_deja_constancia_del_agente_ausente(self):
+        case = ClinicalCase(raw_text="texto", pico=_make_pico())
+        with patch("backend.pipeline.debate.LiteratureAnalystAgent") as M01, \
+             patch("backend.pipeline.debate.ClinicalConsultantAgent") as M03:
+            self._mock_ambos(M01, M03)
+            report = asyncio.run(run_debate(case, self._solo_agente_01()))
+        assert len(report.absent_agents) == 2
+        assert any("02" in a for a in report.absent_agents)
+        assert any("03" in a for a in report.absent_agents)
+
+    def test_con_un_solo_agente_no_simula_rondas(self):
+        """Sin contrincante no hay debate adversarial: mejor 0 rondas que 3 vacías."""
+        case = ClinicalCase(raw_text="texto", pico=_make_pico())
+        with patch("backend.pipeline.debate.LiteratureAnalystAgent") as M01, \
+             patch("backend.pipeline.debate.ClinicalConsultantAgent") as M03:
+            a01, a03 = self._mock_ambos(M01, M03)
+            report = asyncio.run(run_debate(case, self._solo_agente_01()))
+
+        assert report.debate_rounds == []
+        assert [h.text for h in report.hypotheses] == ["hipótesis literatura A"]
+        # No se gastan llamadas al LLM en un debate que no puede ocurrir
+        a01.critique.assert_not_called()
+        a01.revise.assert_not_called()
+        a03.critique.assert_not_called()
+
+    def test_debate_completo_no_reporta_ausentes(self):
+        case = ClinicalCase(raw_text="texto", pico=_make_pico())
+        r1 = Report(
+            case_summary="s",
+            agent_outputs=[
+                _output("01", "Analista de Literatura", ["a"]),
+                _output("02", "Especialista Genómica", ["c"]),
+                _output("03", "Consultor Clínico", ["b"]),
+            ],
+        )
+        with patch("backend.pipeline.debate.LiteratureAnalystAgent") as M01, \
+             patch("backend.pipeline.debate.GenomicsSpecialistAgent") as M02, \
+             patch("backend.pipeline.debate.ClinicalConsultantAgent") as M03:
+            self._mock_ambos(M01, M03)
+            a02 = MagicMock()
+            a02.AGENT_ID = "02"
+            a02.AGENT_NAME = "Especialista Genómica"
+            a02.critique.return_value = []
+            a02.revise.return_value = _output("02", "A02", ["revisada 02"])
+            M02.return_value = a02
+            report = asyncio.run(run_debate(case, r1))
+
+        assert report.absent_agents == []
+        assert len(report.debate_rounds) == 3
+
+    def test_falla_claro_si_ningun_id_coincide(self):
+        """Un output con un agent_id desconocido no debe dar KeyError sino un error legible."""
+        case = ClinicalCase(raw_text="texto", pico=_make_pico())
+        r1 = Report(
+            case_summary="s",
+            agent_outputs=[_output("99", "Agente Fantasma", ["x"])],
+        )
+        with patch("backend.pipeline.debate.LiteratureAnalystAgent") as M01, \
+             patch("backend.pipeline.debate.ClinicalConsultantAgent") as M03:
+            self._mock_ambos(M01, M03)
+            with pytest.raises(RuntimeError, match="numeración de agentes"):
+                asyncio.run(run_debate(case, r1))

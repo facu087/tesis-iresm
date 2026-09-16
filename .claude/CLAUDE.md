@@ -66,15 +66,29 @@ Backend mergeado a `develop` (capa de recuperación de evidencia / RAG). Autor: 
 - [x] Scripts de demo EP07: modelos_pydantic, reporte_json, endpoint_fastapi (scripts/demo_*.py)
 - [x] Embeddings biomédicos configurables en el RAG (backend/rag/chroma_store.py)
 - [x] Fix: el RAG consultaba PubMed en español — ahora usa `condition_en`
+- [x] **Integrar** RAG + verificador de PMIDs en el flujo del pipeline (router/orchestrator)
+- [x] Verificación bibliográfica de PMIDs: título real vs. citado (backend/pipeline/verification.py)
+- [x] Vista de reporte: estado de verificación de hipótesis y fuentes (frontend/src/app/report/page.tsx)
+- [x] PDF: estado de verificación en el reporte exportado (backend/pipeline/pdf_exporter.py)
 - [ ] Agente 02 (Especialista Genómica): prompt + llamada LLM + parseo JSON
 - [ ] Agente 04 (Árbitro Verificador): verificación bibliográfica de cada hipótesis
-- [ ] Agente 05 (Navegador de Ensayos): ClinicalTrials.gov + Orphanet
+- [x] Agente 05 (Navegador de Ensayos): ClinicalTrials.gov + Orphanet
+      (backend/agents/agent_05_trials.py + backend/pipeline/trial_matching.py)
 - [ ] Agente 06 (Sintetizador): reporte final — reemplaza a `pipeline/report_builder.py`
-- [ ] Priorización de hipótesis por nivel de evidencia EBM (I, II, III)
-- [ ] **Integrar** RAG + verificador de PMIDs en el flujo del pipeline (router/orchestrator)
+- [x] Priorización de hipótesis por nivel de evidencia EBM (I, II, III) (backend/pipeline/evidence.py)
 
-> ⚠ Los módulos del Sprint 4 ya están en `develop` pero todavía NO están conectados
-> al pipeline principal. Próximo paso: integrarlos.
+> El RAG, el verificador de PMIDs y el Agente 05 ya corren en el flujo de
+> `POST /api/analyze`: el RAG enriquece el contexto de la Ronda 1
+> (`pipeline/orchestrator.py`, `_enrich_context_with_rag`), y la navegación de
+> ensayos y la verificación corren en paralelo después del debate
+> (`asyncio.gather` en `api/router.py`). Falta la parte de **síntesis** del
+> Agente 04 y los agentes 02 y 06.
+>
+> El Agente 05 es **híbrido**: el LLM solo traduce hipótesis a términos de
+> condición en inglés y etiqueta compatibilidad (`alta`/`media`/`baja`); la
+> búsqueda, los filtros duros por edad y sexo, la coincidencia exacta con
+> Orphanet y el orden del resultado son deterministas y viven en
+> `pipeline/trial_matching.py`. El LLM nunca excluye un ensayo.
 
 #### Numeración de agentes (canónica)
 
@@ -84,7 +98,7 @@ Backend mergeado a `develop` (capa de recuperación de evidencia / RAG). Autor: 
 | 02 | Especialista Genómica | 📋 Pendiente |
 | 03 | Consultor Clínico | ✅ Implementado |
 | 04 | Árbitro Verificador | 📋 Pendiente |
-| 05 | Navegador de Ensayos | 📋 Pendiente |
+| 05 | Navegador de Ensayos | ✅ Implementado |
 | 06 | Sintetizador | 📋 Pendiente |
 
 > La **fuente de verdad** de la numeración y los roles es la tabla de
@@ -125,6 +139,10 @@ Para documentar cada tarea (capturas para Trello) hay scripts en `scripts/demo_*
 que muestran entrada → salida de cada módulo. Cada uno guarda artefactos en `output/`.
 Correr con: `python3 scripts/demo_<nombre>.py`
 
+La evidencia que se sube a cada tarjeta (PNG de entrada → salida + `.txt` con la
+salida completa + `.json` resumen) se genera en `output/evidencia/<nro-tarjeta>/`,
+que es local e ignorada por git. Lo que queda es el adjunto en Trello.
+
 Scripts disponibles:
 - `demo_pubmed.py` — cliente PubMed E-utilities (búsqueda + verificación PMIDs)
 - `demo_orphanet.py` — cliente Orphanet (enfermedades raras)
@@ -140,6 +158,14 @@ Scripts disponibles:
   sobre el caso de prueba (rankings, overlap y dispersión de scores)
 - `demo_verificacion.py` — verificación bibliográfica: contrasta contra PubMed los PMIDs
   citados por los agentes y muestra el título real al lado del citado (Agente 04)
+- `demo_priorizacion_evidencia.py` — priorización EBM: nivel declarado vs. efectivo, estado
+  y orden del reporte; genera `priorizacion.txt`, `reporte.json` y `reporte.pdf`
+  (`--pubmed` verifica PMIDs reales)
+- `demo_agente05.py` — Agente 05: entrada (candidatas, términos saneados, demografía)
+  → salida (ensayos con compatibilidad, sede, excluidos por edad/sexo, enfermedades
+  raras, estado de cada API y latencia); genera `navegacion.json` y `resumen.txt`.
+  `--sin-red` usa respuestas grabadas y simula la caída de ClinicalTrials.gov,
+  Orphanet y el LLM para mostrar cada fallback (`fallbacks.txt`)
 
 También se corrigió un bug del Sprint 2: falsos positivos en el extractor de
 biomarcadores (regex de anticuerpos y de marcadores de lab). Ver commit `e72e004`.
@@ -169,6 +195,7 @@ tesis-iresm/
 │   │   ├── base_agent.py           ← clase base ABC con interfaz común
 │   │   ├── agent_01_literature.py  ← Analista de Literatura (Groq)
 │   │   ├── agent_03_clinical.py    ← Consultor Clínico (Groq)
+│   │   ├── agent_05_trials.py      ← Navegador de Ensayos (S4) — navigate(), no debate
 │   │   └── __init__.py
 │   ├── ingestion/
 │   │   ├── extractor.py            ← PDF nativo (pdfplumber) + OCR (Tesseract)
@@ -180,12 +207,16 @@ tesis-iresm/
 │   │   ├── report.py           ← AgentOutput, Report
 │   │   ├── case.py             ← ClinicalCase, PICOSynthesis
 │   │   ├── biomarkers.py       ← BiomarkerProfile
-│   │   ├── trial.py            ← ClinicalTrial
+│   │   ├── trial.py            ← ClinicalTrial + contrato del Agente 05 (S4)
 │   │   └── __init__.py
 │   ├── pipeline/
 │   │   ├── pico.py             ← build() síntesis PICO + format_for_agents()
 │   │   ├── orchestrator.py     ← distribución paralela asyncio (Ronda 1)
 │   │   ├── debate.py           ← motor de debate adversarial (Rondas 2–4)
+│   │   ├── verification.py     ← verificación de PMIDs citados contra PubMed (S4)
+│   │   ├── evidence.py         ← clasificación EBM: tope de nivel, estado y orden (S4)
+│   │   ├── trial_matching.py   ← lógica determinista del Agente 05: términos,
+│   │   │                          filtros edad/sexo, Orphanet, orden (S4)
 │   │   ├── report_builder.py   ← generación de JSON estructurado del reporte
 │   │   ├── pdf_exporter.py     ← exportación a PDF con ReportLab
 │   │   └── __init__.py
@@ -224,7 +255,7 @@ tesis-iresm/
 │   └── demo_*.py               ← scripts de verificación por tarea (evidencia Trello):
 │       │                          extraccion, ocr, normalizacion, biomarcadores, pico,
 │       │                          base_agent, agente01, agente03, orquestador,
-│       └─                         clinical_trials, debate, pdf
+│       └─                         clinical_trials, debate, pdf, agente05
 ├── tests/
 │   ├── test_ingesta.py
 │   ├── test_normalizer.py
@@ -307,9 +338,10 @@ proveedor: `BaseAgent._call_llm()` instancia el cliente de Groq directamente
 (`backend/agents/base_agent.py`). El swap a Claude / GPT-4o / Gemini se hace en
 ese único método, agregando despacho por proveedor.
 
-Vale tenerlo en cuenta al escribir los agentes 02, 04, 05 y 06: si cada uno
+Vale tenerlo en cuenta al escribir los agentes 02, 04 y 06: si cada uno
 asume la firma de Groq en lugar de delegar en `_call_llm()`, el swap se
-multiplica por la cantidad de agentes.
+multiplica por la cantidad de agentes. El Agente 05 ya sigue esa regla:
+sus dos llamadas pasan por `self._call_llm()` (vía `asyncio.to_thread`).
 
 ---
 
@@ -359,7 +391,10 @@ GOOGLE_API_KEY=         # Gemini Pro — Agente 03
 
 # APIs científicas
 PUBMED_API_KEY=         # Opcional, aumenta rate limit
-ORPHANET_API_KEY=       # Requiere registro en orphanet.org
+ORPHANET_API_KEY=       # Opcional: la API responde sin credencial (medido el
+                        # 2026-09-15, 10 de 10 llamadas). Si está definida se
+                        # manda en el header apiKey; si no, el cliente manda un
+                        # valor por defecto que el servicio acepta.
 
 # RAG — embeddings (opcional)
 NEXUS_EMBEDDING_MODEL=  # Sobreescribe el modelo de embeddings del RAG.
@@ -378,6 +413,8 @@ SESSION_TTL_MINUTES=60
 
 ## Documentación de referencia
 
+- **Ver `.claude/traspaso.md` para retomar el trabajo**: modo orquestador con OpenSpec,
+  decisiones tomadas el 2026-09-15, pendientes en orden y cómo levantar la demo
 - Ver `.claude/architecture.md` para el flujo detallado del pipeline
 - Ver `.claude/backlog.md` para el estado actual del Trello y próximas tareas
 - Ver `.claude/stack.md` para las decisiones tecnológicas y sus justificaciones

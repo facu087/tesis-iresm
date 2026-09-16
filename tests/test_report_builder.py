@@ -7,8 +7,14 @@ from backend.models.biomarkers import BiomarkerProfile
 from backend.models.case import ClinicalCase, PICOSynthesis
 from backend.models.hypothesis import EvidenceLevel, Hypothesis, Priority, Source
 from backend.models.report import AgentOutput, Critique, DebateRound, Report
-from backend.models.trial import ClinicalTrial
+from backend.models.trial import (
+    ClinicalTrial,
+    RareDiseaseMatch,
+    TrialNavigationResult,
+    TrialSearchSummary,
+)
 from backend.pipeline.report_builder import build_export
+from backend.pipeline.verification import SourceStatus, SourceVerification
 
 
 # ── Fixtures ───────────────────────────────────────────────────────────────────
@@ -93,17 +99,30 @@ def _make_trial() -> ClinicalTrial:
     )
 
 
+def _verificadas(*fuentes: tuple[str, list[str]]) -> dict[str, SourceVerification]:
+    """Veredictos VERIFICADA con sus tipos de publicación, sin llamar a PubMed."""
+    return {
+        pmid: SourceVerification(
+            pmid=pmid, status=SourceStatus.VERIFICADA, claimed_title="Estudio A",
+            publication_types=tipos,
+        )
+        for pmid, tipos in fuentes
+    }
+
+
 def _build(
     case: ClinicalCase | None = None,
     report: Report | None = None,
     trials: list[ClinicalTrial] | None = None,
     processing_time: float = 10.5,
+    verifications: dict[str, SourceVerification] | None = None,
 ) -> StructuredReport:
     return build_export(
         case=case or _make_case(),
         report=report or _make_report(),
         trials=[_make_trial()] if trials is None else trials,
         processing_time=processing_time,
+        verifications=verifications,
     )
 
 
@@ -186,9 +205,11 @@ class TestHypotheses:
         assert result.hypotheses[1].text == "H baja"
 
     def test_ordena_por_evidencia_dentro_de_misma_prioridad(self):
-        h_iii = _hypothesis("H-III", Priority.HIGH, EvidenceLevel.III)
-        h_i = _hypothesis("H-I", Priority.HIGH, EvidenceLevel.I)
-        result = _build(report=_make_report(hypotheses=[h_iii, h_i]))
+        # Con veredictos: sin verificación todo quedaría topeado a III.
+        h_iii = _hypothesis("H-III", Priority.HIGH, EvidenceLevel.III, sources=[_source("11111111")])
+        h_i = _hypothesis("H-I", Priority.HIGH, EvidenceLevel.I, sources=[_source("22222222")])
+        verifications = _verificadas(("11111111", ["Meta-Analysis"]), ("22222222", ["Meta-Analysis"]))
+        result = _build(report=_make_report(hypotheses=[h_iii, h_i]), verifications=verifications)
         assert result.hypotheses[0].evidence_level == "I"
 
     def test_supporting_agents_incluye_agentes_de_ronda_1(self):
@@ -209,6 +230,107 @@ class TestHypotheses:
         )
         result = _build(report=report)
         assert result.hypotheses[0].supporting_agents == []
+
+
+# ── Tests: priorización por evidencia EBM ─────────────────────────────────────
+
+def _discordante(pmid: str) -> dict[str, SourceVerification]:
+    return {pmid: SourceVerification(pmid=pmid, status=SourceStatus.DISCORDANTE, claimed_title="X")}
+
+
+class TestPriorizacionEvidencia:
+    def test_nivel_topeado_por_la_fuente_verificada(self):
+        h = _hypothesis("B12 por metformina", Priority.HIGH, EvidenceLevel.I, sources=[_source("11111111")])
+        result = _build(
+            report=_make_report(hypotheses=[h]),
+            verifications=_verificadas(("11111111", ["Journal Article", "Observational Study"])),
+        )
+        exportada = result.hypotheses[0]
+        assert exportada.evidence_level == "II"
+        assert exportada.declared_evidence_level == "I"
+        assert exportada.status == "respaldada"
+        assert "topeado" in exportada.evidence_note
+        assert exportada.sources[0].publication_types == ["Journal Article", "Observational Study"]
+
+    def test_respaldada_antes_que_especulativa(self):
+        especulativa = _hypothesis("Tóxica", Priority.HIGH, EvidenceLevel.I, sources=[_source("22222222")])
+        respaldada = _hypothesis("CIDP", Priority.LOW, EvidenceLevel.III, sources=[_source("11111111")])
+        verifications = {**_verificadas(("11111111", ["Case Reports"])), **_discordante("22222222")}
+        result = _build(report=_make_report(hypotheses=[especulativa, respaldada]), verifications=verifications)
+        assert [h.text for h in result.hypotheses] == ["CIDP", "Tóxica"]
+        assert [h.status for h in result.hypotheses] == ["respaldada", "especulativa"]
+        assert result.hypotheses[1].evidence_level == "III"
+
+    def test_nivel_antes_que_prioridad(self):
+        h_iii_alta = _hypothesis("TTR", Priority.HIGH, EvidenceLevel.III, sources=[_source("11111111")])
+        h_ii_baja = _hypothesis("CIDP", Priority.LOW, EvidenceLevel.II, sources=[_source("22222222")])
+        verifications = _verificadas(("11111111", ["Meta-Analysis"]), ("22222222", ["Meta-Analysis"]))
+        result = _build(report=_make_report(hypotheses=[h_iii_alta, h_ii_baja]), verifications=verifications)
+        assert [h.text for h in result.hypotheses] == ["CIDP", "TTR"]
+
+    def test_fuente_sin_veredicto_no_arrastra_campos_del_llm(self):
+        fuente = Source(
+            pmid="33333333", title="Cita inventada", verified=True,
+            verification_status="verificada", publication_types=["Meta-Analysis"],
+        )
+        h = _hypothesis("B12", sources=[fuente])
+        result = _build(report=_make_report(hypotheses=[h]))
+        exportada = result.hypotheses[0]
+        assert exportada.status == "pendiente"
+        assert exportada.sources[0].verified is None
+        assert exportada.sources[0].verification_status is None
+        assert exportada.sources[0].publication_types == []
+        assert result.bibliography[0].verified is None
+
+    def test_discordante_no_exporta_tipos_de_publicacion(self):
+        h = _hypothesis("B12", sources=[_source("22222222")])
+        verifications = {"22222222": SourceVerification(
+            pmid="22222222", status=SourceStatus.DISCORDANTE, claimed_title="X",
+            publication_types=["Randomized Controlled Trial"],
+        )}
+        result = _build(report=_make_report(hypotheses=[h]), verifications=verifications)
+        assert result.hypotheses[0].sources[0].publication_types == []
+
+
+class TestConteosDeVerificacion:
+    def test_estados_suman_el_total(self):
+        respaldadas = [
+            _hypothesis(f"R{i}", sources=[_source(f"1000000{i}")]) for i in range(2)
+        ]
+        pendiente = _hypothesis("P", sources=[_source("20000000")])
+        especulativas = [
+            _hypothesis(f"E{i}", sources=[_source(f"3000000{i}")]) for i in range(3)
+        ]
+        verifications = {
+            **_verificadas(("10000000", ["Meta-Analysis"]), ("10000001", ["Journal Article"])),
+            "20000000": SourceVerification(
+                pmid="20000000", status=SourceStatus.NO_VERIFICABLE, claimed_title="Estudio A",
+            ),
+            **{k: v for i in range(3) for k, v in _discordante(f"3000000{i}").items()},
+        }
+        report = _make_report(hypotheses=respaldadas + [pendiente] + especulativas)
+        resumen = _build(report=report, verifications=verifications).verification
+        assert resumen.hipotesis_respaldadas == 2
+        assert resumen.hipotesis_pendientes == 1
+        assert resumen.hipotesis_especulativas == 3
+
+    def test_cuenta_hipotesis_topeadas(self):
+        hipotesis = [
+            # I con meta-análisis: no se topea.
+            _hypothesis("H1", evidence_level=EvidenceLevel.I, sources=[_source("10000000")]),
+            # I con observacional: I → II.
+            _hypothesis("H2", evidence_level=EvidenceLevel.I, sources=[_source("10000001")]),
+            # II sin verificar: II → III.
+            _hypothesis("H3", evidence_level=EvidenceLevel.II, sources=[_source("10000002")]),
+            # III sin fuentes: sigue en III.
+            _hypothesis("H4", evidence_level=EvidenceLevel.III, sources=[]),
+        ]
+        verifications = {
+            **_verificadas(("10000000", ["Meta-Analysis"]), ("10000001", ["Observational Study"])),
+            **_discordante("10000002"),
+        }
+        resumen = _build(report=_make_report(hypotheses=hipotesis), verifications=verifications).verification
+        assert resumen.hipotesis_topeadas == 2
 
 
 # ── Tests: debate_summary ──────────────────────────────────────────────────────
@@ -289,3 +411,108 @@ class TestBibliography:
         h = _hypothesis("H sin fuentes", sources=[])
         result = _build(report=_make_report(hypotheses=[h]))
         assert result.bibliography == []
+
+
+# ── Tests: navegación de ensayos (Agente 05) ──────────────────────────────────
+
+def _make_navigation(
+    rare_diseases: list[RareDiseaseMatch] | None = None,
+    **summary_overrides,
+) -> TrialNavigationResult:
+    resumen = dict(
+        estado_clinicaltrials="ok",
+        estado_orphanet="ok",
+        planificacion="ok",
+        evaluacion="ok",
+        terminos_consultados=["hereditary ATTR amyloidosis"],
+        encontrados=3,
+        excluidos_por_edad=1,
+    )
+    resumen.update(summary_overrides)
+    return TrialNavigationResult(
+        trials=[_make_trial()],
+        rare_diseases=rare_diseases or [],
+        summary=TrialSearchSummary(**resumen),
+    )
+
+
+_ATTR_MATCH = RareDiseaseMatch(
+    orpha_code="271861",
+    name="Hereditary ATTR amyloidosis",
+    url="https://www.orpha.net/en/disease/detail/271861",
+    hypothesis="Hipótesis de prueba.",
+    matched_term="hereditary ATTR amyloidosis",
+)
+
+
+class TestNavegacionDeEnsayos:
+    def test_reporte_previo_sin_navegacion_deja_trial_search_nulo(self):
+        result = _build()
+        assert result.trial_search is None
+        assert result.rare_diseases == []
+
+    def test_structured_report_sin_campos_nuevos_valida(self):
+        """El contrato es aditivo: el JSON previo al Agente 05 sigue validando."""
+        previo = _build().model_dump()
+        previo.pop("rare_diseases")
+        previo.pop("trial_search")
+        reconstruido = StructuredReport(**previo)
+        assert reconstruido.trial_search is None
+        assert reconstruido.rare_diseases == []
+
+    def test_reporte_con_busqueda_completa(self):
+        result = build_export(
+            case=_make_case(),
+            report=_make_report(),
+            trials=[_make_trial()],
+            processing_time=10.5,
+            navigation=_make_navigation(),
+        )
+        assert result.trial_search is not None
+        assert result.trial_search.estado_clinicaltrials == "ok"
+        assert result.trial_search.estado_orphanet == "ok"
+        assert result.trial_search.terminos_consultados == ["hereditary ATTR amyloidosis"]
+        assert result.trial_search.excluidos_por_edad == 1
+
+    def test_hipotesis_marcada_como_enfermedad_rara(self):
+        result = build_export(
+            case=_make_case(),
+            report=_make_report(),
+            trials=[_make_trial()],
+            processing_time=10.5,
+            navigation=_make_navigation(rare_diseases=[_ATTR_MATCH]),
+        )
+        assert len(result.rare_diseases) == 1
+        marca = result.rare_diseases[0]
+        assert marca.orpha_code == "271861"
+        assert marca.url.endswith("/271861")
+        assert marca.hypothesis == "Hipótesis de prueba."
+
+    def test_sin_coincidencias_de_orphanet(self):
+        result = build_export(
+            case=_make_case(),
+            report=_make_report(),
+            trials=[_make_trial()],
+            processing_time=10.5,
+            navigation=_make_navigation(estado_orphanet="ok"),
+        )
+        assert result.rare_diseases == []
+
+    def test_api_caida_se_refleja_en_el_reporte(self):
+        result = build_export(
+            case=_make_case(),
+            report=_make_report(),
+            trials=[],
+            processing_time=10.5,
+            navigation=TrialNavigationResult(
+                summary=TrialSearchSummary(estado_clinicaltrials="no_disponible")
+            ),
+        )
+        assert result.clinical_trials == []
+        assert result.trial_search.estado_clinicaltrials == "no_disponible"
+
+    def test_conserva_el_orden_de_ensayos_del_agente(self):
+        primero = _make_trial().model_copy(update={"nct_id": "NCT_A"})
+        segundo = _make_trial().model_copy(update={"nct_id": "NCT_B"})
+        result = _build(trials=[primero, segundo])
+        assert [t.nct_id for t in result.clinical_trials] == ["NCT_A", "NCT_B"]

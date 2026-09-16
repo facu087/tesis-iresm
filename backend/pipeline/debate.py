@@ -174,7 +174,7 @@ async def run_debate(case: ClinicalCase, round_1_report: Report) -> Report:
 
     # Reutilizar el perfil genómico del orquestador; si falta, construirlo sin red
     genomic_ctx = case.genomic_context or gc_module.build(case)
-    agents: list[BaseAgent] = [
+    all_agents: list[BaseAgent] = [
         LiteratureAnalystAgent(),
         GenomicsSpecialistAgent(genomic_context=genomic_ctx),
         ClinicalConsultantAgent(),
@@ -185,16 +185,19 @@ async def run_debate(case: ClinicalCase, round_1_report: Report) -> Report:
         o.agent_id: o for o in round_1_report.agent_outputs
     }
 
-    # Solo participan del debate los agentes que produjeron output en Ronda 1
-    agents = [a for a in agents if a.AGENT_ID in outputs_by_id]
-    absent = [
-        f"{a.AGENT_NAME} (ID:{a.AGENT_ID})"
-        for a in [LiteratureAnalystAgent(), GenomicsSpecialistAgent(), ClinicalConsultantAgent()]
-        if a.AGENT_ID not in outputs_by_id
+    # El debate corre SOLO con los agentes que produjeron output en la Ronda 1.
+    # run_round_1() deja afuera a los que fallaron, así que la lista completa de
+    # agentes y las claves de outputs_by_id no tienen por qué coincidir: indexar
+    # por AGENT_ID sin filtrar levantaba KeyError y tumbaba /api/analyze entero.
+    agents = [a for a in all_agents if a.AGENT_ID in outputs_by_id]
+    absent_agents = [
+        f"{a.AGENT_NAME} (ID:{a.AGENT_ID})" for a in all_agents if a.AGENT_ID not in outputs_by_id
     ]
-    if absent:
+
+    if absent_agents:
         print(
-            f"[NEXUS] Debate sin {', '.join(absent)}: no produjeron hipótesis en la Ronda 1.",
+            f"[NEXUS] Debate sin {', '.join(absent_agents)}: "
+            f"no produjeron hipótesis en la Ronda 1.",
             file=sys.stderr,
         )
 
@@ -204,6 +207,9 @@ async def run_debate(case: ClinicalCase, round_1_report: Report) -> Report:
             f"(IDs recibidos: {sorted(outputs_by_id)}). Revisá la numeración de agentes."
         )
 
+    # Con un solo agente no hay debate adversarial posible: nadie a quien criticar
+    # ni críticas que responder. Se devuelve la Ronda 1 con la constancia, en vez
+    # de simular tres rondas vacías y reportar un consenso que nunca se debatió.
     if len(agents) < 2:
         print(
             "[NEXUS] Debate omitido: se necesitan al menos 2 agentes y quedó "
@@ -217,7 +223,7 @@ async def run_debate(case: ClinicalCase, round_1_report: Report) -> Report:
             debate_rounds=[],
             divergences=[],
             sources_summary=round_1_report.sources_summary,
-            absent_agents=absent,
+            absent_agents=absent_agents,
         )
 
     # ── Ronda 2: críticas ─────────────────────────────────────────
@@ -249,4 +255,5 @@ async def run_debate(case: ClinicalCase, round_1_report: Report) -> Report:
         debate_rounds=[round_2, round_3, round_4],
         divergences=divergences,
         sources_summary=sources_summary,
+        absent_agents=absent_agents,
     )

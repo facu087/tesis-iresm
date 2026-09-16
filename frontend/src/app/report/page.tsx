@@ -8,8 +8,12 @@ import type {
   RankedHypothesis,
   ClinicalTrial,
   CaseSummarySection,
+  Compatibility,
   DebateSummary,
+  HypothesisStatus,
+  RareDiseaseMatch,
   Source,
+  TrialSearchSummary,
   VerificationSummary,
 } from "@/lib/types";
 
@@ -163,7 +167,7 @@ export default function ReportPage() {
           {tab === "hipotesis"    && <HipotesisTab    hypotheses={report.hypotheses} />}
           {tab === "caso"         && <CasoTab         summary={report.case_summary} />}
           {tab === "debate"       && <DebateTab        debate={report.debate_summary} />}
-          {tab === "ensayos"      && <EnsayosTab       trials={report.clinical_trials} />}
+          {tab === "ensayos"      && <EnsayosTab       report={report} />}
           {tab === "bibliografia" && <BibliografiaTab  sources={report.bibliography} />}
         </div>
       </main>
@@ -205,13 +209,43 @@ const EVIDENCE_BADGE: Record<string, string> = {
 
 const STATUS_BADGE: Record<string, string> = {
   respaldada:   "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200",
+  pendiente:    "bg-sky-100 text-sky-700 ring-1 ring-sky-200",
   especulativa: "bg-amber-100 text-amber-800 ring-1 ring-amber-300",
 };
 
 const STATUS_LABEL: Record<string, string> = {
   respaldada:   "✓ Respaldada",
+  pendiente:    "? Pendiente",
   especulativa: "⚠ Especulativa",
 };
+
+const STATUS_TOOLTIP: Record<string, (h: RankedHypothesis) => string> = {
+  respaldada:   (h) => `${h.verified_sources} referencia(s) confirmada(s) contra PubMed`,
+  pendiente:    () => "La verificación contra PubMed no pudo completarse",
+  especulativa: () => "Ninguna de sus referencias se pudo confirmar contra PubMed",
+};
+
+/**
+ * Grupos de la pestaña de hipótesis, en el mismo orden en que las ordena el
+ * backend (backend/pipeline/evidence.py): respaldadas, pendientes, especulativas.
+ */
+const STATUS_GROUPS: { status: HypothesisStatus; title: string; description: string }[] = [
+  {
+    status: "respaldada",
+    title: "Hipótesis respaldadas",
+    description: "Al menos una referencia confirmada contra PubMed.",
+  },
+  {
+    status: "pendiente",
+    title: "Pendientes de verificación",
+    description: "PubMed no respondió: el nivel queda en III hasta poder confirmar las fuentes.",
+  },
+  {
+    status: "especulativa",
+    title: "Hipótesis especulativas",
+    description: "Ninguna referencia resistió la verificación. Se muestran, no se descartan.",
+  },
+];
 
 /** Cómo se muestra cada veredicto de fuente. */
 const SOURCE_VERDICT: Record<string, { label: string; color: string; tachado: boolean }> = {
@@ -233,6 +267,9 @@ function VerificationBanner({ v }: { v: VerificationSummary }) {
 
   const sospechosas = v.discordantes + v.inexistentes;
   const hayProblema = sospechosas > 0;
+  const pendientes = v.hipotesis_pendientes ?? 0;
+  const topeadas = v.hipotesis_topeadas ?? 0;
+  const totalHipotesis = v.hipotesis_respaldadas + pendientes + v.hipotesis_especulativas;
 
   return (
     <div className={hayProblema ? "bg-red-50 border-b border-red-200" : "bg-emerald-50 border-b border-emerald-200"}>
@@ -242,8 +279,7 @@ function VerificationBanner({ v }: { v: VerificationSummary }) {
           <>
             {sospechosas} de {v.total_fuentes} referencias citadas no se pudieron confirmar
             contra PubMed{v.discordantes > 0 && <> ({v.discordantes} apuntan a otro artículo)</>}.
-            {" "}{v.hipotesis_especulativas} de{" "}
-            {v.hipotesis_especulativas + v.hipotesis_respaldadas} hipótesis quedan como especulativas.
+            {" "}{v.hipotesis_especulativas} de {totalHipotesis} hipótesis quedan como especulativas.
           </>
         ) : (
           <>
@@ -253,6 +289,12 @@ function VerificationBanner({ v }: { v: VerificationSummary }) {
         {v.no_verificables > 0 && (
           <> {v.no_verificables} no se pudieron consultar (fallo de red): no se invalidan.</>
         )}
+        {pendientes > 0 && (
+          <> {pendientes} de {totalHipotesis} hipótesis quedan pendientes de verificación.</>
+        )}
+        {topeadas > 0 && (
+          <> A {topeadas} hipótesis se les bajó el nivel de evidencia declarado por el agente.</>
+        )}
       </div>
     </div>
   );
@@ -260,77 +302,117 @@ function VerificationBanner({ v }: { v: VerificationSummary }) {
 
 /* ── Hipótesis tab ─────────────────────────────────────────────────────── */
 
+/** Estado de agrupación: un status desconocido (reporte viejo) va con las especulativas. */
+function groupStatus(h: RankedHypothesis): HypothesisStatus {
+  return STATUS_GROUPS.some((g) => g.status === h.status) ? h.status : "especulativa";
+}
+
 function HipotesisTab({ hypotheses }: { hypotheses: RankedHypothesis[] }) {
   if (!hypotheses.length) {
     return <EmptyState message="No se generaron hipótesis." />;
   }
   return (
-    <div className="space-y-5">
-      {hypotheses.map((h) => (
-        <div
-          key={h.rank}
-          className="rounded-2xl border border-slate-200 bg-white p-6 space-y-4"
-        >
-          {/* Rank + título + badges */}
-          <div className="flex items-start gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-sm font-bold text-white mt-0.5">
-              #{h.rank}
-            </span>
-            <div className="flex-1 space-y-2">
-              <p className="text-base font-semibold text-slate-900 leading-snug">
-                {h.text}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {h.status && (
-                  <span
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_BADGE[h.status] ?? ""}`}
-                    title={
-                      h.status === "respaldada"
-                        ? `${h.verified_sources} referencia(s) confirmada(s) contra PubMed`
-                        : "Ninguna de sus referencias se pudo confirmar contra PubMed"
-                    }
-                  >
-                    {STATUS_LABEL[h.status] ?? h.status}
-                  </span>
-                )}
-                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${PRIORITY_BADGE[h.priority] ?? ""}`}>
-                  Prioridad {PRIORITY_LABEL[h.priority] ?? h.priority}
-                </span>
-                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${EVIDENCE_BADGE[h.evidence_level] ?? ""}`}>
-                  Evidencia nivel {h.evidence_level}
-                </span>
-                {h.supporting_agents.map((ag) => (
-                  <span key={ag} className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-500">
-                    Agente {ag}
-                  </span>
-                ))}
+    <div className="space-y-8">
+      {STATUS_GROUPS.map((group) => {
+        const items = hypotheses.filter((h) => groupStatus(h) === group.status);
+        if (!items.length) return null;
+        return (
+          <section key={group.status} className="space-y-4">
+            <div className="flex items-baseline justify-between gap-3 border-b border-slate-200 pb-2">
+              <div>
+                <h2 className="text-sm font-bold uppercase tracking-wide text-slate-700">
+                  {group.title} <span className="text-slate-400">({items.length})</span>
+                </h2>
+                <p className="text-xs text-slate-500">{group.description}</p>
               </div>
             </div>
-          </div>
-
-          {/* Justificación */}
-          <div className="rounded-xl bg-slate-50 px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">
-              Justificación
-            </p>
-            <p className="text-sm text-slate-700 leading-relaxed">{h.rationale}</p>
-          </div>
-
-          {/* Fuentes de la hipótesis */}
-          {h.sources.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
-                Fuentes
-              </p>
-              <ul className="space-y-1.5">
-                {h.sources.map((s, i) => (
-                  <SourceRow key={s.pmid ?? i} source={s} />
-                ))}
-              </ul>
+            <div className="space-y-5">
+              {items.map((h) => (
+                <HypothesisCard key={h.rank} h={h} />
+              ))}
             </div>
-          )}
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+function HypothesisCard({ h }: { h: RankedHypothesis }) {
+  const topeada =
+    !!h.declared_evidence_level && h.declared_evidence_level !== h.evidence_level;
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-6 space-y-4">
+      {/* Rank + título + badges */}
+      <div className="flex items-start gap-3">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-sm font-bold text-white mt-0.5">
+          #{h.rank}
+        </span>
+        <div className="flex-1 space-y-2">
+          <p className="text-base font-semibold text-slate-900 leading-snug">
+            {h.text}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {h.status && (
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_BADGE[h.status] ?? ""}`}
+                title={STATUS_TOOLTIP[h.status]?.(h)}
+              >
+                {STATUS_LABEL[h.status] ?? h.status}
+              </span>
+            )}
+            <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${PRIORITY_BADGE[h.priority] ?? ""}`}>
+              Prioridad {PRIORITY_LABEL[h.priority] ?? h.priority}
+            </span>
+            <span
+              className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${EVIDENCE_BADGE[h.evidence_level] ?? ""}`}
+              title={h.evidence_note || undefined}
+            >
+              Evidencia nivel {h.evidence_level}
+              {topeada && (
+                <span className="ml-1 font-normal">
+                  (el agente declaró {h.declared_evidence_level})
+                </span>
+              )}
+            </span>
+            {h.supporting_agents.map((ag) => (
+              <span key={ag} className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-500">
+                Agente {ag}
+              </span>
+            ))}
+          </div>
         </div>
-      ))}
+      </div>
+
+      {/* Justificación */}
+      <div className="rounded-xl bg-slate-50 px-4 py-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">
+          Justificación
+        </p>
+        <p className="text-sm text-slate-700 leading-relaxed">{h.rationale}</p>
+      </div>
+
+      {/* Por qué quedó con este nivel de evidencia */}
+      {h.evidence_note && (
+        <p className={`text-xs leading-relaxed ${topeada ? "text-orange-700" : "text-slate-500"}`}>
+          <span className="font-semibold">Nivel de evidencia:</span> {h.evidence_note}
+        </p>
+      )}
+
+      {/* Fuentes de la hipótesis */}
+      {h.sources.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
+            Fuentes
+          </p>
+          <ul className="space-y-1.5">
+            {h.sources.map((s, i) => (
+              <SourceRow key={s.pmid ?? i} source={s} />
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
@@ -456,100 +538,266 @@ function DebateTab({ debate }: { debate: DebateSummary }) {
   );
 }
 
-/* ── Ensayos tab ────────────────────────────────────────────────────────── */
+/* ── Ensayos tab (Agente 05) ────────────────────────────────────────────── */
 
-function EnsayosTab({ trials }: { trials: ClinicalTrial[] }) {
-  if (!trials.length) {
-    return (
-      <EmptyState message="No se encontraron ensayos clínicos activos relacionados al caso." />
-    );
+const COMPATIBILITY_BADGE: Record<Compatibility, string> = {
+  alta:        "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200",
+  media:       "bg-amber-100 text-amber-700 ring-1 ring-amber-200",
+  baja:        "bg-slate-100 text-slate-600 ring-1 ring-slate-200",
+  sin_evaluar: "bg-white text-slate-400 ring-1 ring-slate-200",
+};
+
+const COMPATIBILITY_LABEL: Record<Compatibility, string> = {
+  alta:        "Compatibilidad alta",
+  media:       "Compatibilidad media",
+  baja:        "Compatibilidad baja",
+  sin_evaluar: "Sin evaluar",
+};
+
+/** Aclaración fija: la misma que imprime el PDF. */
+const TRIAL_DISCLAIMER =
+  "La compatibilidad es orientativa: la elegibilidad la determina el equipo investigador de cada ensayo.";
+
+/** Argentina ordena el resultado; nunca filtra. La comparación es normalizada. */
+function tieneSedeEnArgentina(t: ClinicalTrial): boolean {
+  return t.locations.some(
+    (pais) =>
+      pais
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .toLowerCase()
+        .trim() === "argentina",
+  );
+}
+
+/** Avisos de estado: distinguen "no hay ensayos" de "no se pudo consultar". */
+function avisosDeBusqueda(s: TrialSearchSummary): string[] {
+  const avisos: string[] = [];
+  if (s.estado_clinicaltrials === "no_disponible") {
+    avisos.push("ClinicalTrials.gov no se pudo consultar");
+  } else if (s.estado_clinicaltrials === "parcial") {
+    avisos.push("algunas consultas a ClinicalTrials.gov fallaron");
   }
+  if (s.estado_orphanet === "no_disponible") {
+    avisos.push("Orphanet no se pudo consultar");
+  } else if (s.estado_orphanet === "parcial") {
+    avisos.push("algunas consultas a Orphanet fallaron");
+  }
+  if (s.evaluacion === "fallback") {
+    avisos.push("la evaluación de compatibilidad no se pudo completar");
+  }
+  return avisos;
+}
+
+function EnsayosTab({ report }: { report: StructuredReport }) {
+  // `trial_search` nulo = reporte anterior al Agente 05: se muestra como antes.
+  const busqueda = report.trial_search ?? null;
+  const trials = report.clinical_trials;
+  const raras = report.rare_diseases ?? [];
+  const avisos = busqueda ? avisosDeBusqueda(busqueda) : [];
+
   return (
     <div className="space-y-5">
-      {trials.map((t) => (
-        <div
-          key={t.nct_id}
-          className="rounded-2xl border border-slate-200 bg-white p-6 space-y-4"
-        >
-          {/* Título + badges + link */}
-          <div className="flex items-start justify-between gap-4">
-            <div className="space-y-2 flex-1">
-              <p className="text-base font-semibold text-slate-900 leading-snug">
-                {t.title}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-mono text-slate-600">
-                  {t.nct_id}
-                </span>
-                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                  t.status === "RECRUITING"
-                    ? "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200"
-                    : "bg-slate-100 text-slate-600"
-                }`}>
-                  {t.status}
-                </span>
-                {t.phase && (
-                  <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs text-blue-700 ring-1 ring-blue-100">
-                    {t.phase}
-                  </span>
-                )}
-              </div>
-            </div>
+      {avisos.length > 0 && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3 text-xs text-amber-800">
+          <span className="font-semibold">Estado de la búsqueda:</span>{" "}
+          {avisos.join("; ")}.
+        </div>
+      )}
+
+      {busqueda && trials.length > 0 && (
+        <p className="text-xs text-slate-500">⚠ {TRIAL_DISCLAIMER}</p>
+      )}
+
+      {raras.length > 0 && <RareDiseasesCard matches={raras} />}
+
+      {trials.length === 0 ? (
+        <EmptyState
+          message={
+            busqueda?.estado_clinicaltrials === "no_disponible"
+              ? "No se pudo consultar ClinicalTrials.gov: esto no significa que no existan ensayos relacionados."
+              : "No se encontraron ensayos clínicos activos relacionados al caso."
+          }
+        />
+      ) : (
+        trials.map((t) => <TrialCard key={t.nct_id} t={t} evaluado={!!busqueda} />)
+      )}
+    </div>
+  );
+}
+
+function RareDiseasesCard({ matches }: { matches: RareDiseaseMatch[] }) {
+  return (
+    <div className="rounded-2xl border border-violet-200 bg-violet-50 p-6 space-y-3">
+      <div>
+        <p className="text-sm font-semibold text-violet-900">
+          Enfermedades raras relacionadas (Orphanet)
+        </p>
+        <p className="text-xs text-violet-700">
+          Hipótesis de investigación que corresponden a una enfermedad rara catalogada.
+          No son diagnósticos del paciente.
+        </p>
+      </div>
+      <ul className="space-y-2">
+        {matches.map((m) => (
+          <li key={`${m.orpha_code}-${m.hypothesis}`} className="text-sm text-slate-700">
             <a
-              href={t.url}
+              href={m.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+              className="font-semibold text-violet-800 hover:underline"
             >
-              ClinicalTrials ↗
+              ORPHA:{m.orpha_code} — {m.name} ↗
             </a>
-          </div>
+            <span className="block text-xs text-slate-500">
+              Hipótesis: {m.hypothesis}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
-          {/* Resumen */}
-          <p className="text-sm text-slate-600 leading-relaxed">{t.brief_summary}</p>
+function TrialCard({ t, evaluado }: { t: ClinicalTrial; evaluado: boolean }) {
+  const compatibilidad: Compatibility = t.compatibility ?? "sin_evaluar";
+  const criterios = t.criteria_to_verify ?? [];
+  const hipotesis = t.related_hypotheses ?? [];
 
-          {/* Metadatos */}
-          <div className="grid sm:grid-cols-2 gap-x-8 gap-y-1 text-xs text-slate-500">
-            {t.conditions.length > 0 && (
-              <span>
-                <strong>Condiciones:</strong> {t.conditions.join(", ")}
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-6 space-y-4">
+      {/* Título + badges + link */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-2 flex-1">
+          <p className="text-base font-semibold text-slate-900 leading-snug">
+            {t.title}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {evaluado && (
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${COMPATIBILITY_BADGE[compatibilidad]}`}
+              >
+                {COMPATIBILITY_LABEL[compatibilidad]}
               </span>
             )}
-            {t.sponsor && (
-              <span>
-                <strong>Patrocinador:</strong> {t.sponsor}
+            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-mono text-slate-600">
+              {t.nct_id}
+            </span>
+            {/* Advertencia, no badge de calidad: el ensayo todavía no abrió. */}
+            {t.status === "NOT_YET_RECRUITING" ? (
+              <span className="rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-semibold text-orange-700 ring-1 ring-orange-200">
+                ⏳ Aún no recluta
+              </span>
+            ) : (
+              <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                t.status === "RECRUITING"
+                  ? "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200"
+                  : "bg-slate-100 text-slate-600"
+              }`}>
+                {t.status}
               </span>
             )}
-            {t.start_date && (
-              <span>
-                <strong>Inicio:</strong> {t.start_date}
+            {tieneSedeEnArgentina(t) && (
+              <span className="rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-700 ring-1 ring-sky-200">
+                📍 Sede en Argentina
               </span>
             )}
-            {t.completion_date && (
-              <span>
-                <strong>Fin estimado:</strong> {t.completion_date}
-              </span>
-            )}
-            {(t.min_age || t.max_age) && (
-              <span>
-                <strong>Edad:</strong> {t.min_age ?? "?"} – {t.max_age ?? "?"}
-              </span>
-            )}
-            {t.sex && (
-              <span>
-                <strong>Sexo:</strong> {t.sex}
-              </span>
-            )}
-            {t.locations.length > 0 && (
-              <span className="sm:col-span-2">
-                <strong>Sedes:</strong>{" "}
-                {t.locations.slice(0, 3).join(" · ")}
-                {t.locations.length > 3 && ` +${t.locations.length - 3} más`}
+            {t.phase && (
+              <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs text-blue-700 ring-1 ring-blue-100">
+                {t.phase}
               </span>
             )}
           </div>
         </div>
-      ))}
+        <a
+          href={t.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+        >
+          ClinicalTrials ↗
+        </a>
+      </div>
+
+      {/* Resumen */}
+      <p className="text-sm text-slate-600 leading-relaxed">{t.brief_summary}</p>
+
+      {/* Fundamento de la compatibilidad */}
+      {evaluado && t.compatibility_rationale && (
+        <div className="rounded-xl bg-slate-50 px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">
+            Por qué
+          </p>
+          <p className="text-sm text-slate-700 leading-relaxed">
+            {t.compatibility_rationale}
+          </p>
+        </div>
+      )}
+
+      {/* Criterios a verificar */}
+      {evaluado && criterios.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
+            Criterios a verificar
+          </p>
+          <ul className="space-y-1.5">
+            {criterios.map((c, i) => (
+              <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
+                {c}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Hipótesis que trajeron este ensayo */}
+      {evaluado && hipotesis.length > 0 && (
+        <p className="text-xs text-slate-500">
+          <strong>Hipótesis relacionadas:</strong> {hipotesis.join(" · ")}
+        </p>
+      )}
+
+      {/* Metadatos */}
+      <div className="grid sm:grid-cols-2 gap-x-8 gap-y-1 text-xs text-slate-500">
+        {t.conditions.length > 0 && (
+          <span>
+            <strong>Condiciones:</strong> {t.conditions.join(", ")}
+          </span>
+        )}
+        {t.sponsor && (
+          <span>
+            <strong>Patrocinador:</strong> {t.sponsor}
+          </span>
+        )}
+        {t.start_date && (
+          <span>
+            <strong>Inicio:</strong> {t.start_date}
+          </span>
+        )}
+        {t.completion_date && (
+          <span>
+            <strong>Fin estimado:</strong> {t.completion_date}
+          </span>
+        )}
+        {(t.min_age || t.max_age) && (
+          <span>
+            <strong>Edad:</strong> {t.min_age ?? "?"} – {t.max_age ?? "?"}
+          </span>
+        )}
+        {t.sex && (
+          <span>
+            <strong>Sexo:</strong> {t.sex}
+          </span>
+        )}
+        {t.locations.length > 0 && (
+          <span className="sm:col-span-2">
+            <strong>Sedes:</strong>{" "}
+            {t.locations.slice(0, 3).join(" · ")}
+            {t.locations.length > 3 && ` +${t.locations.length - 3} más`}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -644,6 +892,12 @@ function SourceRow({ source }: { source: Source }) {
         </span>
         {veredicto && (
           <span className={`ml-1.5 font-semibold ${veredicto.color}`}>({veredicto.label})</span>
+        )}
+        {/* Tipos de publicación de PubMed: son los que fijan el tope de evidencia. */}
+        {source.verified && !!source.publication_types?.length && (
+          <span className="mt-0.5 block text-slate-400">
+            Tipo en PubMed: {source.publication_types.join(", ")}
+          </span>
         )}
         {/* El título real es la prueba: el PMID existe, pero es de otra cosa. */}
         {source.actual_title && (

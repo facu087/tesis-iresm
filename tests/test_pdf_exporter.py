@@ -23,7 +23,7 @@ from backend.api.schemas import (
 )
 from backend.main import app
 from backend.models.hypothesis import Source
-from backend.models.trial import ClinicalTrial
+from backend.models.trial import ClinicalTrial, RareDiseaseMatch, TrialSearchSummary
 from backend.pipeline.pdf_exporter import _limpiar, generate_pdf
 
 
@@ -268,6 +268,78 @@ class TestVerificacionEnPdf:
         assert "Advertencia de verificación bibliográfica" not in texto
 
 
+# ── Tests: priorización por evidencia EBM en el PDF ───────────────────────────
+
+class TestPriorizacionEnPdf:
+    def _report_priorizado(self) -> StructuredReport:
+        verificada = Source(
+            pmid="30000002", title="Metformin use and B12 deficiency: a cohort",
+            verified=True, verification_status="verificada",
+            publication_types=["Journal Article", "Observational Study"],
+        )
+        respaldada = RankedHypothesis(
+            rank=1, text="Déficit de B12 por metformina.", priority="HIGH",
+            evidence_level="II", declared_evidence_level="I",
+            evidence_note="El agente declaró nivel I; queda topeado en II.",
+            rationale="Razonamiento.", supporting_agents=["Consultor Clínico"],
+            sources=[verificada], status="respaldada", verified_sources=1,
+        )
+        pendiente = RankedHypothesis(
+            rank=2, text="Polineuropatía desmielinizante inflamatoria crónica.", priority="MEDIUM",
+            evidence_level="III", declared_evidence_level="II",
+            evidence_note="Verificación bibliográfica no disponible.",
+            rationale="Razonamiento.", supporting_agents=[],
+            sources=[Source(pmid="30000003", title="CIDP", verification_status="no_verificable")],
+            status="pendiente",
+        )
+        especulativa = RankedHypothesis(
+            rank=3, text="Amiloidosis TTR hereditaria.", priority="HIGH",
+            evidence_level="III", declared_evidence_level="III",
+            rationale="Razonamiento.", supporting_agents=[], sources=[],
+            status="especulativa",
+        )
+        report = _make_report(hypotheses=[respaldada, pendiente, especulativa])
+        report.verification = VerificationSummary(
+            total_fuentes=2, verificadas=1, no_verificables=1,
+            hipotesis_respaldadas=1, hipotesis_pendientes=1, hipotesis_especulativas=1,
+            hipotesis_topeadas=2,
+        )
+        return report
+
+    def test_agrupa_por_estado_con_encabezados_en_orden(self):
+        texto = _texto_del_pdf(generate_pdf(self._report_priorizado()))
+        i_resp = texto.index("HIPÓTESIS RESPALDADAS (1)")
+        i_pend = texto.index("PENDIENTES DE VERIFICACIÓN (1)")
+        i_espe = texto.index("HIPÓTESIS ESPECULATIVAS (1)")
+        assert i_resp < i_pend < i_espe
+
+    def test_omite_grupos_vacios(self):
+        report = self._report_priorizado()
+        report.hypotheses = [report.hypotheses[0], report.hypotheses[2]]
+        texto = _texto_del_pdf(generate_pdf(report))
+        assert "PENDIENTES DE VERIFICACIÓN" not in texto
+        assert "HIPÓTESIS ESPECULATIVAS (1)" in texto
+
+    def test_etiqueta_pendiente(self):
+        assert "PENDIENTE" in _texto_del_pdf(generate_pdf(self._report_priorizado()))
+
+    def test_muestra_el_nivel_declarado_cuando_fue_topeado(self):
+        texto = _texto_del_pdf(generate_pdf(self._report_priorizado()))
+        assert "Evidencia II (declarado I)" in texto
+        assert "queda topeado en II" in texto
+        # La especulativa declaró III y quedó en III: no muestra "declarado".
+        assert "(declarado III)" not in texto
+
+    def test_portada_con_pendientes_y_topeadas(self):
+        texto = _texto_del_pdf(generate_pdf(self._report_priorizado()))
+        assert "Hipótesis pendientes de verificación" in texto
+        assert "Hipótesis con nivel de evidencia topeado" in texto
+
+    def test_fuente_verificada_muestra_su_tipo_de_publicacion(self):
+        texto = _texto_del_pdf(generate_pdf(self._report_priorizado()))
+        assert "Observational Study" in texto
+
+
 # ── Tests: endpoint /api/report/pdf ───────────────────────────────────────────
 
 class TestExportPdfEndpoint:
@@ -297,7 +369,119 @@ class TestExportPdfEndpoint:
             response = client.post("/api/report/pdf", json=self._report_json())
         assert response.content[:4] == b"%PDF"
 
+    def test_reporte_previo_a_la_priorizacion_ebm_sigue_siendo_valido(self):
+        """Contrato aditivo: un JSON sin los campos nuevos se acepta y exporta."""
+        viejo = self._report_json()
+        for h in viejo["hypotheses"]:
+            h.pop("declared_evidence_level", None)
+            h.pop("evidence_note", None)
+            for s in h["sources"]:
+                s.pop("publication_types", None)
+        for s in viejo["bibliography"]:
+            s.pop("publication_types", None)
+        viejo["verification"].pop("hipotesis_pendientes", None)
+        viejo["verification"].pop("hipotesis_topeadas", None)
+
+        StructuredReport.model_validate(viejo)
+        with TestClient(app) as client:
+            response = client.post("/api/report/pdf", json=viejo)
+        assert response.status_code == 200
+        assert response.content[:4] == b"%PDF"
+
     def test_body_invalido_devuelve_422(self):
         with TestClient(app) as client:
             response = client.post("/api/report/pdf", json={"invalid": "data"})
         assert response.status_code == 422
+
+
+# ── Tests: navegación de ensayos (Agente 05) ──────────────────────────────────
+
+class TestEnsayosNavegados:
+    def _trial_evaluado(self) -> ClinicalTrial:
+        return ClinicalTrial(
+            nct_id="NCT04000009",
+            title="Ensayo de amiloidosis hereditaria",
+            status="NOT_YET_RECRUITING",
+            brief_summary="Ensayo sobre estabilizadores de transtiretina.",
+            conditions=["Hereditary ATTR amyloidosis"],
+            locations=["Argentina"],
+            url="https://clinicaltrials.gov/study/NCT04000009",
+            compatibility="alta",
+            compatibility_rationale="La condición estudiada coincide con la hipótesis.",
+            criteria_to_verify=["Confirmar biopsia de nervio", "Revisar función renal"],
+            related_hypotheses=["Amiloidosis hereditaria por transtiretina"],
+            matched_terms=["hereditary ATTR amyloidosis"],
+        )
+
+    def _report_navegado(self, **overrides) -> StructuredReport:
+        report = _make_report(trials=[self._trial_evaluado()])
+        report.rare_diseases = [
+            RareDiseaseMatch(
+                orpha_code="271861",
+                name="Hereditary ATTR amyloidosis",
+                url="https://www.orpha.net/en/disease/detail/271861",
+                hypothesis="Amiloidosis hereditaria por transtiretina",
+                matched_term="hereditary ATTR amyloidosis",
+            )
+        ]
+        datos = dict(
+            estado_clinicaltrials="ok",
+            estado_orphanet="ok",
+            planificacion="ok",
+            evaluacion="ok",
+            terminos_consultados=["hereditary ATTR amyloidosis"],
+            encontrados=1,
+        )
+        datos.update(overrides)
+        report.trial_search = TrialSearchSummary(**datos)
+        return report
+
+    def test_pdf_con_ensayos_evaluados(self):
+        texto = _texto_del_pdf(generate_pdf(self._report_navegado()))
+        assert "COMPATIBILIDAD ALTA" in texto
+        assert "Confirmar biopsia de nervio" in texto
+        assert "ORPHA:271861" in texto
+        assert "orpha.net" in texto
+        assert "la elegibilidad la determina el equipo investigador" in texto
+
+    def test_pdf_avisa_que_el_ensayo_no_recluta(self):
+        texto = _texto_del_pdf(generate_pdf(self._report_navegado()))
+        assert "AÚN NO RECLUTA" in texto
+
+    def test_pdf_senala_la_sede_en_argentina(self):
+        texto = _texto_del_pdf(generate_pdf(self._report_navegado()))
+        assert "SEDE EN ARGENTINA" in texto
+
+    def test_pdf_con_la_api_caida(self):
+        report = _make_report()
+        report.clinical_trials = []
+        report.trial_search = TrialSearchSummary(estado_clinicaltrials="no_disponible")
+        texto = _texto_del_pdf(generate_pdf(report))
+        assert "No se pudo consultar ClinicalTrials.gov" in texto
+        assert "No se encontraron ensayos clínicos activos relacionados." not in texto
+
+    def test_pdf_avisa_cuando_orphanet_no_respondio(self):
+        report = self._report_navegado(estado_orphanet="no_disponible")
+        texto = _texto_del_pdf(generate_pdf(report))
+        assert "Orphanet no se pudo consultar" in texto
+
+    def test_reporte_previo_se_imprime_como_antes(self):
+        """Sin `trial_search` no aparecen etiquetas de compatibilidad."""
+        texto = _texto_del_pdf(generate_pdf(_make_report()))
+        assert "COMPATIBILIDAD" not in texto
+        assert "la elegibilidad la determina el equipo investigador" not in texto
+        assert "NCT04000001" in texto
+
+    def test_reporte_previo_sin_ensayos_mantiene_el_mensaje_original(self):
+        report = _make_report()
+        report.clinical_trials = []
+        texto = _texto_del_pdf(generate_pdf(report))
+        assert "No se encontraron ensayos clínicos activos relacionados." in texto
+
+    def test_ensayo_sin_evaluar_se_rotula(self):
+        report = self._report_navegado(evaluacion="fallback")
+        report.clinical_trials[0].compatibility = "sin_evaluar"
+        report.clinical_trials[0].compatibility_rationale = None
+        texto = _texto_del_pdf(generate_pdf(report))
+        assert "SIN EVALUAR" in texto
+        assert "la evaluación de compatibilidad no se pudo completar" in texto
