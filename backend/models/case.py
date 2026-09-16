@@ -6,8 +6,11 @@ Metodología estándar de medicina basada en evidencia para formular
 preguntas clínicas claras y reproducibles.
 """
 
+from __future__ import annotations
+
 from pydantic import BaseModel
 from .biomarkers import BiomarkerProfile
+from .genomics import GenomicContext
 
 
 class PICOSynthesis(BaseModel):
@@ -42,3 +45,4 @@ class ClinicalCase(BaseModel):
     raw_text: str                               # Texto clínico original (ya anonimizado)
     pico: PICOSynthesis | None = None           # Se completa tras el análisis PICO
     biomarkers: BiomarkerProfile | None = None  # Se completa tras la extracción de biomarcadores
+    genomic_context: GenomicContext | None = None  # Se completa en la Ronda 1 (Agente 02)

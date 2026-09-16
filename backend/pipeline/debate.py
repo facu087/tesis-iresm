@@ -21,10 +21,12 @@ import asyncio
 import sys
 
 from ..agents.agent_01_literature import LiteratureAnalystAgent
+from ..agents.agent_02_genomics import GenomicsSpecialistAgent
 from ..agents.agent_03_clinical import ClinicalConsultantAgent
 from ..agents.base_agent import BaseAgent
 from ..models.case import ClinicalCase
 from ..models.report import AgentOutput, Critique, DebateRound, Report
+from . import genomic_context as gc_module
 from . import pico
 
 
@@ -169,12 +171,54 @@ async def run_debate(case: ClinicalCase, round_1_report: Report) -> Report:
         raise ValueError("round_1_report no tiene agent_outputs — ejecutar Ronda 1 primero.")
 
     context = pico.format_for_agents(case.pico)
-    agents: list[BaseAgent] = [LiteratureAnalystAgent(), ClinicalConsultantAgent()]
+
+    # Reutilizar el perfil genómico del orquestador; si falta, construirlo sin red
+    genomic_ctx = case.genomic_context or gc_module.build(case)
+    agents: list[BaseAgent] = [
+        LiteratureAnalystAgent(),
+        GenomicsSpecialistAgent(genomic_context=genomic_ctx),
+        ClinicalConsultantAgent(),
+    ]
 
     # Indexar outputs de Ronda 1 por agent_id
     outputs_by_id: dict[str, AgentOutput] = {
         o.agent_id: o for o in round_1_report.agent_outputs
     }
+
+    # Solo participan del debate los agentes que produjeron output en Ronda 1
+    agents = [a for a in agents if a.AGENT_ID in outputs_by_id]
+    absent = [
+        f"{a.AGENT_NAME} (ID:{a.AGENT_ID})"
+        for a in [LiteratureAnalystAgent(), GenomicsSpecialistAgent(), ClinicalConsultantAgent()]
+        if a.AGENT_ID not in outputs_by_id
+    ]
+    if absent:
+        print(
+            f"[NEXUS] Debate sin {', '.join(absent)}: no produjeron hipótesis en la Ronda 1.",
+            file=sys.stderr,
+        )
+
+    if not agents:
+        raise RuntimeError(
+            "Ningún agente del debate coincide con los outputs de la Ronda 1 "
+            f"(IDs recibidos: {sorted(outputs_by_id)}). Revisá la numeración de agentes."
+        )
+
+    if len(agents) < 2:
+        print(
+            "[NEXUS] Debate omitido: se necesitan al menos 2 agentes y quedó "
+            f"{len(agents)}. Se devuelven las hipótesis de la Ronda 1.",
+            file=sys.stderr,
+        )
+        return Report(
+            case_summary=round_1_report.case_summary,
+            hypotheses=round_1_report.hypotheses,
+            agent_outputs=round_1_report.agent_outputs,
+            debate_rounds=[],
+            divergences=[],
+            sources_summary=round_1_report.sources_summary,
+            absent_agents=absent,
+        )
 
     # ── Ronda 2: críticas ─────────────────────────────────────────
     round_2 = await _round_2(agents, context, outputs_by_id)

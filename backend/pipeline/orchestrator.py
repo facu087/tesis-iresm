@@ -5,9 +5,10 @@ Responsabilidades:
   1. Normalizar el texto clínico extraído.
   2. Construir la síntesis PICO (contexto estructurado para los agentes).
   3. Extraer biomarcadores e historial terapéutico.
-  4. Indexar literatura PubMed relevante en ChromaDB (RAG).
+  4. Indexar literatura PubMed relevante en ChromaDB (RAG) y construir
+     el perfil genómico (genomic_context) en paralelo.
   5. Enriquecer el contexto de los agentes con bibliografía verificable.
-  6. Ejecutar Agentes 01 y 03 en PARALELO (asyncio.gather + to_thread).
+  6. Ejecutar Agentes 01, 02 y 03 en PARALELO (asyncio.gather + to_thread).
   7. Consolidar los outputs en un Report.
 
 Los agentes usan el cliente Groq sincrónico; asyncio.to_thread() los corre
@@ -20,6 +21,7 @@ import sys
 from typing import Sequence
 
 from ..agents.agent_01_literature import LiteratureAnalystAgent
+from ..agents.agent_02_genomics import GenomicsSpecialistAgent
 from ..agents.agent_03_clinical import ClinicalConsultantAgent
 from ..agents.base_agent import BaseAgent
 from ..ingestion.biomarker_extractor import extract as extract_biomarkers
@@ -29,6 +31,7 @@ from ..models.hypothesis import Hypothesis
 from ..models.report import AgentOutput, Report
 from ..rag.indexer import index_from_clinical_context
 from ..rag.retriever import PubMedRetriever
+from . import genomic_context as gc_module
 from . import pico
 
 
@@ -117,8 +120,20 @@ async def run_round_1(case: ClinicalCase) -> Report:
         raise ValueError("case.pico es None — llamar a pico.build() antes de run_round_1().")
 
     base_context = pico.format_for_agents(case.pico)
-    context = await _enrich_context_with_rag(case, base_context)
-    agents: Sequence[BaseAgent] = [LiteratureAnalystAgent(), ClinicalConsultantAgent()]
+
+    # RAG y perfil genómico se construyen en paralelo antes de la Ronda 1
+    ctx_base = gc_module.build(case)
+    context, genomic_ctx = await asyncio.gather(
+        _enrich_context_with_rag(case, base_context),
+        gc_module.enrich(ctx_base),
+    )
+    case.genomic_context = genomic_ctx
+
+    agents: Sequence[BaseAgent] = [
+        LiteratureAnalystAgent(),
+        GenomicsSpecialistAgent(genomic_context=genomic_ctx),
+        ClinicalConsultantAgent(),
+    ]
 
     results = await asyncio.gather(
         *(_run_agent_async(agent, context) for agent in agents),

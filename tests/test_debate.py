@@ -175,13 +175,19 @@ class TestRunDebate:
             ],
         )
 
-    def _mock_agents(self, mock_a01_cls, mock_a03_cls):
+    def _mock_agents(self, mock_a01_cls, mock_a02_cls, mock_a03_cls):
         a01 = MagicMock()
         a01.AGENT_ID = "01"
         a01.AGENT_NAME = "Analista de Literatura"
         a01.critique.return_value = [_critique("01", "A01", "03", "hipótesis clínica B", "MEDIUM")]
         a01.revise.return_value = _output("01", "A01", ["hipótesis literatura revisada"])
         mock_a01_cls.return_value = a01
+
+        # Agente 02 no tiene output en Ronda 1 (los tests base lo excluyen del debate)
+        a02 = MagicMock()
+        a02.AGENT_ID = "02"
+        a02.AGENT_NAME = "Especialista Genómica"
+        mock_a02_cls.return_value = a02
 
         a03 = MagicMock()
         a03.AGENT_ID = "03"
@@ -190,15 +196,23 @@ class TestRunDebate:
         a03.revise.return_value = _output("03", "A03", ["hipótesis clínica revisada"])
         mock_a03_cls.return_value = a03
 
-        return a01, a03
+        return a01, a02, a03
+
+    def _patch_all_agents(self):
+        return (
+            patch("backend.pipeline.debate.LiteratureAnalystAgent"),
+            patch("backend.pipeline.debate.GenomicsSpecialistAgent"),
+            patch("backend.pipeline.debate.ClinicalConsultantAgent"),
+        )
 
     def test_run_debate_produce_report_con_3_rondas(self):
         case = ClinicalCase(raw_text="texto", pico=_make_pico())
         r1 = self._make_round1_report()
 
         with patch("backend.pipeline.debate.LiteratureAnalystAgent") as M01, \
+             patch("backend.pipeline.debate.GenomicsSpecialistAgent") as M02, \
              patch("backend.pipeline.debate.ClinicalConsultantAgent") as M03:
-            self._mock_agents(M01, M03)
+            self._mock_agents(M01, M02, M03)
             report = asyncio.run(run_debate(case, r1))
 
         assert len(report.debate_rounds) == 3
@@ -211,8 +225,9 @@ class TestRunDebate:
         r1 = self._make_round1_report()
 
         with patch("backend.pipeline.debate.LiteratureAnalystAgent") as M01, \
+             patch("backend.pipeline.debate.GenomicsSpecialistAgent") as M02, \
              patch("backend.pipeline.debate.ClinicalConsultantAgent") as M03:
-            self._mock_agents(M01, M03)
+            self._mock_agents(M01, M02, M03)
             report = asyncio.run(run_debate(case, r1))
 
         assert len(report.agent_outputs) == 2
@@ -222,8 +237,9 @@ class TestRunDebate:
         r1 = self._make_round1_report()
 
         with patch("backend.pipeline.debate.LiteratureAnalystAgent") as M01, \
+             patch("backend.pipeline.debate.GenomicsSpecialistAgent") as M02, \
              patch("backend.pipeline.debate.ClinicalConsultantAgent") as M03:
-            self._mock_agents(M01, M03)
+            self._mock_agents(M01, M02, M03)
             report = asyncio.run(run_debate(case, r1))
 
         texts = [h.text for h in report.hypotheses]
@@ -247,10 +263,11 @@ class TestRunDebate:
         r1 = self._make_round1_report()
 
         with patch("backend.pipeline.debate.LiteratureAnalystAgent") as M01, \
+             patch("backend.pipeline.debate.GenomicsSpecialistAgent") as M02, \
              patch("backend.pipeline.debate.ClinicalConsultantAgent") as M03:
-            self._mock_agents(M01, M03)
+            self._mock_agents(M01, M02, M03)
             report = asyncio.run(run_debate(case, r1))
 
         ronda2 = report.debate_rounds[0]
         assert ronda2.round_number == 2
-        assert len(ronda2.critiques) == 2  # una de cada agente
+        assert len(ronda2.critiques) == 2  # Agente 02 excluido (sin output en Ronda 1)
