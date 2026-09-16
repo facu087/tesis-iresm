@@ -24,6 +24,8 @@ from reportlab.platypus import (
 )
 
 from ..api.schemas import RankedHypothesis, StructuredReport
+from ..models.trial import ClinicalTrial, TrialSearchSummary
+from .trial_matching import has_preferred_location
 
 # ── Paleta de colores ──────────────────────────────────────────────────────────
 _NEXUS_BLUE = colors.HexColor("#1a3a5c")
@@ -55,6 +57,20 @@ _STATUS_GROUPS = [
     ("especulativa", "Hipótesis especulativas",
      "Ninguna referencia resistió la verificación. Se muestran, no se descartan."),
 ]
+
+# Navegación de ensayos (Agente 05): etiqueta orientativa por ensayo.
+_COMPATIBILITY_LABELS = {
+    "alta": ("COMPATIBILIDAD ALTA", _GREEN),
+    "media": ("COMPATIBILIDAD MEDIA", _AMBER),
+    "baja": ("COMPATIBILIDAD BAJA", _GRAY),
+    "sin_evaluar": ("SIN EVALUAR", _GRAY),
+}
+
+# Aclaración fija: la misma que muestra el frontend.
+_TRIAL_DISCLAIMER = (
+    "La compatibilidad es orientativa: la elegibilidad la determina el equipo "
+    "investigador de cada ensayo."
+)
 
 # Cómo se rotula cada veredicto de fuente en el PDF.
 _VERDICT_LABELS = {
@@ -423,33 +439,132 @@ def _debate_summary(report: StructuredReport, s: dict) -> list:
     return elems
 
 
+def _search_status_notice(report: StructuredReport) -> str:
+    """Aviso de que alguna API de la navegación no respondió del todo."""
+    busqueda = report.trial_search
+    if busqueda is None:
+        return ""
+
+    avisos: list[str] = []
+    if busqueda.estado_clinicaltrials == "no_disponible":
+        avisos.append("ClinicalTrials.gov no se pudo consultar")
+    elif busqueda.estado_clinicaltrials == "parcial":
+        avisos.append("algunas consultas a ClinicalTrials.gov fallaron")
+    if busqueda.estado_orphanet == "no_disponible":
+        avisos.append("Orphanet no se pudo consultar")
+    elif busqueda.estado_orphanet == "parcial":
+        avisos.append("algunas consultas a Orphanet fallaron")
+    if busqueda.evaluacion == "fallback":
+        avisos.append("la evaluación de compatibilidad no se pudo completar")
+    if not avisos:
+        return ""
+    return f"Estado de la búsqueda: {'; '.join(avisos)}."
+
+
+def _trial_block(
+    trial: ClinicalTrial, busqueda: TrialSearchSummary | None, s: dict
+) -> list:
+    """Bloque de un ensayo. Sin `busqueda` imprime igual que antes del Agente 05."""
+    elems: list = []
+    phase_str = f" | {trial.phase}" if trial.phase else ""
+    elems.append(_par(f"<b>{trial.nct_id}{phase_str}</b> — {trial.title}", s["body"]))
+
+    if busqueda is not None:
+        etiquetas: list[str] = []
+        texto, color = _COMPATIBILITY_LABELS.get(
+            trial.compatibility, _COMPATIBILITY_LABELS["sin_evaluar"]
+        )
+        etiquetas.append(f"<font color='{_hex(color)}'><b>{texto}</b></font>")
+        if trial.status == "NOT_YET_RECRUITING":
+            # Advertencia, no badge de calidad: el ensayo todavía no abrió.
+            etiquetas.append(f"<font color='{_hex(_ORANGE)}'><b>AÚN NO RECLUTA</b></font>")
+        if has_preferred_location(trial):
+            etiquetas.append(f"<font color='{_hex(_NEXUS_BLUE)}'><b>SEDE EN ARGENTINA</b></font>")
+        elems.append(_par(" · ".join(etiquetas), s["small"]))
+
+        if trial.compatibility_rationale:
+            elems.append(_par(f"<i>Fundamento:</i> {trial.compatibility_rationale}", s["small"]))
+        if trial.criteria_to_verify:
+            elems.append(_par("<i>Criterios a verificar:</i>", s["small"]))
+            for criterio in trial.criteria_to_verify:
+                elems.append(_par(f"· {criterio}", s["small"]))
+        if trial.related_hypotheses:
+            elems.append(_par(
+                f"<i>Hipótesis relacionadas:</i> {'; '.join(trial.related_hypotheses)}",
+                s["small"],
+            ))
+
+    details = []
+    if trial.conditions:
+        details.append(f"Condiciones: {', '.join(trial.conditions[:3])}")
+    if trial.locations:
+        details.append(f"Países: {', '.join(trial.locations[:4])}")
+    if trial.min_age or trial.max_age:
+        details.append(f"Rango etario: {trial.min_age or '?'} – {trial.max_age or '?'}")
+    if trial.url:
+        details.append(f"URL: {trial.url}")
+    for detail in details:
+        elems.append(_par(detail, s["small"]))
+    elems.append(Spacer(1, 0.2 * cm))
+    return elems
+
+
+def _rare_diseases(report: StructuredReport, s: dict) -> list:
+    """
+    Apartado de Orphanet: hipótesis que corresponden a una enfermedad rara.
+
+    Nunca es un diagnóstico del paciente: son hipótesis de investigación que
+    coinciden con una entidad catalogada.
+    """
+    if not report.rare_diseases:
+        return []
+
+    elems: list = [Spacer(1, 0.3 * cm)]
+    elems.append(_par("<b>Enfermedades raras relacionadas (Orphanet)</b>", s["body"]))
+    elems.append(_par(
+        "Hipótesis de investigación que corresponden a una enfermedad rara catalogada. "
+        "No son diagnósticos del paciente.",
+        s["small"],
+    ))
+    for marca in report.rare_diseases:
+        elems.append(_par(
+            f"· <b>ORPHA:{marca.orpha_code}</b> — {marca.name} · {marca.url}", s["small"]
+        ))
+        elems.append(_par(f"  Hipótesis: {marca.hypothesis}", s["small"]))
+    return elems
+
+
 def _clinical_trials(report: StructuredReport, s: dict) -> list:
     elems = _section("ENSAYOS CLÍNICOS ACTIVOS RELEVANTES", s)
+    # `trial_search` nulo = reporte anterior al Agente 05: se imprime como antes.
+    busqueda = report.trial_search
+
+    aviso = _search_status_notice(report)
+    if aviso:
+        elems.append(_par(f"<font color='{_hex(_RED)}'>{aviso}</font>", s["small"]))
 
     if not report.clinical_trials:
-        elems.append(_par(
-            "No se encontraron ensayos clínicos activos relacionados.", s["body"]
-        ))
+        if busqueda is not None and busqueda.estado_clinicaltrials == "no_disponible":
+            elems.append(_par(
+                "No se pudo consultar ClinicalTrials.gov: esto no significa que no "
+                "existan ensayos relacionados.",
+                s["body"],
+            ))
+        else:
+            elems.append(_par(
+                "No se encontraron ensayos clínicos activos relacionados.", s["body"]
+            ))
+        elems.extend(_rare_diseases(report, s))
         return elems
 
-    for trial in report.clinical_trials:
-        phase_str = f" | {trial.phase}" if trial.phase else ""
-        elems.append(_par(
-            f"<b>{trial.nct_id}{phase_str}</b> — {trial.title}", s["body"]
-        ))
-        details = []
-        if trial.conditions:
-            details.append(f"Condiciones: {', '.join(trial.conditions[:3])}")
-        if trial.locations:
-            details.append(f"Países: {', '.join(trial.locations[:4])}")
-        if trial.min_age or trial.max_age:
-            details.append(f"Rango etario: {trial.min_age or '?'} – {trial.max_age or '?'}")
-        if trial.url:
-            details.append(f"URL: {trial.url}")
-        for detail in details:
-            elems.append(_par(detail, s["small"]))
+    if busqueda is not None:
+        elems.append(_par(_TRIAL_DISCLAIMER, s["small"]))
         elems.append(Spacer(1, 0.2 * cm))
 
+    for trial in report.clinical_trials:
+        elems.extend(_trial_block(trial, busqueda, s))
+
+    elems.extend(_rare_diseases(report, s))
     return elems
 
 

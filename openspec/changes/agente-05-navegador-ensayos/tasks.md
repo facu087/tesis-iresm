@@ -39,7 +39,7 @@
 
 ## 6. PDF exportado
 
-- [ ] 6.1 Extender `_clinical_trials` en `backend/pipeline/pdf_exporter.py` con compatibilidad, criterios a verificar, aviso de "aún no recluta", sede en Argentina, apartado de Orphanet, aclaración orientativa y aviso de API no disponible, renderizando como hoy cuando `trial_search` es nulo (design D13); verificar con tests en `tests/test_pdf_exporter.py` de "PDF con ensayos evaluados", "PDF con la API caída" y reporte previo, extrayendo el texto del PDF generado
+- [x] 6.1 Extender `_clinical_trials` en `backend/pipeline/pdf_exporter.py` con compatibilidad, criterios a verificar, aviso de "aún no recluta", sede en Argentina, apartado de Orphanet, aclaración orientativa y aviso de API no disponible, renderizando como hoy cuando `trial_search` es nulo (design D13); verificar con tests en `tests/test_pdf_exporter.py` de "PDF con ensayos evaluados", "PDF con la API caída" y reporte previo, extrayendo el texto del PDF generado
 
 ## 7. Frontend
 
