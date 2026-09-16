@@ -25,10 +25,7 @@ from ..models.biomarkers import BiomarkerProfile
 
 # Genes: mayúsculas, 2-10 chars, opcionalmente seguidos de número
 _GENE_PATTERN = re.compile(
-    r'\b(?:'
-    r'[A-Z]{2,6}\d{0,2}'           # Ej: KCNQ2, TTR, ATM
-    r'|[A-Z]{1}[A-Z0-9]{1,8}B\d?' # Ej: NDRG1, PMP22
-    r')\b'
+    r'\b[A-Z][A-Z0-9]{1,7}\b'  # Ej: TTR, KCNQ2, SCN1A, SH3TC2, DYNC1H1
 )
 
 # Siglas clínicas que NO son genes
