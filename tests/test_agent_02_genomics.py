@@ -58,7 +58,7 @@ class TestIdentidad:
 
     def test_no_importa_groq(self):
         import ast, pathlib
-        src = pathlib.Path("backend/agents/agent_02_genomics.py").read_text()
+        src = pathlib.Path("backend/agents/agent_02_genomics.py").read_text(encoding="utf-8")
         tree = ast.parse(src)
         imports = [
             node.names[0].name if isinstance(node, ast.Import) else node.module
