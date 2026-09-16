@@ -21,10 +21,12 @@ import asyncio
 import sys
 
 from ..agents.agent_01_literature import LiteratureAnalystAgent
+from ..agents.agent_02_genomics import GenomicsSpecialistAgent
 from ..agents.agent_03_clinical import ClinicalConsultantAgent
 from ..agents.base_agent import BaseAgent
 from ..models.case import ClinicalCase
 from ..models.report import AgentOutput, Critique, DebateRound, Report
+from . import genomic_context as gc_module
 from . import pico
 
 
@@ -169,7 +171,14 @@ async def run_debate(case: ClinicalCase, round_1_report: Report) -> Report:
         raise ValueError("round_1_report no tiene agent_outputs — ejecutar Ronda 1 primero.")
 
     context = pico.format_for_agents(case.pico)
-    all_agents: list[BaseAgent] = [LiteratureAnalystAgent(), ClinicalConsultantAgent()]
+
+    # Reutilizar el perfil genómico del orquestador; si falta, construirlo sin red
+    genomic_ctx = case.genomic_context or gc_module.build(case)
+    all_agents: list[BaseAgent] = [
+        LiteratureAnalystAgent(),
+        GenomicsSpecialistAgent(genomic_context=genomic_ctx),
+        ClinicalConsultantAgent(),
+    ]
 
     # Indexar outputs de Ronda 1 por agent_id
     outputs_by_id: dict[str, AgentOutput] = {
