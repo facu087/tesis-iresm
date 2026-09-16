@@ -237,6 +237,27 @@ se probaron con una corrida real de `POST /api/analyze` sobre el caso de la tesi
 > excluyen— pero el LLM los etiquetó `baja` con el motivo explícito, que es lo que
 > hace legible la lista.
 
+## Reparto de tareas (2026-09-15)
+
+Se reparte **por área de archivos**, para que dos personas no toquen el mismo módulo.
+Surge de un choque real: el mismo día, dos sesiones actualizaron en paralelo los
+artefactos OpenSpec del Agente 05 (commits `20498d4` y `13d7f96`), con las mismas
+decisiones de fondo y distinto texto. Se resolvió en el merge del PR #13.
+
+| Responsable | Tarjetas | Área / archivos |
+|---|---|---|
+| **Facundo** | #51 Agente 02 (en curso), #73 fix del regex de genes, #71 cliente ClinVar | Genómica e ingesta: `orchestrator.py`, `debate.py`, `models/case.py`, `pharmgkb.py`, `biomarker_extractor.py`, `external/clinvar.py` |
+| **Matías** | #52 Agente 04 (Árbitro) + hallazgo G | Verificación: `verification.py`, `evidence.py`, paso 7 del router, `base_agent.parse_hypotheses()` |
+| **Fede** | #74 cliente Orphadata, hallazgos A, B y H, arreglos del PDF (portada y celdas del resumen), y los dos arreglos manuales de Trello (#65 adjunto duplicado, #63 PNG sin extensión) | RAG, frontend y calidad: `rag/retriever.py`, `tests/test_rag_integration.py`, `pdf_exporter.py`, `frontend/` |
+| **Sin asignar** | #62 Agente 06 (Sintetizador) | Va **última**: depende de que exista el Agente 04 y pisa el `pdf_exporter.py` que toca Fede. La toma quien se libere primero. |
+
+### Reglas para no pisarnos
+
+1. **Asignarse la tarjeta en Trello antes de arrancar.** Si no tiene a nadie, está libre.
+2. **Los artefactos de un cambio OpenSpec los edita solo quien tiene la tarjeta.**
+3. **Pushear la rama con el primer commit**, aunque esté a medias: así se ve en GitHub
+   que esa tarea está tomada.
+
 ## Hallazgos abiertos (pendientes de decisión)
 
 Cosas detectadas y verificadas, que **no** se arreglaron todavía porque exceden
