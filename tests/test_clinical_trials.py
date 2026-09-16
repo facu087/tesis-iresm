@@ -163,14 +163,34 @@ class TestSearch:
         params = call_kwargs[1].get("params") or call_kwargs[0][1]
         assert params.get("filter.overallStatus") == "RECRUITING"
 
-    def test_search_sin_filtro_recruiting(self):
+    def test_search_sin_filtro_de_estado(self):
         with patch("backend.external.clinical_trials.httpx.Client") as MockClient:
             mock_client = self._mock_get([_make_study()])
             MockClient.return_value = mock_client
-            search("neuropathy", recruiting_only=False)
+            search("neuropathy", statuses=())
         call_kwargs = mock_client.get.call_args
         params = call_kwargs[1].get("params") or call_kwargs[0][1]
         assert "filter.overallStatus" not in params
+
+    def test_search_combina_varios_estados(self):
+        """El Agente 05 pide los que reclutan y los que todavía no abrieron."""
+        with patch("backend.external.clinical_trials.httpx.Client") as MockClient:
+            mock_client = self._mock_get([_make_study()])
+            MockClient.return_value = mock_client
+            search("neuropathy", statuses=("RECRUITING", "NOT_YET_RECRUITING"))
+        call_kwargs = mock_client.get.call_args
+        params = call_kwargs[1].get("params") or call_kwargs[0][1]
+        assert params.get("filter.overallStatus") == "RECRUITING|NOT_YET_RECRUITING"
+
+    def test_search_by_biomarkers_no_cambia_el_filtro_por_defecto(self):
+        """El default preserva el comportamiento previo al Agente 05."""
+        with patch("backend.external.clinical_trials.httpx.Client") as MockClient:
+            mock_client = self._mock_get([_make_study()])
+            MockClient.return_value = mock_client
+            search_by_biomarkers(["TTR"], condition="amyloidosis")
+        call_kwargs = mock_client.get.call_args
+        params = call_kwargs[1].get("params") or call_kwargs[0][1]
+        assert params.get("filter.overallStatus") == "RECRUITING"
 
     def test_search_incluye_keywords(self):
         with patch("backend.external.clinical_trials.httpx.Client") as MockClient:

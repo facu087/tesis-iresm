@@ -7,7 +7,12 @@ from backend.models.biomarkers import BiomarkerProfile
 from backend.models.case import ClinicalCase, PICOSynthesis
 from backend.models.hypothesis import EvidenceLevel, Hypothesis, Priority, Source
 from backend.models.report import AgentOutput, Critique, DebateRound, Report
-from backend.models.trial import ClinicalTrial
+from backend.models.trial import (
+    ClinicalTrial,
+    RareDiseaseMatch,
+    TrialNavigationResult,
+    TrialSearchSummary,
+)
 from backend.pipeline.report_builder import build_export
 from backend.pipeline.verification import SourceStatus, SourceVerification
 
@@ -406,3 +411,108 @@ class TestBibliography:
         h = _hypothesis("H sin fuentes", sources=[])
         result = _build(report=_make_report(hypotheses=[h]))
         assert result.bibliography == []
+
+
+# ── Tests: navegación de ensayos (Agente 05) ──────────────────────────────────
+
+def _make_navigation(
+    rare_diseases: list[RareDiseaseMatch] | None = None,
+    **summary_overrides,
+) -> TrialNavigationResult:
+    resumen = dict(
+        estado_clinicaltrials="ok",
+        estado_orphanet="ok",
+        planificacion="ok",
+        evaluacion="ok",
+        terminos_consultados=["hereditary ATTR amyloidosis"],
+        encontrados=3,
+        excluidos_por_edad=1,
+    )
+    resumen.update(summary_overrides)
+    return TrialNavigationResult(
+        trials=[_make_trial()],
+        rare_diseases=rare_diseases or [],
+        summary=TrialSearchSummary(**resumen),
+    )
+
+
+_ATTR_MATCH = RareDiseaseMatch(
+    orpha_code="271861",
+    name="Hereditary ATTR amyloidosis",
+    url="https://www.orpha.net/en/disease/detail/271861",
+    hypothesis="Hipótesis de prueba.",
+    matched_term="hereditary ATTR amyloidosis",
+)
+
+
+class TestNavegacionDeEnsayos:
+    def test_reporte_previo_sin_navegacion_deja_trial_search_nulo(self):
+        result = _build()
+        assert result.trial_search is None
+        assert result.rare_diseases == []
+
+    def test_structured_report_sin_campos_nuevos_valida(self):
+        """El contrato es aditivo: el JSON previo al Agente 05 sigue validando."""
+        previo = _build().model_dump()
+        previo.pop("rare_diseases")
+        previo.pop("trial_search")
+        reconstruido = StructuredReport(**previo)
+        assert reconstruido.trial_search is None
+        assert reconstruido.rare_diseases == []
+
+    def test_reporte_con_busqueda_completa(self):
+        result = build_export(
+            case=_make_case(),
+            report=_make_report(),
+            trials=[_make_trial()],
+            processing_time=10.5,
+            navigation=_make_navigation(),
+        )
+        assert result.trial_search is not None
+        assert result.trial_search.estado_clinicaltrials == "ok"
+        assert result.trial_search.estado_orphanet == "ok"
+        assert result.trial_search.terminos_consultados == ["hereditary ATTR amyloidosis"]
+        assert result.trial_search.excluidos_por_edad == 1
+
+    def test_hipotesis_marcada_como_enfermedad_rara(self):
+        result = build_export(
+            case=_make_case(),
+            report=_make_report(),
+            trials=[_make_trial()],
+            processing_time=10.5,
+            navigation=_make_navigation(rare_diseases=[_ATTR_MATCH]),
+        )
+        assert len(result.rare_diseases) == 1
+        marca = result.rare_diseases[0]
+        assert marca.orpha_code == "271861"
+        assert marca.url.endswith("/271861")
+        assert marca.hypothesis == "Hipótesis de prueba."
+
+    def test_sin_coincidencias_de_orphanet(self):
+        result = build_export(
+            case=_make_case(),
+            report=_make_report(),
+            trials=[_make_trial()],
+            processing_time=10.5,
+            navigation=_make_navigation(estado_orphanet="ok"),
+        )
+        assert result.rare_diseases == []
+
+    def test_api_caida_se_refleja_en_el_reporte(self):
+        result = build_export(
+            case=_make_case(),
+            report=_make_report(),
+            trials=[],
+            processing_time=10.5,
+            navigation=TrialNavigationResult(
+                summary=TrialSearchSummary(estado_clinicaltrials="no_disponible")
+            ),
+        )
+        assert result.clinical_trials == []
+        assert result.trial_search.estado_clinicaltrials == "no_disponible"
+
+    def test_conserva_el_orden_de_ensayos_del_agente(self):
+        primero = _make_trial().model_copy(update={"nct_id": "NCT_A"})
+        segundo = _make_trial().model_copy(update={"nct_id": "NCT_B"})
+        result = _build(trials=[primero, segundo])
+        assert [t.nct_id for t in result.clinical_trials] == ["NCT_A", "NCT_B"]

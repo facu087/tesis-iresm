@@ -68,6 +68,18 @@ export interface DebateSummary {
   consensus_reached: boolean;
 }
 
+/**
+ * Etiqueta orientativa de compatibilidad (Agente 05).
+ * No afirma elegibilidad: la determina el equipo investigador del ensayo.
+ */
+export type Compatibility = "alta" | "media" | "baja" | "sin_evaluar";
+
+/** Resultado de consultar una API externa durante la navegación de ensayos. */
+export type ApiStatus = "ok" | "parcial" | "no_disponible" | "sin_consulta";
+
+/** Resultado de un paso del Agente 05 que depende del LLM. */
+export type StepStatus = "ok" | "fallback" | "sin_candidatas" | "sin_ensayos";
+
 export interface ClinicalTrial {
   nct_id: string;
   title: string;
@@ -84,6 +96,37 @@ export interface ClinicalTrial {
   sex?: string;
   locations: string[];
   url: string;
+  /* Agente 05 — campos opcionales: un reporte previo no los trae. */
+  compatibility?: Compatibility;
+  compatibility_rationale?: string | null;
+  criteria_to_verify?: string[];
+  related_hypotheses?: string[];
+  matched_terms?: string[];
+}
+
+/**
+ * Hipótesis que corresponde a una enfermedad rara catalogada en Orphanet.
+ * Nunca es un diagnóstico del paciente.
+ */
+export interface RareDiseaseMatch {
+  orpha_code: string;
+  name: string;
+  url: string;
+  hypothesis: string;
+  matched_term: string;
+}
+
+/** Qué se consultó, qué falló y qué se excluyó durante la navegación. */
+export interface TrialSearchSummary {
+  estado_clinicaltrials: ApiStatus;
+  estado_orphanet: ApiStatus;
+  planificacion: StepStatus;
+  evaluacion: StepStatus;
+  terminos_consultados: string[];
+  encontrados: number;
+  excluidos_por_edad: number;
+  excluidos_por_sexo: number;
+  evaluaciones_descartadas: number;
 }
 
 export interface ReportMetadata {
@@ -117,6 +160,10 @@ export interface StructuredReport {
   clinical_trials: ClinicalTrial[];
   bibliography: Source[];
   verification?: VerificationSummary;
+  /* Agente 05. `trial_search` nulo o ausente = reporte anterior al agente:
+     la vista renderiza los ensayos como antes. */
+  rare_diseases?: RareDiseaseMatch[];
+  trial_search?: TrialSearchSummary | null;
 }
 
 /** Error estructurado que devuelve FastAPI */

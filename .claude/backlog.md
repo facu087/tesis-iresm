@@ -110,7 +110,7 @@ Suite de tests: **82 tests, 100% passing** (`pytest tests/`)
 | 7 | Gestión de rate limits y fallbacks en APIs externas | ✅ Hecho |
 | 8 | Agente 02 (Especialista Genómica): prompt + llamada GPT-4o + parseo JSON | 📋 Pendiente |
 | 9 | Agente 04 (Árbitro Verificador): síntesis y verificación bibliográfica externa | ⚠️ Parcial |
-| 10 | Agente 05 (Navegador de Ensayos): búsqueda en ClinicalTrials + Orphanet | 📋 Pendiente |
+| 10 | Agente 05 (Navegador de Ensayos): búsqueda en ClinicalTrials + Orphanet | ✅ Hecho (`agents/agent_05_trials.py`, `pipeline/trial_matching.py`) |
 | 11 | Priorización de hipótesis por nivel de evidencia EBM (I, II, III) | ✅ Hecho (`pipeline/evidence.py`) |
 | 12 | Integrar contexto RAG (búsqueda semántica PubMed) a la Ronda 1 del orquestador | ✅ Hecho |
 | 13 | Agente 06 (Sintetizador): reporte final asistido por LLM | 📋 Pendiente |
@@ -198,6 +198,45 @@ se probaron con una corrida real de `POST /api/analyze` sobre el caso de la tesi
 > `openspec/specs/clasificacion-evidencia-ebm/`. Tarjeta #54 con evidencia adjunta
 > (`priorizacion.txt`, `reporte.json`, `reporte.pdf`, captura de la vista) y en QA.
 
+> Nota (10) — **Agente 05, Navegador de Ensayos** (cambio OpenSpec
+> `agente-05-navegador-ensayos`, tarjeta #53): agente **híbrido**. El LLM solo hace
+> dos cosas —traducir las hipótesis (hasta 3, sin las `descartada`) a términos de
+> condición en inglés y etiquetar cada ensayo `alta`/`media`/`baja`— y **nunca**
+> excluye un ensayo ni puede inventar NCT IDs: su salida se valida contra los que se
+> le mandaron. Todo lo que quita un ensayo de la vista es determinista
+> (`pipeline/trial_matching.py`): saneamiento de términos, filtros duros de edad y
+> sexo leídos por reglas del perfil PICO, dedupe por NCT y tope de 10.
+> Consulta `RECRUITING` **y** `NOT_YET_RECRUITING` (un ensayo que abre en tres meses
+> es accionable, y se etiqueta "aún no recluta"). Orden del resultado:
+> compatibilidad → sede en Argentina → ya reclutando → descubrimiento; la sede ordena,
+> nunca filtra. Orphanet marca una hipótesis como enfermedad rara solo ante
+> **coincidencia exacta** normalizada con el nombre preferido: tomar el primer
+> resultado etiquetaba una neuropatía axonal del adulto como enfermedad neonatal letal.
+> Corre en paralelo con la verificación bibliográfica (`asyncio.gather` en
+> `api/router.py`) y ninguna falla externa rompe `POST /api/analyze`: el reporte trae
+> `trial_search` con el estado de cada API. Contrato JSON **aditivo**: `ClinicalTrial`
+> suma `compatibility`, `compatibility_rationale`, `criteria_to_verify`,
+> `related_hypotheses` y `matched_terms`; `StructuredReport` suma `rare_diseases` y
+> `trial_search` (nulo = reporte anterior al agente). Evidencia:
+> `scripts/demo_agente05.py` (y `--sin-red`, que muestra los cuatro fallbacks sin
+> conexión) + corrida real de `POST /api/analyze` sobre el caso base, artefactos en
+> `output/corrida_agente05/` y `output/demo_agente05/` (locales, gitignoreados).
+>
+> **Medido en la corrida real del 2026-09-15** (294 s en total, sin `ORPHANET_API_KEY`):
+> 21 ensayos únicos, 2 excluidos por edad, 0 por sexo, 10 en el reporte; ambas APIs
+> `ok`, planificación y evaluación `ok`, **0 evaluaciones descartadas** (el LLM no
+> inventó ningún NCT ID). Compatibilidad: 2 `media` y 8 `baja`, ninguna `alta` — el
+> caso es una neuropatía sin diagnóstico y casi todos los ensayos de ATTR piden
+> cardiomiopatía confirmada. Orphanet marcó 1 hipótesis: ORPHA 85443 *AL amyloidosis*.
+> El ensayo con sede en Argentina (NCT07052903) quedó primero dentro de su nivel de
+> compatibilidad, no arriba de todo: la sede desempata, no manda.
+>
+> **Limitación observada**: la búsqueda por relevancia de ClinicalTrials.gov trae
+> ruido (con "Hereditary sensory and autonomic neuropathy" devolvió dos ensayos de
+> tumores sólidos con mutación ATM). No se filtran —solo los filtros deterministas
+> excluyen— pero el LLM los etiquetó `baja` con el motivo explícito, que es lo que
+> hace legible la lista.
+
 ## Hallazgos abiertos (pendientes de decisión)
 
 Cosas detectadas y verificadas, que **no** se arreglaron todavía porque exceden
@@ -212,7 +251,8 @@ el alcance de la tarea en la que aparecieron. Con archivo y línea, para retomar
 | E | **OpenSpec**: **adoptado** (v1.11.0, rama `chore/s4-openspec`). Alcance: los 4 agentes que faltan (02, 04, 05, 06) y las reglas de clasificación EBM — sin backfillear los Sprints 1–3. Uso en `.claude/CLAUDE.md` § "Spec-driven con OpenSpec". | `openspec/config.yaml` |
 | F | El extractor de biomarcadores devuelve **`genes=['CMT']`** en el caso base: `CMT`, `FAP` y `ATTR` están en `_KNOWN_GENES`, pero son enfermedades o paneles, no genes. Además `tests/test_biomarkers.py` no es un test de pytest (es un script con `main()`, pytest recolecta 0 tests) y exige que `CMT` salga como gen. Por esto la tarjeta #68 no pasó a QA. | `backend/ingestion/biomarker_extractor.py:65-67`, `tests/test_biomarkers.py:63-66` |
 | G | `BaseAgent.parse_hypotheses()` arma `Source(**s)` con lo que manda el LLM, así que acepta `verified`, `verification_status` o `publication_types` autodeclarados. La clasificación EBM y `_annotate_source()` ya los ignoran/limpian, pero conviene sanearlos en el parseo (lo toca el Agente 04). | `backend/agents/base_agent.py:92` |
-| H | Lint del frontend con 1 error y 1 warning **previos** a la priorización EBM: `setState` síncrono en un effect (`report/page.tsx`, `useEffect` de carga del reporte) y un `eslint-disable` sin uso (`analyzing/page.tsx:120`). `next build` no corre lint, así que no bloquea el build. | `frontend/src/app/report/page.tsx`, `frontend/src/app/analyzing/page.tsx:120` |
+| H | Lint del frontend con 1 error y 1 warning **previos** a la priorización EBM: `setState` síncrono en un effect (`report/page.tsx`, `useEffect` de carga del reporte) y un `eslint-disable` sin uso (`analyzing/page.tsx:120`). `next build` no corre lint, así que no bloquea el build. Sigue igual después del Agente 05: el error es del effect que lee `sessionStorage`, ajeno a la tab de ensayos. | `frontend/src/app/report/page.tsx`, `frontend/src/app/analyzing/page.tsx:120` |
+| I | **Los genes de enfermedades raras no están en la ORPHAcodes API**: expone 32 rutas y ninguna de genes (es una API de nomenclatura). `get_genes()` levanta `OrphanetGenesNoDisponibles` en vez de mentir con `[]`. Están en Orphadata, otro host y otro producto: `GET https://api.orphadata.com/rd-associated-genes/orphacodes/{code}` (200, CC-BY-4.0, sin apiKey; 404 = esa enfermedad no tiene asociación génica). Integrarlo va en **tarjeta aparte**: el Agente 05 no depende de ellos. | `backend/external/orphanet.py:255` (`get_genes`), docstring del módulo |
 
 ---
 

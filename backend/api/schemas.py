@@ -7,7 +7,7 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from ..models.hypothesis import Source
-from ..models.trial import ClinicalTrial
+from ..models.trial import ClinicalTrial, RareDiseaseMatch, TrialSearchSummary
 
 _DISCLAIMER = (
     "NEXUS es un sistema de soporte investigativo. "
@@ -97,3 +97,13 @@ class StructuredReport(BaseModel):
     clinical_trials: list[ClinicalTrial]
     bibliography: list[Source]
     verification: VerificationSummary = VerificationSummary()
+
+    # Agente 05 — Navegador de Ensayos. Campos aditivos: un reporte anterior
+    # al agente valida igual.
+    rare_diseases: list[RareDiseaseMatch] = []
+    # Nullable a propósito, a diferencia de `verification`: None significa
+    # "reporte anterior al Agente 05", y es la señal que usan el frontend y el
+    # PDF para renderizar la sección de ensayos como antes. Un default con
+    # estados en "sin_consulta" haría que un reporte viejo con ensayos afirme
+    # que no se consultó nada.
+    trial_search: TrialSearchSummary | None = None

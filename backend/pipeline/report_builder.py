@@ -21,7 +21,7 @@ from ..api.schemas import (
 from ..models.case import ClinicalCase
 from ..models.hypothesis import Source
 from ..models.report import Report
-from ..models.trial import ClinicalTrial
+from ..models.trial import ClinicalTrial, TrialNavigationResult
 from .evidence import HypothesisStatus, prioritize
 from .verification import SourceStatus, SourceVerification, source_key
 
@@ -191,6 +191,7 @@ def build_export(
     trials: list[ClinicalTrial],
     processing_time: float,
     verifications: dict[str, SourceVerification] | None = None,
+    navigation: TrialNavigationResult | None = None,
 ) -> StructuredReport:
     """
     Ensambla el StructuredReport de exportación a partir de los outputs del pipeline.
@@ -203,6 +204,9 @@ def build_export(
         verifications:    Veredictos de verify_report_sources(). Si se omite,
                           ninguna fuente queda verificada y todas las hipótesis
                           se etiquetan como especulativas.
+        navigation:       Resultado del Agente 05 (Navegador de Ensayos). Si se
+                          omite, `trial_search` queda nulo y el reporte se
+                          renderiza como antes del agente.
 
     Returns:
         StructuredReport listo para serializar a JSON o exportar a PDF.
@@ -222,4 +226,6 @@ def build_export(
         clinical_trials=trials,
         bibliography=_build_bibliography(report, verifications),
         verification=_build_verification_summary(verifications, hypotheses),
+        rare_diseases=list(navigation.rare_diseases) if navigation else [],
+        trial_search=navigation.summary if navigation else None,
     )
