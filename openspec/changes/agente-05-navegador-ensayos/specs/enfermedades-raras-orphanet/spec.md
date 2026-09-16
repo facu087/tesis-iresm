@@ -4,6 +4,10 @@ Consulta a Orphanet desde el pipeline para señalar qué hipótesis de investiga
 corresponden a enfermedades raras catalogadas, con su código ORPHA y enlace, priorizando
 la precisión sobre la cobertura para no etiquetar mal una hipótesis clínica.
 
+> Los dos primeros requisitos describen el contrato del cliente, que ya quedó implementado
+> en `fix/s4-cliente-orphanet` (commit `41828a8`). Se documentan acá porque el Agente 05
+> depende de ellos y no había spec que los cubriera.
+
 ## ADDED Requirements
 
 ### Requirement: Búsqueda por nombre contra el servicio vigente de Orphanet
@@ -39,15 +43,19 @@ error de API externa y MUST NOT devolverse como lista vacía. Solo los errores t
 - **WHEN** Orphanet responde 503 en todos los intentos
 - **THEN** la búsqueda señala un error de API externa después de agotar los reintentos
 
-### Requirement: Credencial obligatoria desde el entorno
-El sistema SHALL leer la credencial de Orphanet solo de la variable de entorno
-`ORPHANET_API_KEY`. Si la variable no está definida, el Agente 05 MUST NOT consultar Orphanet
-y SHALL informar `estado_orphanet: "sin_configurar"`, sin que la búsqueda de ensayos se vea
-afectada.
+### Requirement: Credencial opcional, leída solo del entorno
+El servicio responde sin credencial. El sistema SHALL enviar el header `apiKey` con el valor de
+la variable de entorno `ORPHANET_API_KEY` cuando esté definida y, si no lo está, con un valor
+por defecto que el servicio acepta. La credencial MUST NOT estar escrita en el código fuente.
+La ausencia de `ORPHANET_API_KEY` MUST NOT impedir la consulta a Orphanet.
 
 #### Scenario: Entorno sin credencial
 - **WHEN** `ORPHANET_API_KEY` no está definida
-- **THEN** no se realiza ninguna consulta a Orphanet, `rare_diseases` queda vacío y los ensayos se buscan igual
+- **THEN** el Agente 05 consulta Orphanet igual y puede marcar hipótesis como enfermedades raras
+
+#### Scenario: Credencial rechazada
+- **WHEN** Orphanet responde 401
+- **THEN** la consulta señala un error de API externa y el Agente 05 informa `estado_orphanet: "no_disponible"`
 
 ### Requirement: Coincidencia exacta para marcar una enfermedad rara
 El Agente 05 SHALL consultar Orphanet con el término principal de cada hipótesis candidata y,
@@ -72,9 +80,18 @@ una vez.
 
 ### Requirement: Orphanet no bloquea la búsqueda de ensayos
 Una falla de Orphanet MUST NOT impedir ni retrasar indefinidamente la búsqueda y evaluación de
-ensayos. El Agente 05 SHALL informar `estado_orphanet` como `ok`, `parcial`, `no_disponible`,
-`sin_configurar` o `sin_consulta` (sin términos válidos para consultar).
+ensayos. El Agente 05 SHALL informar `estado_orphanet` como `ok`, `parcial`, `no_disponible` o
+`sin_consulta` (sin términos válidos para consultar).
 
 #### Scenario: Orphanet caído con ClinicalTrials.gov disponible
 - **WHEN** todas las consultas a Orphanet fallan y ClinicalTrials.gov responde
 - **THEN** el resultado incluye los ensayos evaluados, `rare_diseases` vacío y `estado_orphanet: "no_disponible"`
+
+### Requirement: Los genes no se piden a Orphanet
+El servicio de nomenclatura de Orphanet no expone genes asociados. El Agente 05 MUST NOT
+solicitar genes a Orphanet ni depender de ellos para marcar una enfermedad rara, buscar
+ensayos o evaluar compatibilidad.
+
+#### Scenario: Hipótesis marcada como enfermedad rara
+- **WHEN** una hipótesis coincide con una entidad de Orphanet
+- **THEN** la marca se construye con código ORPHA, nombre preferido y enlace, sin consultar genes

@@ -30,25 +30,39 @@ evidencia (I, II, III), sin repetir textos idénticos.
 - **THEN** el agente omite la planificación, informa `planificacion: "sin_candidatas"` y ejecuta igual la búsqueda base
 
 ### Requirement: Búsqueda base sin regresión
-El Agente 05 SHALL ejecutar siempre una búsqueda base de ensayos en estado RECRUITING
-equivalente a la vigente antes de este cambio: condición en inglés (`condition_en`) como
-condición y hasta 5 términos de biomarcadores (genes, anticuerpos, fármacos) como palabras
-clave, reintentando solo con la condición si la combinación no devuelve resultados. La
-búsqueda base MUST NOT usar el motivo de consulta en español como condición de reemplazo.
+El Agente 05 SHALL ejecutar siempre una búsqueda base de ensayos equivalente a la vigente
+antes de este cambio: condición en inglés (`condition_en`) como condición y hasta 5 términos
+de biomarcadores (genes, anticuerpos, fármacos) como palabras clave, reintentando solo con la
+condición si la combinación no devuelve resultados. La búsqueda base MUST NOT usar el motivo
+de consulta en español como condición de reemplazo.
 
 #### Scenario: Caso con condición en inglés y genes
 - **WHEN** el caso trae `condition_en = "axonal sensorimotor polyneuropathy"` y el gen `TTR`
-- **THEN** la búsqueda base consulta esa condición con `TTR` como palabra clave, filtrando ensayos RECRUITING
+- **THEN** la búsqueda base consulta esa condición con `TTR` como palabra clave
 
 #### Scenario: Caso sin condición en inglés ni biomarcadores
 - **WHEN** `condition_en` está vacío y no hay biomarcadores válidos
 - **THEN** el agente no ejecuta la búsqueda base y no envía el motivo de consulta en español a ClinicalTrials.gov
 
+### Requirement: Estados de reclutamiento consultados
+Todas las consultas a ClinicalTrials.gov, la base y las de cada hipótesis, SHALL pedir los
+ensayos en estado `RECRUITING` y `NOT_YET_RECRUITING`. Cada ensayo MUST conservar su estado
+de reclutamiento para que el reporte pueda distinguirlos. Los ensayos que aún no reclutan
+MUST NOT excluirse ni penalizarse en la evaluación de compatibilidad.
+
+#### Scenario: Ensayo que todavía no abrió
+- **WHEN** una consulta devuelve un ensayo en estado `NOT_YET_RECRUITING`
+- **THEN** el ensayo se incluye en el resultado con su estado, disponible para que la vista y el PDF lo etiqueten
+
+#### Scenario: Estados no solicitados
+- **WHEN** ClinicalTrials.gov tiene ensayos `COMPLETED` o `SUSPENDED` para la misma condición
+- **THEN** esos ensayos no se consultan ni ocupan lugar en el resultado
+
 ### Requirement: Planificación de términos por hipótesis
 El Agente 05 SHALL pedir al LLM, una única vez por análisis, un término de condición en
 inglés médico y hasta 2 sinónimos por cada hipótesis candidata. Cada término MUST pasar la
 regla de saneamiento antes de usarse. Por cada candidata con término válido, el agente SHALL
-consultar ensayos RECRUITING con el término principal y, si no hay resultados, con cada
+consultar ensayos con el término principal y, si no hay resultados, con cada
 sinónimo en orden hasta obtener alguno. Si la llamada al LLM falla o no produce ningún
 término válido, el agente SHALL continuar solo con la búsqueda base e informar
 `planificacion: "fallback"`.
@@ -133,12 +147,11 @@ evaluación MUST NOT afirmar que el paciente es elegible, recomendar la inscripc
 diagnósticos. El LLM MUST NOT excluir ensayos: una compatibilidad `baja` conserva el ensayo.
 Las evaluaciones cuyo NCT ID no esté entre los enviados MUST descartarse y contarse en
 `evaluaciones_descartadas`; una etiqueta fuera del conjunto permitido MUST tratarse como
-`sin_evaluar`. Los ensayos SHALL ordenarse por compatibilidad (`alta`, `media`, `baja`,
-`sin_evaluar`) y, a igualdad, por orden de descubrimiento.
+`sin_evaluar`.
 
 #### Scenario: Evaluación válida
 - **WHEN** el LLM evalúa `NCT04000001` como `alta` con dos criterios a verificar
-- **THEN** el ensayo queda primero, con su fundamento y sus criterios en el resultado
+- **THEN** el ensayo queda entre los de compatibilidad `alta`, con su fundamento y sus criterios en el resultado
 
 #### Scenario: NCT ID inventado por el LLM
 - **WHEN** la respuesta incluye una evaluación para `NCT99999999`, que no se envió
@@ -146,11 +159,30 @@ Las evaluaciones cuyo NCT ID no esté entre los enviados MUST descartarse y cont
 
 #### Scenario: Falla del LLM en la evaluación
 - **WHEN** la llamada de evaluación falla o devuelve JSON inválido
-- **THEN** todos los ensayos quedan `sin_evaluar`, en orden de descubrimiento, con `evaluacion: "fallback"`
+- **THEN** todos los ensayos quedan `sin_evaluar`, con `evaluacion: "fallback"`
 
 #### Scenario: Ensayo omitido por el LLM
 - **WHEN** el LLM evalúa 4 de 5 ensayos enviados
 - **THEN** el ensayo omitido queda `sin_evaluar` y se conserva
+
+### Requirement: Orden del resultado
+Los ensayos SHALL ordenarse por compatibilidad (`alta`, `media`, `baja`, `sin_evaluar`) y,
+a igualdad de compatibilidad, primero los que tienen una sede en Argentina, después los que
+ya están reclutando y por último el orden de descubrimiento. La sede y el estado de
+reclutamiento ordenan y MUST NOT excluir ningún ensayo. La ubicación del paciente MUST NOT
+usarse como criterio: la preferencia por Argentina es del despliegue, no un dato del caso.
+
+#### Scenario: Ensayo local menos compatible
+- **WHEN** un ensayo con sede en Argentina tiene compatibilidad `media` y otro del exterior la tiene `alta`
+- **THEN** el ensayo del exterior aparece primero
+
+#### Scenario: Desempate por sede
+- **WHEN** dos ensayos tienen compatibilidad `alta` y solo uno tiene sede en Argentina
+- **THEN** el que tiene sede en Argentina aparece primero
+
+#### Scenario: Desempate por estado de reclutamiento
+- **WHEN** dos ensayos tienen la misma compatibilidad, ninguno tiene sede en Argentina y uno está `NOT_YET_RECRUITING`
+- **THEN** el que ya está reclutando aparece primero
 
 ### Requirement: Resultado disponible ante fallas externas
 El Agente 05 SHALL devolver siempre un resultado, aunque fallen ClinicalTrials.gov, Orphanet o

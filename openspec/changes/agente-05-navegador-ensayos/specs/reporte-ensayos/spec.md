@@ -44,8 +44,8 @@ rara catalogada", nunca como diagnóstico del paciente.
 reportes generados antes de este cambio `trial_search` MUST poder estar ausente o ser nulo.
 
 #### Scenario: Reporte con búsqueda completa
-- **WHEN** el Agente 05 termina con ClinicalTrials.gov disponible y Orphanet sin configurar
-- **THEN** `trial_search` informa `estado_clinicaltrials: "ok"`, `estado_orphanet: "sin_configurar"` y los términos consultados
+- **WHEN** el Agente 05 termina con ClinicalTrials.gov disponible y Orphanet respondiendo
+- **THEN** `trial_search` informa `estado_clinicaltrials: "ok"`, `estado_orphanet: "ok"` y los términos consultados
 
 #### Scenario: Reporte previo sin estado de búsqueda
 - **WHEN** un reporte no trae `trial_search`
@@ -53,7 +53,8 @@ reportes generados antes de este cambio `trial_search` MUST poder estar ausente 
 
 ### Requirement: Vista de ensayos en el frontend
 La tab "Ensayos clínicos" SHALL mostrar, por ensayo, una etiqueta de compatibilidad, el
-fundamento, los criterios a verificar y las hipótesis relacionadas cuando existan. La tab SHALL
+fundamento, los criterios a verificar y las hipótesis relacionadas cuando existan. SHALL
+señalar los ensayos que todavía no reclutan y los que tienen una sede en Argentina. La tab SHALL
 mostrar un bloque de enfermedades raras de Orphanet con código y enlace cuando `rare_diseases`
 no esté vacío, y SHALL mostrar la aclaración fija: "La compatibilidad es orientativa: la
 elegibilidad la determina el equipo investigador de cada ensayo." Cuando no haya ensayos, el
@@ -69,14 +70,23 @@ etiquetas de compatibilidad, sin aclaración y sin bloque de Orphanet.
 - **WHEN** un ensayo tiene `compatibility: "sin_evaluar"`
 - **THEN** la tab lo muestra con una etiqueta neutra "Sin evaluar" y sin fundamento
 
+#### Scenario: Ensayo que todavía no recluta
+- **WHEN** un ensayo tiene estado `NOT_YET_RECRUITING`
+- **THEN** la tab lo señala como "Aún no recluta", de forma distinguible de la etiqueta de compatibilidad
+
+#### Scenario: Ensayo con sede en Argentina
+- **WHEN** un ensayo incluye Argentina entre sus sedes
+- **THEN** la tab lo señala y el ensayo aparece antes que los demás de su mismo nivel de compatibilidad
+
 #### Scenario: Reporte previo
 - **WHEN** el reporte no trae `trial_search` ni `rare_diseases` y sus ensayos no traen `compatibility`
 - **THEN** la tab muestra los ensayos con los mismos datos que antes y sin errores de render
 
 ### Requirement: Ensayos en el PDF exportado
 La sección "ENSAYOS CLÍNICOS ACTIVOS RELEVANTES" del PDF SHALL incluir por ensayo la
-compatibilidad y los criterios a verificar, un apartado de enfermedades raras de Orphanet cuando
-existan, la misma aclaración orientativa que el frontend y, si ClinicalTrials.gov no pudo
+compatibilidad, los criterios a verificar y, cuando corresponda, que el ensayo todavía no
+recluta y que tiene una sede en Argentina; un apartado de enfermedades raras de Orphanet cuando
+existan; la misma aclaración orientativa que el frontend y, si ClinicalTrials.gov no pudo
 consultarse, un aviso explícito en lugar del texto "No se encontraron ensayos clínicos activos
 relacionados." Un reporte sin `trial_search` MUST imprimirse como antes de este cambio.
 

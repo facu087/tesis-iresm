@@ -14,23 +14,27 @@ Motivación en `proposal.md` (Why). Estado actual relevante para el cómo:
   (texto libre en español, p. ej. "Paciente masculino de 42 años con DM2 de 10 años de evolución").
 - `ClinicalTrial` ya trae `min_age`, `max_age` ("18 Years"), `sex` (ALL/MALE/FEMALE) y
   `eligibility_criteria` (texto libre, a veces de varios miles de caracteres).
+- `external/clinical_trials.py` expone `search(condition, keywords, max_results,
+  recruiting_only: bool)`: el booleano solo permite "todos los estados" o "solo
+  `RECRUITING`". `ClinicalTrial` ya trae `status` y `locations` (lista de países).
 - `external/rate_limiter.py` define `clinical_trials_limiter/breaker` y
-  `orphanet_limiter/breaker`, hoy sin uso.
-- **Orphanet probado contra la API real el 2026-09-15** (solo con nombres de enfermedades):
+  `orphanet_limiter/breaker`. El limiter de Orphanet **ya lo usa el cliente**
+  internamente (`OrphanetClient._request`); los de ClinicalTrials.gov siguen sin uso.
+- **Cliente Orphanet ya arreglado** en `fix/s4-cliente-orphanet` (commit `41828a8`, en
+  `develop`), a partir de estas mediciones contra la API real del 2026-09-15:
 
   | Llamada | Resultado |
   |---|---|
-  | `GET /EN/ClinicalEntity/approximatelymatching?name=…` (lo que usa `search()`) | 404 genérico `{"title": "Not Found"}` |
+  | `GET /EN/ClinicalEntity/approximatelymatching?name=…` (lo que usaba `search()`) | 404 genérico `{"title": "Not Found"}` |
   | `GET /EN/ClinicalEntity/ApproximateName/{name}` | 200, lista de `{"ORPHAcode": int, "Preferred term": str}` |
-  | `ApproximateName` sin header `apiKey` | 401 |
+  | `ApproximateName` sin header `apiKey` | **200** (10 de 10 llamadas). Los 401 que medimos antes eran intermitentes, con una sola muestra cada uno |
   | `ApproximateName` sin coincidencias | 404 con cuerpo `"Query not found"` |
-  | `GET /EN/ClinicalEntity/DisorderGene/{code}` (lo que usa `_get_genes()`) | 404 genérico |
+  | `GET /EN/ClinicalEntity/DisorderGene/{code}` (lo que usaba `_get_genes()`) | 404 genérico: la ORPHAcodes API es de nomenclatura y no expone genes |
   | `ApproximateName/axonal sensorimotor polyneuropathy` | 1.º resultado: *Autosomal recessive lethal neonatal axonal sensorimotor polyneuropathy* |
   | `ApproximateName/hereditary transthyretin amyloidosis` | 234 resultados; 1.º *Hereditary amyloidosis*, 2.º *Hereditary ATTR amyloidosis* (271861) |
 
-  Es decir: el cliente actual nunca devolvió resultados reales (el `except Exception` lo
-  ocultaba, y `demo_orphanet.py` usa datos simulados), y el orden del servicio no sirve
-  para elegir "la" enfermedad.
+  Lo que queda para este cambio: el orden del servicio no sirve para elegir "la"
+  enfermedad (de ahí D8), y nadie llama al cliente desde el pipeline.
 
 ## Goals / Non-Goals
 
@@ -45,9 +49,11 @@ Motivación en `proposal.md` (Why). Estado actual relevante para el cómo:
 **Non-Goals:**
 - Determinar elegibilidad real ni recomendar inscripción.
 - Estado de hipótesis y reglas EBM (#54), síntesis del Árbitro (#52), Sintetizador (#62).
-- Arreglar `OrphanetClient.get_by_code()` / `_get_genes()` (no los usa el pipeline; queda
-  registrado como hallazgo abierto).
-- Geolocalizar ensayos por país del paciente, o ampliar a `NOT_YET_RECRUITING`.
+- Arreglar el cliente de Orphanet: ya se hizo en `fix/s4-cliente-orphanet` (commit `41828a8`).
+- Traer genes desde Orphanet: la ORPHAcodes API no los expone y `get_genes()` levanta
+  `OrphanetGenesNoDisponibles`. Están en Orphadata, otro host y otro producto; va en
+  tarjeta aparte y el Agente 05 no depende de ellos.
+- Filtrar ensayos por país: la sede en Argentina ordena, nunca excluye.
 - Agregar edad/sexo estructurados a `PICOSynthesis`.
 
 ## Decisions
@@ -61,10 +67,12 @@ TrialNavigationInput
    │         └─ saneamiento determinista de cada término
    ├─(2) ClinicalTrials.gov: búsqueda base (igual a hoy) + 1 consulta por hipótesis
    │         (sinónimos si el principal da 0) ──────────────────── fallback por consulta
+   │         RECRUITING + NOT_YET_RECRUITING, etiquetados (D14)
    ├─(3) Orphanet: ApproximateName por término → coincidencia EXACTA ── fallback: sin marcas
    ├─(4) Filtros duros edad/sexo (locales) + dedupe por NCT + tope 10
-   └─(5) LLM: compatibilidad alta/media/baja + criterios a verificar ─ fallback: sin_evaluar
-             └─ validación: solo NCT IDs enviados, etiquetas del enum
+   ├─(5) LLM: compatibilidad alta/media/baja + criterios a verificar ─ fallback: sin_evaluar
+   │         └─ validación: solo NCT IDs enviados, etiquetas del enum
+   └─(6) Orden: compatibilidad → Argentina → ya reclutando → descubrimiento (D15)
    ▼
 TrialNavigationResult(trials, rare_diseases, summary)
 ```
@@ -97,7 +105,11 @@ implementa lanzando `NotImplementedError("El Agente 05 no participa del debate: 
   de `AgentOutput` es "hipótesis de un agente"; `parse_hypotheses` exige al menos una.
 - **Alternativa descartada — separar `BaseAgent` en base LLM + `DebateAgent`**: es el diseño
   correcto cuando existan 04, 05 y 06 (ninguno debate), pero toca `base_agent.py` mientras
-  #51/#52/#62 se planifican en paralelo. Queda como pregunta abierta.
+  #51/#52/#62 se planifican en paralelo. **Decidido con el equipo**: se difiere hasta que
+  04 y 06 existan, y será un refactor propio que no altera este contrato.
+
+Las 2 llamadas extra a Groq por análisis están **aceptadas por el equipo**, con el
+presupuesto de tokens de D11 y el fallback de cada paso.
 
 ### D3. Contrato de entrada neutral y adaptador único
 
@@ -209,18 +221,69 @@ expertos, asociaciones, medicamentos huérfanos) para las hipótesis que corresp
 enfermedad rara catalogada. No agrega términos nuevos de búsqueda (con coincidencia exacta el
 nombre preferido ya es uno de los términos) ni cambia la compatibilidad.
 
-### D9. Cliente Orphanet: arreglar `search()` y mover el fallback al agente
+### D9. Cliente Orphanet: contrato que consume el agente (ya implementado)
 
-- Endpoint `GET {BASE}/ApproximateName/{quote(name, safe="")}`, parseo de `ORPHAcode` y
-  `Preferred term` (la respuesta no trae definición: `definition=""`).
-- 404 con cuerpo `"Query not found"` → `[]`. Otro 404 o 401 → `ExternalApiError("Orphanet", …)`
-  sin reintento. Timeout/conexión/5xx → reintento (tenacity con `retry_if_exception_type`)
-  y luego `ApiUnavailableError`.
-- Se quita el `except (httpx.HTTPError, Exception): return []` de `search()`: además de
-  ocultar el 404, dejaba sin efecto el `@retry`.
-- El agente decide el fallback (`estado_orphanet`) y respeta `orphanet_limiter` / `orphanet_breaker`.
-- Sin `ORPHANET_API_KEY` el agente no instancia el cliente (`sin_configurar`). La API acepta
-  cualquier valor del header, pero la regla del proyecto es "API keys solo desde .env".
+El arreglo del cliente salió de este cambio y se hizo en `fix/s4-cliente-orphanet`. Lo que
+el Agente 05 puede dar por dado:
+
+- `search(name)` pega a `GET {BASE}/ApproximateName/{quote(name, safe="")}` y devuelve
+  `RareDisease` con `orpha_code`, `preferred_term`, sinónimos, `definition` (`""` cuando la
+  API responde "None available") y el enlace a orpha.net.
+- 404 con cuerpo `"Query not found"` → `[]` (sin coincidencias, no es error). Otro 404 o 401
+  → `ExternalApiError` sin reintento. Timeout, conexión y 5xx → reintento y luego
+  `ApiUnavailableError` (subclase de `ExternalApiError`, `external/rate_limiter.py`).
+- **El cliente ya aplica `orphanet_limiter` internamente**: el agente MUST NOT volver a
+  aplicarlo, o duplica la espera. El agente sí envuelve las llamadas en `orphanet_breaker`,
+  que el cliente no conoce.
+- `get_genes()` levanta `OrphanetGenesNoDisponibles`: el agente no lo llama.
+
+Lo único que decide este cambio es el fallback: el agente traduce cualquiera de esas
+excepciones a `estado_orphanet` y sigue con los ensayos.
+
+**Credencial**: la API responde 200 sin `apiKey` (10 de 10 llamadas medidas). El cliente
+manda `ORPHANET_API_KEY` si está definida y, si no, un valor por defecto que la API acepta.
+El agente **consulta Orphanet siempre**, haya o no credencial en el entorno. Un 401
+intermitente cae en `no_disponible` como cualquier otra falla.
+
+- **Alternativa descartada — exigir `ORPHANET_API_KEY` y saltear Orphanet sin ella**: era el
+  diseño original, escrito cuando creíamos que la API devolvía 401 sin clave. Con la medición
+  corregida, apagaría una función que anda en todos los entornos del equipo, ninguno de los
+  cuales tiene la variable definida.
+
+### D14. Ensayos que todavía no reclutan
+
+`clinical_trials.search()` hoy recibe `recruiting_only: bool` y solo sabe filtrar por
+`RECRUITING` o no filtrar nada. Pasa a recibir los estados a consultar
+(`statuses: Sequence[str] = ("RECRUITING",)`), que se mandan a `filter.overallStatus`
+separados por `|` como acepta la API v2. El Agente 05 consulta
+`("RECRUITING", "NOT_YET_RECRUITING")`.
+
+El default deja las llamadas actuales igual, así que `search_by_biomarkers` y los tests
+vigentes no cambian. El estado ya viaja en `ClinicalTrial.status`, así que no hace falta un
+campo nuevo: la vista y el PDF etiquetan "aún no recluta" cuando vale `NOT_YET_RECRUITING`.
+
+- **Por qué incluirlos**: un ensayo que abre en tres meses es accionable para el médico, que
+  puede contactar al equipo investigador. Excluirlo esconde información útil; la etiqueta
+  evita que se lea como "está reclutando hoy".
+- **Alternativa descartada — consultar todos los estados y filtrar localmente**: trae ensayos
+  terminados y suspendidos que gastan lugar en el tope de 10 y tokens en la evaluación.
+
+### D15. Orden del resultado: compatibilidad, después Argentina
+
+`compatibilidad (alta, media, baja, sin_evaluar) → sede en Argentina → ya reclutando →
+orden de descubrimiento`. La sede sale de `ClinicalTrial.locations`, que ya trae la lista de
+países; "Argentina" se compara normalizado.
+
+- **Por qué la compatibilidad va primero**: es lo que el médico necesita arriba. Un ensayo
+  local poco compatible por encima de uno muy compatible del exterior invierte el criterio
+  clínico por uno logístico.
+- **Argentina ordena, nunca filtra**: es una preferencia de despliegue del equipo, no un dato
+  del paciente. Ningún ensayo se pierde por su sede, y nada del paciente viaja a la API.
+- **Alternativa descartada — Argentina primero de todo**: la evaluó el equipo y se descartó
+  por lo anterior.
+- **Alternativa descartada — país como variable de entorno**: configurable es más general,
+  pero hoy hay un solo despliegue y una constante es más simple de testear. Si aparece otro
+  país, el cambio es acotado.
 
 ### D10. Consultas externas: reuso de `rate_limiter`, paralelismo acotado
 
@@ -257,11 +320,15 @@ criterio.
   `TrialSearchSummary`; `rare_diseases?` y `trial_search?: TrialSearchSummary | null` en
   `StructuredReport`.
 - `EnsayosTab` recibe el reporte completo. Si `trial_search` es nulo, render idéntico al actual.
-  Si no: aviso de estado (API no disponible / parcial / Orphanet sin configurar), aclaración
+  Si no: aviso de estado (ClinicalTrials.gov u Orphanet no disponible o parcial), aclaración
   orientativa, bloque "Enfermedades raras relacionadas (Orphanet)", y por ensayo badge de
   compatibilidad (alta verde, media ámbar, baja gris, sin evaluar neutro), fundamento,
   criterios a verificar e hipótesis relacionadas. `EmptyState` distingue "no se encontraron"
   de "no se pudo consultar". Se mantienen las 5 tabs.
+- Etiquetas nuevas por ensayo (D14/D15): "Aún no recluta" cuando `status` es
+  `NOT_YET_RECRUITING`, y "Sede en Argentina" cuando `locations` la incluye. La de
+  reclutamiento es una advertencia, no un badge de calidad: el médico tiene que ver de un
+  vistazo que ese ensayo todavía no abrió.
 - `analyzing/page.tsx`: el paso "Generación del reporte" pasa a nombrar al Agente 05
   (solo texto; la vista no recibe eventos reales del backend).
 - `pdf_exporter._clinical_trials`: mismas piezas; la línea de la portada sigue contando ensayos.
@@ -294,16 +361,17 @@ criterio.
 1. Sin migración de datos: no hay persistencia.
 2. Backend y frontend se pueden desplegar en cualquier orden: el frontend viejo ignora los
    campos nuevos y el nuevo renderiza como antes cuando `trial_search` es nulo.
-3. `ORPHANET_API_KEY` es opcional; sin ella el reporte dice "Orphanet sin configurar".
+3. `ORPHANET_API_KEY` es opcional: la API responde sin credencial y el reporte informa el
+   estado real de la consulta (`ok`, `parcial` o `no_disponible`).
 4. Rollback: revertir el paso 6 del router a `search_by_biomarkers` (la función se conserva);
    los campos nuevos quedan con sus defaults.
 
 ## Open Questions
 
-- ¿Separar `BaseAgent` en una base de utilidades LLM y un `DebateAgent` cuando existan 04 y 06?
-  Hoy el 05 implementa `run()` lanzando `NotImplementedError`; el cambio sería un refactor
-  propio que no altera este contrato.
-- ¿Priorizar ensayos con sede en Argentina mediante una variable de despliegue (no un dato del
-  paciente)? Sería un cambio posterior sobre el orden, sin tocar filtros ni evaluación.
-- ¿Incluir ensayos `NOT_YET_RECRUITING`? Requiere extender el cliente de ClinicalTrials.gov.
 - ¿El Agente 06 va a consumir `trial_search` para redactar la sección de ensayos? Se define en #62.
+- ¿Integrar Orphadata (`api.orphadata.com/rd-associated-genes/orphacodes/{code}`) para cruzar
+  los genes del caso con la enfermedad rara marcada? Tarjeta aparte; no afecta este contrato.
+
+Resueltas por el equipo el 2026-09-15, ahora en Decisions: incluir `NOT_YET_RECRUITING` (D14),
+ordenar por sede en Argentina (D15), aceptar las 2 llamadas extra a Groq y diferir la
+separación de `BaseAgent` hasta que existan los agentes 04 y 06 (D2).
