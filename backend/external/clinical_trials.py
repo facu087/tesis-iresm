@@ -7,6 +7,8 @@ Autenticación: ninguna (API pública)
 Rate limit: sin límite publicado — se aplica back-off con tenacity por precaución.
 """
 
+from typing import Sequence
+
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -14,6 +16,9 @@ from ..models.trial import ClinicalTrial
 
 _BASE_URL = "https://clinicaltrials.gov/api/v2/studies"
 _TRIAL_URL_TEMPLATE = "https://clinicaltrials.gov/study/{nct_id}"
+
+# Estados de reclutamiento por defecto: solo los ensayos que reclutan hoy.
+_DEFAULT_STATUSES: tuple[str, ...] = ("RECRUITING",)
 
 # Campos que necesitamos — reducir payload de la respuesta
 _FIELDS = ",".join([
@@ -113,16 +118,18 @@ def search(
     condition: str,
     keywords: str = "",
     max_results: int = 10,
-    recruiting_only: bool = True,
+    statuses: Sequence[str] = _DEFAULT_STATUSES,
 ) -> list[ClinicalTrial]:
     """
     Busca ensayos clínicos en ClinicalTrials.gov.
 
     Args:
-        condition:       Condición o enfermedad principal (ej: "axonal neuropathy").
-        keywords:        Términos adicionales de búsqueda (ej: "autonomic TTR").
-        max_results:     Número máximo de resultados a devolver (máx. 1000).
-        recruiting_only: Si True, filtra solo ensayos con status RECRUITING.
+        condition:   Condición o enfermedad principal (ej: "axonal neuropathy").
+        keywords:    Términos adicionales de búsqueda (ej: "autonomic TTR").
+        max_results: Número máximo de resultados a devolver (máx. 1000).
+        statuses:    Estados de reclutamiento a consultar. El default deja solo
+                     los que reclutan hoy; el Agente 05 pide además
+                     NOT_YET_RECRUITING. Una secuencia vacía no filtra por estado.
 
     Returns:
         Lista de ClinicalTrial ordenada por relevancia (orden de la API).
@@ -134,8 +141,9 @@ def search(
     }
     if keywords:
         params["query.term"] = keywords
-    if recruiting_only:
-        params["filter.overallStatus"] = "RECRUITING"
+    if statuses:
+        # La API v2 acepta varios estados separados por "|" en el mismo filtro.
+        params["filter.overallStatus"] = "|".join(statuses)
 
     try:
         data = _get(params)

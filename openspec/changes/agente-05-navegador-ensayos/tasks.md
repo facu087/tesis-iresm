@@ -1,7 +1,7 @@
 ## 1. Modelos de datos (contrato aditivo)
 
-- [ ] 1.1 En `backend/models/trial.py`, agregar a `ClinicalTrial` los campos `compatibility` (default `"sin_evaluar"`), `compatibility_rationale`, `criteria_to_verify`, `related_hypotheses` y `matched_terms`, con docstrings en español; verificar que `pytest tests/test_clinical_trials.py tests/test_report_builder.py tests/test_pdf_exporter.py` sigue pasando sin tocar esos tests
-- [ ] 1.2 En el mismo módulo, crear `RareDiseaseMatch`, `TrialSearchSummary`, `TrialCandidate`, `PatientDemographics`, `TrialNavigationInput` y `TrialNavigationResult` (design D3/D5); verificar con tests nuevos en `tests/test_trial_matching.py` que un `ClinicalTrial` construido desde un JSON previo (sin campos nuevos) valida y queda `sin_evaluar`
+- [x] 1.1 En `backend/models/trial.py`, agregar a `ClinicalTrial` los campos `compatibility` (default `"sin_evaluar"`), `compatibility_rationale`, `criteria_to_verify`, `related_hypotheses` y `matched_terms`, con docstrings en español; verificar que `pytest tests/test_clinical_trials.py tests/test_report_builder.py tests/test_pdf_exporter.py` sigue pasando sin tocar esos tests
+- [x] 1.2 En el mismo módulo, crear `RareDiseaseMatch`, `TrialSearchSummary`, `TrialCandidate`, `PatientDemographics`, `TrialNavigationInput` y `TrialNavigationResult` (design D3/D5); verificar con tests nuevos en `tests/test_trial_matching.py` que un `ClinicalTrial` construido desde un JSON previo (sin campos nuevos) valida y queda `sin_evaluar`
 
 ## 2. Cliente ClinicalTrials.gov: estados de reclutamiento
 
@@ -9,17 +9,17 @@
 > `search()` contra `ApproximateName`, taxonomía de errores y uso del `orphanet_limiter`.
 > Este cambio solo lo consume; no toca `backend/external/orphanet.py`.
 
-- [ ] 2.1 En `backend/external/clinical_trials.py`, reemplazar el parámetro `recruiting_only: bool` de `search()` por `statuses: Sequence[str] = ("RECRUITING",)`, unidos por `|` en `filter.overallStatus` (design D14), manteniendo el comportamiento actual con el default; verificar con tests en `tests/test_clinical_trials.py` que el default consulta solo `RECRUITING`, que `("RECRUITING", "NOT_YET_RECRUITING")` arma el filtro combinado y que `search_by_biomarkers` sigue pasando sin cambios
+- [x] 2.1 En `backend/external/clinical_trials.py`, reemplazar el parámetro `recruiting_only: bool` de `search()` por `statuses: Sequence[str] = ("RECRUITING",)`, unidos por `|` en `filter.overallStatus` (design D14), manteniendo el comportamiento actual con el default; verificar con tests en `tests/test_clinical_trials.py` que el default consulta solo `RECRUITING`, que `("RECRUITING", "NOT_YET_RECRUITING")` arma el filtro combinado y que `search_by_biomarkers` sigue pasando sin cambios
 
 ## 3. Lógica determinista (`backend/pipeline/trial_matching.py`)
 
-- [ ] 3.1 Implementar `build_navigation_input(case, hypotheses, statuses=None)` y la selección de candidatas (excluye `descartada`, orden prioridad → evidencia, sin duplicados, máximo 3) armando `eligibility_profile` solo con campos PICO; verificar con tests en `tests/test_trial_matching.py` que cubren los escenarios de "Entrada independiente del origen de las hipótesis" y que `raw_text` y `clinical_narrative` no aparecen en la entrada
-- [ ] 3.2 Implementar `sanitize_term()` (design D7); verificar con tests que descartan `42-year-old male neuropathy`, `anti-gangliósido GM1`, términos de más de 80 caracteres u 8 palabras, y aceptan `TTR`, `PMP22` y `hereditary ATTR amyloidosis`
-- [ ] 3.3 Implementar `parse_patient_demographics()` y el parseo de edades de ensayos (design D6); verificar con tests que "Paciente masculino de 42 años con DM2 de 10 años de evolución" da 42/MALE, que un perfil sin sexo da `None` y que "N/A" o formatos desconocidos dan `None`
-- [ ] 3.4 Implementar los filtros duros por edad y sexo con conteo de exclusiones; verificar con tests de los escenarios "Paciente fuera del rango etario", "Ensayo sin edad máxima", "Sexo incompatible" y "Perfil sin sexo identificable"
-- [ ] 3.5 Implementar la normalización de nombres y la coincidencia exacta con Orphanet (design D8); verificar con tests que `Hereditary ATTR amyloidosis` coincide con `ATTR amyloidosis, hereditary` y que `Autosomal recessive lethal neonatal axonal sensorimotor polyneuropathy` no coincide con `axonal sensorimotor polyneuropathy`
-- [ ] 3.6 Implementar la unificación por NCT ID (`matched_terms`, `related_hypotheses`) y el tope de 10 por orden de descubrimiento; verificar con tests de "Ensayo encontrado por dos consultas" y "Más de 10 ensayos únicos"
-- [ ] 3.7 Implementar el orden final del resultado —compatibilidad → sede en Argentina → ya reclutando → descubrimiento (design D15), con la sede leída de `ClinicalTrial.locations` normalizada— verificando con tests los escenarios "Ensayo local menos compatible", "Desempate por sede" y "Desempate por estado de reclutamiento"
+- [x] 3.1 Implementar `build_navigation_input(case, hypotheses, statuses=None)` y la selección de candidatas (excluye `descartada`, orden prioridad → evidencia, sin duplicados, máximo 3) armando `eligibility_profile` solo con campos PICO; verificar con tests en `tests/test_trial_matching.py` que cubren los escenarios de "Entrada independiente del origen de las hipótesis" y que `raw_text` y `clinical_narrative` no aparecen en la entrada
+- [x] 3.2 Implementar `sanitize_term()` (design D7); verificar con tests que descartan `42-year-old male neuropathy`, `anti-gangliósido GM1`, términos de más de 80 caracteres u 8 palabras, y aceptan `TTR`, `PMP22` y `hereditary ATTR amyloidosis`
+- [x] 3.3 Implementar `parse_patient_demographics()` y el parseo de edades de ensayos (design D6); verificar con tests que "Paciente masculino de 42 años con DM2 de 10 años de evolución" da 42/MALE, que un perfil sin sexo da `None` y que "N/A" o formatos desconocidos dan `None`
+- [x] 3.4 Implementar los filtros duros por edad y sexo con conteo de exclusiones; verificar con tests de los escenarios "Paciente fuera del rango etario", "Ensayo sin edad máxima", "Sexo incompatible" y "Perfil sin sexo identificable"
+- [x] 3.5 Implementar la normalización de nombres y la coincidencia exacta con Orphanet (design D8); verificar con tests que `Hereditary ATTR amyloidosis` coincide con `ATTR amyloidosis, hereditary` y que `Autosomal recessive lethal neonatal axonal sensorimotor polyneuropathy` no coincide con `axonal sensorimotor polyneuropathy`
+- [x] 3.6 Implementar la unificación por NCT ID (`matched_terms`, `related_hypotheses`) y el tope de 10 por orden de descubrimiento; verificar con tests de "Ensayo encontrado por dos consultas" y "Más de 10 ensayos únicos"
+- [x] 3.7 Implementar el orden final del resultado —compatibilidad → sede en Argentina → ya reclutando → descubrimiento (design D15), con la sede leída de `ClinicalTrial.locations` normalizada— verificando con tests los escenarios "Ensayo local menos compatible", "Desempate por sede" y "Desempate por estado de reclutamiento"
 
 ## 4. Agente 05 (`backend/agents/agent_05_trials.py`)
 
