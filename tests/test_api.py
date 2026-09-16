@@ -13,7 +13,12 @@ from backend.models.biomarkers import BiomarkerProfile
 from backend.models.case import ClinicalCase, PICOSynthesis
 from backend.models.hypothesis import EvidenceLevel, Hypothesis, Priority, Source
 from backend.models.report import AgentOutput, Report
-from backend.models.trial import ClinicalTrial
+from backend.models.trial import (
+    ClinicalTrial,
+    RareDiseaseMatch,
+    TrialNavigationResult,
+    TrialSearchSummary,
+)
 
 
 # ── Fixtures ───────────────────────────────────────────────────────────────────
@@ -77,6 +82,35 @@ def _make_trial() -> ClinicalTrial:
         phase="PHASE3",
         locations=["Argentina"],
         url="https://clinicaltrials.gov/study/NCT04000001",
+        compatibility="alta",
+        compatibility_rationale="Coincide con la condición estudiada.",
+        criteria_to_verify=["Confirmar biopsia de nervio"],
+        related_hypotheses=["Neuropatía axonal por deficiencia de vitamina B12."],
+        matched_terms=["axonal sensorimotor polyneuropathy"],
+    )
+
+
+def _make_navigation() -> TrialNavigationResult:
+    """Resultado típico del Agente 05 con ambas APIs respondiendo."""
+    return TrialNavigationResult(
+        trials=[_make_trial()],
+        rare_diseases=[
+            RareDiseaseMatch(
+                orpha_code="271861",
+                name="Hereditary ATTR amyloidosis",
+                url="https://www.orpha.net/en/disease/detail/271861",
+                hypothesis="Neuropatía axonal por deficiencia de vitamina B12.",
+                matched_term="hereditary ATTR amyloidosis",
+            )
+        ],
+        summary=TrialSearchSummary(
+            estado_clinicaltrials="ok",
+            estado_orphanet="ok",
+            planificacion="ok",
+            evaluacion="ok",
+            terminos_consultados=["axonal sensorimotor polyneuropathy"],
+            encontrados=1,
+        ),
     )
 
 
@@ -107,9 +141,11 @@ def _pipeline_patches():
             new_callable=AsyncMock,
             return_value=_make_report(),
         ),
-        "search_by_biomarkers": patch(
-            "backend.api.router.search_by_biomarkers",
-            return_value=[_make_trial()],
+        # Paso 6: el Agente 05 reemplazó a search_by_biomarkers en el router.
+        "navigate": patch(
+            "backend.api.router.TrialNavigatorAgent.navigate",
+            new_callable=AsyncMock,
+            return_value=_make_navigation(),
         ),
     }
 
@@ -142,7 +178,7 @@ class TestAnalyzeEndpoint:
             patches["extract_biomarkers"],
             patches["run_round_1"],
             patches["run_debate"],
-            patches["search_by_biomarkers"],
+            patches["navigate"],
             TestClient(app) as client,
         ):
             return client.post("/api/analyze", **request_kwargs)
@@ -216,11 +252,13 @@ class TestAnalyzeEndpoint:
                 )
         assert response.status_code == 415
 
-    def test_fallo_en_trials_no_rompe_el_pipeline(self):
+    def test_error_inesperado_dentro_del_agente_no_rompe_el_pipeline(self):
+        """El router tiene su propia red de seguridad sobre el Agente 05."""
         patches = _pipeline_patches()
-        patches["search_by_biomarkers"] = patch(
-            "backend.api.router.search_by_biomarkers",
-            side_effect=RuntimeError("API no disponible"),
+        patches["navigate"] = patch(
+            "backend.api.router.TrialNavigatorAgent.navigate",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("error no previsto"),
         )
         with (
             patches["normalize"],
@@ -228,12 +266,41 @@ class TestAnalyzeEndpoint:
             patches["extract_biomarkers"],
             patches["run_round_1"],
             patches["run_debate"],
-            patches["search_by_biomarkers"],
+            patches["navigate"],
             TestClient(app) as client,
         ):
             response = client.post("/api/analyze", data={"text": "caso clínico"})
+        body = response.json()
         assert response.status_code == 200
-        assert response.json()["clinical_trials"] == []
+        assert body["clinical_trials"] == []
+        assert body["trial_search"]["estado_clinicaltrials"] == "no_disponible"
+
+    def test_respuesta_incluye_compatibilidad_y_estado_de_la_busqueda(self):
+        response = self._run(data={"text": "caso clínico de prueba"})
+        body = response.json()
+        assert body["clinical_trials"][0]["compatibility"] == "alta"
+        assert body["clinical_trials"][0]["criteria_to_verify"]
+        assert body["trial_search"]["estado_orphanet"] == "ok"
+        assert body["rare_diseases"][0]["orpha_code"] == "271861"
+
+    def test_el_agente_recibe_las_hipotesis_del_debate(self):
+        patches = _pipeline_patches()
+        with (
+            patches["normalize"],
+            patches["pico_build"],
+            patches["extract_biomarkers"],
+            patches["run_round_1"],
+            patches["run_debate"],
+            patches["navigate"] as mock_navigate,
+            TestClient(app) as client,
+        ):
+            client.post("/api/analyze", data={"text": "texto clínico"})
+        entrada = mock_navigate.await_args.args[0]
+        assert [c.text for c in entrada.candidates] == [
+            "Neuropatía axonal por deficiencia de vitamina B12."
+        ]
+        # El motivo de consulta en español no se usa como condición de reemplazo.
+        assert entrada.condition_en == ""
 
     def test_llama_a_run_round_1_con_case(self):
         patches = _pipeline_patches()
@@ -243,7 +310,7 @@ class TestAnalyzeEndpoint:
             patches["extract_biomarkers"],
             patches["run_round_1"] as mock_round_1,
             patches["run_debate"],
-            patches["search_by_biomarkers"],
+            patches["navigate"],
             TestClient(app) as client,
         ):
             client.post("/api/analyze", data={"text": "texto clínico"})
@@ -257,13 +324,13 @@ class TestAnalyzeEndpoint:
             patches["extract_biomarkers"],
             patches["run_round_1"],
             patches["run_debate"] as mock_debate,
-            patches["search_by_biomarkers"],
+            patches["navigate"],
             TestClient(app) as client,
         ):
             client.post("/api/analyze", data={"text": "texto clínico"})
         mock_debate.assert_awaited_once()
 
-    def test_biomarkers_vacios_no_rompen_busqueda_trials(self):
+    def test_biomarkers_vacios_no_rompen_busqueda(self):
         patches = _pipeline_patches()
         patches["extract_biomarkers"] = patch(
             "backend.api.router.extract_biomarkers",
@@ -275,8 +342,64 @@ class TestAnalyzeEndpoint:
             patches["extract_biomarkers"],
             patches["run_round_1"],
             patches["run_debate"],
-            patches["search_by_biomarkers"],
+            patches["navigate"],
             TestClient(app) as client,
         ):
             response = client.post("/api/analyze", data={"text": "texto clínico"})
         assert response.status_code == 200
+
+
+# ── Tests: POST /api/report/pdf ────────────────────────────────────────────────
+
+def _reporte_previo() -> dict:
+    """
+    JSON tal como lo generaba NEXUS antes del Agente 05.
+
+    Sin `trial_search`, sin `rare_diseases` y con ensayos sin `compatibility`:
+    el contrato nuevo es aditivo, así que tiene que seguir siendo aceptado.
+    """
+    return {
+        "metadata": {
+            "generated_at": "2026-06-09T12:00:00Z",
+            "nexus_version": "0.3.0",
+            "processing_time_seconds": 42.5,
+            "disclaimer": "NEXUS es un sistema de soporte investigativo.",
+        },
+        "case_summary": {"narrative": "Paciente varón de 42 años."},
+        "hypotheses": [],
+        "debate_summary": {
+            "rounds_completed": 4,
+            "total_critiques": 3,
+            "divergences": [],
+            "consensus_reached": True,
+        },
+        "clinical_trials": [
+            {
+                "nct_id": "NCT04000001",
+                "title": "Estudio de neuropatía axonal hereditaria",
+                "status": "RECRUITING",
+                "brief_summary": "Ensayo sobre tratamiento.",
+                "conditions": ["Axonal Neuropathy"],
+                "locations": ["Argentina"],
+                "url": "https://clinicaltrials.gov/study/NCT04000001",
+            }
+        ],
+        "bibliography": [],
+    }
+
+
+class TestExportPdfEndpoint:
+    def test_reporte_previo_sin_campos_nuevos_devuelve_200(self):
+        with TestClient(app) as client:
+            response = client.post("/api/report/pdf", json=_reporte_previo())
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/pdf"
+
+    def test_reporte_previo_queda_sin_evaluar(self):
+        """El ensayo del reporte viejo toma el default del contrato nuevo."""
+        from backend.api.schemas import StructuredReport
+
+        reporte = StructuredReport(**_reporte_previo())
+        assert reporte.trial_search is None
+        assert reporte.rare_diseases == []
+        assert reporte.clinical_trials[0].compatibility == "sin_evaluar"

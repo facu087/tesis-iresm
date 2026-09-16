@@ -9,20 +9,47 @@ import time
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 
-from ..external.clinical_trials import search_by_biomarkers
+from ..agents.agent_05_trials import TrialNavigatorAgent
 from ..ingestion.biomarker_extractor import extract as extract_biomarkers
 from ..ingestion.extractor import extract
 from ..ingestion.normalizer import normalize
 from ..models.case import ClinicalCase
+from ..models.trial import ApiStatus, TrialNavigationInput, TrialNavigationResult, TrialSearchSummary
 from ..pipeline import debate, orchestrator, pico
 from ..pipeline.pdf_exporter import generate_pdf
 from ..pipeline.report_builder import build_export
+from ..pipeline.trial_matching import build_navigation_input
 from ..pipeline.verification import verify_report_sources
 from .schemas import StructuredReport
 
 router = APIRouter(prefix="/api", tags=["análisis"])
 
 _MAX_TEXT_BYTES = 500_000  # ~500 KB
+
+
+async def _navigate_trials_safe(
+    nav_input: TrialNavigationInput,
+) -> TrialNavigationResult:
+    """
+    Red de seguridad del router alrededor del Agente 05.
+
+    El agente ya tiene un fallback por paso; esto cubre una excepción no
+    prevista para que `POST /api/analyze` nunca falle por la navegación de
+    ensayos. Solo se loggea el tipo: el mensaje puede arrastrar texto clínico.
+    """
+    try:
+        return await TrialNavigatorAgent().navigate(nav_input)
+    except Exception as exc:
+        print(
+            f"[NEXUS] Agente 05 — navegación de ensayos: fallback ({type(exc).__name__})",
+            file=sys.stderr,
+        )
+        return TrialNavigationResult(
+            summary=TrialSearchSummary(
+                estado_clinicaltrials=ApiStatus.NO_DISPONIBLE.value,
+                estado_orphanet=ApiStatus.NO_DISPONIBLE.value,
+            )
+        )
 
 
 @router.post("/analyze", response_model=StructuredReport, summary="Analizar caso clínico")
@@ -85,34 +112,23 @@ async def analyze(
     # ── 5. Debate adversarial: Rondas 2–4 ─────────────────────────────────────
     final_report = await debate.run_debate(case_with_pico, round_1_report)
 
-    # ── 6. Búsqueda de ensayos clínicos ───────────────────────────────────────
-    biomarker_names: list[str] = []
-    if biomarkers and not biomarkers.is_empty():
-        biomarker_names = (biomarkers.genes + biomarkers.antibodies + biomarkers.drugs)[:5]
-
-    # ClinicalTrials.gov solo indexa en inglés: se usa condition_en, no el
-    # chief_complaint en español (si no, la búsqueda devuelve 0 resultados).
-    condition = ""
-    if case_with_pico.pico:
-        condition = case_with_pico.pico.condition_en or case_with_pico.pico.chief_complaint
-
-    try:
-        trials = await asyncio.to_thread(search_by_biomarkers, biomarker_names, condition)
-    except Exception as exc:
-        print(f"[NEXUS] Búsqueda de ensayos clínicos omitida: {exc}", file=sys.stderr)
-        trials = []
-
-    # ── 7. Verificación bibliográfica (Agente 04) ─────────────────────────────
-    # Contrasta cada PMID citado contra PubMed. Las hipótesis sin referencia
-    # verificable quedan como "especulativa", no se descartan.
-    verifications = await verify_report_sources(final_report)
+    # ── 6 y 7. Navegación de ensayos (Agente 05) + verificación (Agente 04) ───
+    # Ambos dependen solo del reporte final del debate y usan APIs distintas
+    # (ClinicalTrials.gov/Orphanet vs. PubMed), así que corren en paralelo.
+    # Cuando exista el Árbitro, el orden pasa a ser árbitro → navigate(consenso).
+    nav_input = build_navigation_input(case_with_pico, final_report.hypotheses)
+    navigation, verifications = await asyncio.gather(
+        _navigate_trials_safe(nav_input),
+        verify_report_sources(final_report),
+    )
 
     return build_export(
         case=case_with_pico,
         report=final_report,
-        trials=trials,
+        trials=navigation.trials,
         processing_time=time.perf_counter() - start,
         verifications=verifications,
+        navigation=navigation,
     )
 
 

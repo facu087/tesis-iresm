@@ -32,10 +32,10 @@
 
 ## 5. Integración en el pipeline y el reporte
 
-- [ ] 5.1 En `backend/api/schemas.py`, agregar al final de `StructuredReport` `rare_diseases: list[RareDiseaseMatch] = []` y `trial_search: TrialSearchSummary | None = None`; verificar con un test en `tests/test_report_builder.py` que un `StructuredReport` sin esos campos valida
-- [ ] 5.2 En `backend/pipeline/report_builder.py`, agregar al final de `build_export` el parámetro `navigation: TrialNavigationResult | None = None` que completa `rare_diseases` y `trial_search`, sin tocar `_rank_hypotheses`; verificar con tests de "Hipótesis marcada como enfermedad rara", "Sin coincidencias" y "Reporte con búsqueda completa"
-- [ ] 5.3 En `backend/api/router.py`, reemplazar el paso 6 por `build_navigation_input` + `asyncio.gather(_navigate_trials_safe(...), verify_report_sources(...))`, quitar el reemplazo por `chief_complaint` y el log con `{exc}` (design D4); verificar actualizando `tests/test_api.py` (el patch de `search_by_biomarkers` pasa a ser del agente) con los tests existentes de ensayos más "Error inesperado dentro del agente" devolviendo HTTP 200
-- [ ] 5.4 Verificar con un test en `tests/test_api.py` que `POST /api/report/pdf` acepta un reporte previo sin `trial_search`, `rare_diseases` ni `compatibility` y responde HTTP 200
+- [x] 5.1 En `backend/api/schemas.py`, agregar al final de `StructuredReport` `rare_diseases: list[RareDiseaseMatch] = []` y `trial_search: TrialSearchSummary | None = None`; verificar con un test en `tests/test_report_builder.py` que un `StructuredReport` sin esos campos valida
+- [x] 5.2 En `backend/pipeline/report_builder.py`, agregar al final de `build_export` el parámetro `navigation: TrialNavigationResult | None = None` que completa `rare_diseases` y `trial_search`, sin tocar `_rank_hypotheses`; verificar con tests de "Hipótesis marcada como enfermedad rara", "Sin coincidencias" y "Reporte con búsqueda completa"
+- [x] 5.3 En `backend/api/router.py`, reemplazar el paso 6 por `build_navigation_input` + `asyncio.gather(_navigate_trials_safe(...), verify_report_sources(...))`, quitar el reemplazo por `chief_complaint` y el log con `{exc}` (design D4); verificar actualizando `tests/test_api.py` (el patch de `search_by_biomarkers` pasa a ser del agente) con los tests existentes de ensayos más "Error inesperado dentro del agente" devolviendo HTTP 200
+- [x] 5.4 Verificar con un test en `tests/test_api.py` que `POST /api/report/pdf` acepta un reporte previo sin `trial_search`, `rare_diseases` ni `compatibility` y responde HTTP 200
 
 ## 6. PDF exportado
 
