@@ -161,10 +161,11 @@ Scripts disponibles:
 - `demo_priorizacion_evidencia.py` — priorización EBM: nivel declarado vs. efectivo, estado
   y orden del reporte; genera `priorizacion.txt`, `reporte.json` y `reporte.pdf`
   (`--pubmed` verifica PMIDs reales)
-
-> Pendiente: `demo_agente05.py` (Agente 05 — navegación de ensayos, tarjeta #53).
-> El código y los tests ya están; el demo y la evidencia de Trello quedan para la
-> pasada de evidencia (sección 8 de `openspec/changes/agente-05-navegador-ensayos/tasks.md`).
+- `demo_agente05.py` — Agente 05: entrada (candidatas, términos saneados, demografía)
+  → salida (ensayos con compatibilidad, sede, excluidos por edad/sexo, enfermedades
+  raras, estado de cada API y latencia); genera `navegacion.json` y `resumen.txt`.
+  `--sin-red` usa respuestas grabadas y simula la caída de ClinicalTrials.gov,
+  Orphanet y el LLM para mostrar cada fallback (`fallbacks.txt`)
 
 También se corrigió un bug del Sprint 2: falsos positivos en el extractor de
 biomarcadores (regex de anticuerpos y de marcadores de lab). Ver commit `e72e004`.
@@ -254,7 +255,7 @@ tesis-iresm/
 │   └── demo_*.py               ← scripts de verificación por tarea (evidencia Trello):
 │       │                          extraccion, ocr, normalizacion, biomarcadores, pico,
 │       │                          base_agent, agente01, agente03, orquestador,
-│       └─                         clinical_trials, debate, pdf
+│       └─                         clinical_trials, debate, pdf, agente05
 ├── tests/
 │   ├── test_ingesta.py
 │   ├── test_normalizer.py

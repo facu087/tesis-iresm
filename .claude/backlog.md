@@ -217,9 +217,25 @@ se probaron con una corrida real de `POST /api/analyze` sobre el caso de la tesi
 > `trial_search` con el estado de cada API. Contrato JSON **aditivo**: `ClinicalTrial`
 > suma `compatibility`, `compatibility_rationale`, `criteria_to_verify`,
 > `related_hypotheses` y `matched_terms`; `StructuredReport` suma `rare_diseases` y
-> `trial_search` (nulo = reporte anterior al agente). Evidencia: **pendiente**
-> (`scripts/demo_agente05.py`, sección 8 del cambio) junto con la corrida real contra
-> el backend; la tarjeta no puede pasar a QA sin eso.
+> `trial_search` (nulo = reporte anterior al agente). Evidencia:
+> `scripts/demo_agente05.py` (y `--sin-red`, que muestra los cuatro fallbacks sin
+> conexión) + corrida real de `POST /api/analyze` sobre el caso base, artefactos en
+> `output/corrida_agente05/` y `output/demo_agente05/` (locales, gitignoreados).
+>
+> **Medido en la corrida real del 2026-09-15** (294 s en total, sin `ORPHANET_API_KEY`):
+> 21 ensayos únicos, 2 excluidos por edad, 0 por sexo, 10 en el reporte; ambas APIs
+> `ok`, planificación y evaluación `ok`, **0 evaluaciones descartadas** (el LLM no
+> inventó ningún NCT ID). Compatibilidad: 2 `media` y 8 `baja`, ninguna `alta` — el
+> caso es una neuropatía sin diagnóstico y casi todos los ensayos de ATTR piden
+> cardiomiopatía confirmada. Orphanet marcó 1 hipótesis: ORPHA 85443 *AL amyloidosis*.
+> El ensayo con sede en Argentina (NCT07052903) quedó primero dentro de su nivel de
+> compatibilidad, no arriba de todo: la sede desempata, no manda.
+>
+> **Limitación observada**: la búsqueda por relevancia de ClinicalTrials.gov trae
+> ruido (con "Hereditary sensory and autonomic neuropathy" devolvió dos ensayos de
+> tumores sólidos con mutación ATM). No se filtran —solo los filtros deterministas
+> excluyen— pero el LLM los etiquetó `baja` con el motivo explícito, que es lo que
+> hace legible la lista.
 
 ## Hallazgos abiertos (pendientes de decisión)
 

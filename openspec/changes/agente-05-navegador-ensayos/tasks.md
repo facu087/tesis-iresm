@@ -49,13 +49,13 @@
 
 ## 8. Evidencia para Trello
 
-- [ ] 8.1 Crear `scripts/demo_agente05.py` sobre el caso base (neuropatía axonal sensitivomotora, paciente masculino de 42 años) que muestre entrada (candidatas, términos saneados, demografía detectada) → salida (ensayos con compatibilidad, estado de reclutamiento, sede, excluidos por edad/sexo, enfermedades raras, estado de la búsqueda, latencia) y guarde `output/demo_agente05/navegacion.json` y `output/demo_agente05/resumen.txt`; verificar corriéndolo con `GROQ_API_KEY` y con/sin `ORPHANET_API_KEY`
-- [ ] 8.2 Agregar al demo un modo `--sin-red` que use respuestas grabadas y simule la caída de ClinicalTrials.gov, Orphanet y el LLM para mostrar cada fallback; verificar con `python3 scripts/demo_agente05.py --sin-red` sin conexión
+- [x] 8.1 Crear `scripts/demo_agente05.py` sobre el caso base (neuropatía axonal sensitivomotora, paciente masculino de 42 años) que muestre entrada (candidatas, términos saneados, demografía detectada) → salida (ensayos con compatibilidad, estado de reclutamiento, sede, excluidos por edad/sexo, enfermedades raras, estado de la búsqueda, latencia) y guarde `output/demo_agente05/navegacion.json` y `output/demo_agente05/resumen.txt`; verificar corriéndolo con `GROQ_API_KEY` y con/sin `ORPHANET_API_KEY`
+- [x] 8.2 Agregar al demo un modo `--sin-red` que use respuestas grabadas y simule la caída de ClinicalTrials.gov, Orphanet y el LLM para mostrar cada fallback; verificar con `python3 scripts/demo_agente05.py --sin-red` sin conexión
 
 ## 9. Verificación integral
 
 - [x] 9.1 Correr `pytest tests/` completo y verificar que no hay regresiones; correr `openspec validate agente-05-navegador-ensayos` y verificar que pasa
-- [ ] 9.2 Correr `POST /api/analyze` con el caso base contra el backend real y verificar en el JSON que `clinical_trials` trae `compatibility`, que `trial_search` refleja las APIs consultadas y que el PDF exportado muestra la sección nueva
+- [x] 9.2 Correr `POST /api/analyze` con el caso base contra el backend real y verificar en el JSON que `clinical_trials` trae `compatibility`, que `trial_search` refleja las APIs consultadas y que el PDF exportado muestra la sección nueva
 
 ## 10. Documentación
 
