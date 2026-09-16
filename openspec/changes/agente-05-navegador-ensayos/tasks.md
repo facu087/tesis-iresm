@@ -43,9 +43,9 @@
 
 ## 7. Frontend
 
-- [ ] 7.1 Actualizar `frontend/src/lib/types.ts` con los campos opcionales de `ClinicalTrial`, `RareDiseaseMatch`, `TrialSearchSummary`, `rare_diseases?` y `trial_search?`; verificar que `npm run lint` y `npm run build` en `frontend/` terminan sin errores
+- [x] 7.1 Actualizar `frontend/src/lib/types.ts` con los campos opcionales de `ClinicalTrial`, `RareDiseaseMatch`, `TrialSearchSummary`, `rare_diseases?` y `trial_search?`; verificar que `npm run lint` y `npm run build` en `frontend/` terminan sin errores
 - [ ] 7.2 Actualizar `EnsayosTab` en `frontend/src/app/report/page.tsx` (badge de compatibilidad, señal de "Aún no recluta" y de sede en Argentina, fundamento, criterios a verificar, hipótesis relacionadas, bloque Orphanet, aclaración, aviso de estado y `EmptyState` que distingue "sin resultados" de "no se pudo consultar"; render actual si `trial_search` es nulo); verificar con `npm run build` y abriendo la vista con un reporte nuevo y con uno previo guardado en `output/` (captura para Trello)
-- [ ] 7.3 Actualizar el texto del paso de reporte en `frontend/src/app/analyzing/page.tsx` para nombrar al Agente 05; verificar visualmente en `npm run dev`
+- [x] 7.3 Actualizar el texto del paso de reporte en `frontend/src/app/analyzing/page.tsx` para nombrar al Agente 05; verificar visualmente en `npm run dev`
 
 ## 8. Evidencia para Trello
 
