@@ -72,14 +72,23 @@ Backend mergeado a `develop` (capa de recuperación de evidencia / RAG). Autor: 
 - [x] PDF: estado de verificación en el reporte exportado (backend/pipeline/pdf_exporter.py)
 - [ ] Agente 02 (Especialista Genómica): prompt + llamada LLM + parseo JSON
 - [ ] Agente 04 (Árbitro Verificador): verificación bibliográfica de cada hipótesis
-- [ ] Agente 05 (Navegador de Ensayos): ClinicalTrials.gov + Orphanet
+- [x] Agente 05 (Navegador de Ensayos): ClinicalTrials.gov + Orphanet
+      (backend/agents/agent_05_trials.py + backend/pipeline/trial_matching.py)
 - [ ] Agente 06 (Sintetizador): reporte final — reemplaza a `pipeline/report_builder.py`
 - [x] Priorización de hipótesis por nivel de evidencia EBM (I, II, III) (backend/pipeline/evidence.py)
 
-> El RAG y el verificador de PMIDs ya corren en el flujo de `POST /api/analyze`:
-> el RAG enriquece el contexto de la Ronda 1 (`pipeline/orchestrator.py`,
-> `_enrich_context_with_rag`) y la verificación es el paso 7 de `api/router.py`.
-> Falta la parte de **síntesis** del Agente 04 y los agentes 02, 05 y 06.
+> El RAG, el verificador de PMIDs y el Agente 05 ya corren en el flujo de
+> `POST /api/analyze`: el RAG enriquece el contexto de la Ronda 1
+> (`pipeline/orchestrator.py`, `_enrich_context_with_rag`), y la navegación de
+> ensayos y la verificación corren en paralelo después del debate
+> (`asyncio.gather` en `api/router.py`). Falta la parte de **síntesis** del
+> Agente 04 y los agentes 02 y 06.
+>
+> El Agente 05 es **híbrido**: el LLM solo traduce hipótesis a términos de
+> condición en inglés y etiqueta compatibilidad (`alta`/`media`/`baja`); la
+> búsqueda, los filtros duros por edad y sexo, la coincidencia exacta con
+> Orphanet y el orden del resultado son deterministas y viven en
+> `pipeline/trial_matching.py`. El LLM nunca excluye un ensayo.
 
 #### Numeración de agentes (canónica)
 
@@ -89,7 +98,7 @@ Backend mergeado a `develop` (capa de recuperación de evidencia / RAG). Autor: 
 | 02 | Especialista Genómica | 📋 Pendiente |
 | 03 | Consultor Clínico | ✅ Implementado |
 | 04 | Árbitro Verificador | 📋 Pendiente |
-| 05 | Navegador de Ensayos | 📋 Pendiente |
+| 05 | Navegador de Ensayos | ✅ Implementado |
 | 06 | Sintetizador | 📋 Pendiente |
 
 > La **fuente de verdad** de la numeración y los roles es la tabla de
@@ -153,6 +162,10 @@ Scripts disponibles:
   y orden del reporte; genera `priorizacion.txt`, `reporte.json` y `reporte.pdf`
   (`--pubmed` verifica PMIDs reales)
 
+> Pendiente: `demo_agente05.py` (Agente 05 — navegación de ensayos, tarjeta #53).
+> El código y los tests ya están; el demo y la evidencia de Trello quedan para la
+> pasada de evidencia (sección 8 de `openspec/changes/agente-05-navegador-ensayos/tasks.md`).
+
 También se corrigió un bug del Sprint 2: falsos positivos en el extractor de
 biomarcadores (regex de anticuerpos y de marcadores de lab). Ver commit `e72e004`.
 
@@ -181,6 +194,7 @@ tesis-iresm/
 │   │   ├── base_agent.py           ← clase base ABC con interfaz común
 │   │   ├── agent_01_literature.py  ← Analista de Literatura (Groq)
 │   │   ├── agent_03_clinical.py    ← Consultor Clínico (Groq)
+│   │   ├── agent_05_trials.py      ← Navegador de Ensayos (S4) — navigate(), no debate
 │   │   └── __init__.py
 │   ├── ingestion/
 │   │   ├── extractor.py            ← PDF nativo (pdfplumber) + OCR (Tesseract)
@@ -192,7 +206,7 @@ tesis-iresm/
 │   │   ├── report.py           ← AgentOutput, Report
 │   │   ├── case.py             ← ClinicalCase, PICOSynthesis
 │   │   ├── biomarkers.py       ← BiomarkerProfile
-│   │   ├── trial.py            ← ClinicalTrial
+│   │   ├── trial.py            ← ClinicalTrial + contrato del Agente 05 (S4)
 │   │   └── __init__.py
 │   ├── pipeline/
 │   │   ├── pico.py             ← build() síntesis PICO + format_for_agents()
@@ -200,6 +214,8 @@ tesis-iresm/
 │   │   ├── debate.py           ← motor de debate adversarial (Rondas 2–4)
 │   │   ├── verification.py     ← verificación de PMIDs citados contra PubMed (S4)
 │   │   ├── evidence.py         ← clasificación EBM: tope de nivel, estado y orden (S4)
+│   │   ├── trial_matching.py   ← lógica determinista del Agente 05: términos,
+│   │   │                          filtros edad/sexo, Orphanet, orden (S4)
 │   │   ├── report_builder.py   ← generación de JSON estructurado del reporte
 │   │   ├── pdf_exporter.py     ← exportación a PDF con ReportLab
 │   │   └── __init__.py
@@ -321,9 +337,10 @@ proveedor: `BaseAgent._call_llm()` instancia el cliente de Groq directamente
 (`backend/agents/base_agent.py`). El swap a Claude / GPT-4o / Gemini se hace en
 ese único método, agregando despacho por proveedor.
 
-Vale tenerlo en cuenta al escribir los agentes 02, 04, 05 y 06: si cada uno
+Vale tenerlo en cuenta al escribir los agentes 02, 04 y 06: si cada uno
 asume la firma de Groq en lugar de delegar en `_call_llm()`, el swap se
-multiplica por la cantidad de agentes.
+multiplica por la cantidad de agentes. El Agente 05 ya sigue esa regla:
+sus dos llamadas pasan por `self._call_llm()` (vía `asyncio.to_thread`).
 
 ---
 
@@ -373,7 +390,10 @@ GOOGLE_API_KEY=         # Gemini Pro — Agente 03
 
 # APIs científicas
 PUBMED_API_KEY=         # Opcional, aumenta rate limit
-ORPHANET_API_KEY=       # Requiere registro en orphanet.org
+ORPHANET_API_KEY=       # Opcional: la API responde sin credencial (medido el
+                        # 2026-09-15, 10 de 10 llamadas). Si está definida se
+                        # manda en el header apiKey; si no, el cliente manda un
+                        # valor por defecto que el servicio acepta.
 
 # RAG — embeddings (opcional)
 NEXUS_EMBEDDING_MODEL=  # Sobreescribe el modelo de embeddings del RAG.

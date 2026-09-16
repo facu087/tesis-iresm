@@ -44,7 +44,7 @@
 ## 7. Frontend
 
 - [x] 7.1 Actualizar `frontend/src/lib/types.ts` con los campos opcionales de `ClinicalTrial`, `RareDiseaseMatch`, `TrialSearchSummary`, `rare_diseases?` y `trial_search?`; verificar que `npm run lint` y `npm run build` en `frontend/` terminan sin errores
-- [ ] 7.2 Actualizar `EnsayosTab` en `frontend/src/app/report/page.tsx` (badge de compatibilidad, señal de "Aún no recluta" y de sede en Argentina, fundamento, criterios a verificar, hipótesis relacionadas, bloque Orphanet, aclaración, aviso de estado y `EmptyState` que distingue "sin resultados" de "no se pudo consultar"; render actual si `trial_search` es nulo); verificar con `npm run build` y abriendo la vista con un reporte nuevo y con uno previo guardado en `output/` (captura para Trello)
+- [x] 7.2 Actualizar `EnsayosTab` en `frontend/src/app/report/page.tsx` (badge de compatibilidad, señal de "Aún no recluta" y de sede en Argentina, fundamento, criterios a verificar, hipótesis relacionadas, bloque Orphanet, aclaración, aviso de estado y `EmptyState` que distingue "sin resultados" de "no se pudo consultar"; render actual si `trial_search` es nulo); verificar con `npm run build` y abriendo la vista con un reporte nuevo y con uno previo guardado en `output/` (captura para Trello)
 - [x] 7.3 Actualizar el texto del paso de reporte en `frontend/src/app/analyzing/page.tsx` para nombrar al Agente 05; verificar visualmente en `npm run dev`
 
 ## 8. Evidencia para Trello
@@ -54,11 +54,11 @@
 
 ## 9. Verificación integral
 
-- [ ] 9.1 Correr `pytest tests/` completo y verificar que no hay regresiones; correr `openspec validate agente-05-navegador-ensayos` y verificar que pasa
+- [x] 9.1 Correr `pytest tests/` completo y verificar que no hay regresiones; correr `openspec validate agente-05-navegador-ensayos` y verificar que pasa
 - [ ] 9.2 Correr `POST /api/analyze` con el caso base contra el backend real y verificar en el JSON que `clinical_trials` trae `compatibility`, que `trial_search` refleja las APIs consultadas y que el PDF exportado muestra la sección nueva
 
 ## 10. Documentación
 
-- [ ] 10.1 Actualizar `.claude/CLAUDE.md`: marcar el Agente 05 como implementado en Sprint 4 y en la tabla de numeración, sumar `agent_05_trials.py`, `pipeline/trial_matching.py` y `demo_agente05.py` a la estructura y a la lista de demos; verificar releyendo que no queden referencias a "Agente 05 pendiente"
-- [ ] 10.2 Actualizar `.claude/backlog.md`: tarea 10 del Sprint 4 como hecha con su evidencia, y dejar anotado el hallazgo abierto de los genes de enfermedades raras (la ORPHAcodes API no los expone; están en Orphadata, `api.orphadata.com/rd-associated-genes/orphacodes/{code}`, en tarjeta aparte); verificar que la tabla de hallazgos quedó con archivo y línea
-- [ ] 10.3 Actualizar `.claude/architecture.md` (Agente 05 en paralelo con la verificación hasta que exista el Árbitro, estados de reclutamiento consultados, orden del resultado, campos nuevos de `ClinicalTrial` y `StructuredReport`) y el comentario de `ORPHANET_API_KEY` en `.env.example`, que es opcional porque la API responde sin credencial; verificar que el diagrama y la sección "APIs externas" coinciden con el código
+- [x] 10.1 Actualizar `.claude/CLAUDE.md`: marcar el Agente 05 como implementado en Sprint 4 y en la tabla de numeración, sumar `agent_05_trials.py`, `pipeline/trial_matching.py` y `demo_agente05.py` a la estructura y a la lista de demos; verificar releyendo que no queden referencias a "Agente 05 pendiente"
+- [x] 10.2 Actualizar `.claude/backlog.md`: tarea 10 del Sprint 4 como hecha con su evidencia, y dejar anotado el hallazgo abierto de los genes de enfermedades raras (la ORPHAcodes API no los expone; están en Orphadata, `api.orphadata.com/rd-associated-genes/orphacodes/{code}`, en tarjeta aparte); verificar que la tabla de hallazgos quedó con archivo y línea
+- [x] 10.3 Actualizar `.claude/architecture.md` (Agente 05 en paralelo con la verificación hasta que exista el Árbitro, estados de reclutamiento consultados, orden del resultado, campos nuevos de `ClinicalTrial` y `StructuredReport`) y el comentario de `ORPHANET_API_KEY` en `.env.example`, que es opcional porque la API responde sin credencial; verificar que el diagrama y la sección "APIs externas" coinciden con el código
