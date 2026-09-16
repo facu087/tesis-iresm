@@ -110,12 +110,16 @@ class TestRunRound1:
         output_03 = _make_agent_output("03", "Consultor Clínico", Priority.MEDIUM)
 
         with patch("backend.pipeline.orchestrator.LiteratureAnalystAgent") as MockA01, \
+             patch("backend.pipeline.orchestrator.GenomicsSpecialistAgent") as MockA02, \
              patch("backend.pipeline.orchestrator.ClinicalConsultantAgent") as MockA03:
 
             MockA01.return_value.AGENT_ID = "01"
             MockA01.return_value.AGENT_NAME = "Analista de Literatura"
             MockA01.return_value.run.return_value = output_01
 
+            MockA02.return_value.AGENT_ID = "02"
+            MockA02.return_value.AGENT_NAME = "Especialista Genomica"
+            MockA02.return_value.run.side_effect = RuntimeError("Agente 02 fuera de este test")
             MockA03.return_value.AGENT_ID = "03"
             MockA03.return_value.AGENT_NAME = "Consultor Clínico"
             MockA03.return_value.run.return_value = output_03
@@ -132,10 +136,14 @@ class TestRunRound1:
         output_03 = _make_agent_output("03", "Consultor Clínico", Priority.MEDIUM)
 
         with patch("backend.pipeline.orchestrator.LiteratureAnalystAgent") as MockA01, \
+             patch("backend.pipeline.orchestrator.GenomicsSpecialistAgent") as MockA02, \
              patch("backend.pipeline.orchestrator.ClinicalConsultantAgent") as MockA03:
             MockA01.return_value.AGENT_ID = "01"
             MockA01.return_value.AGENT_NAME = "Analista de Literatura"
             MockA01.return_value.run.return_value = output_01
+            MockA02.return_value.AGENT_ID = "02"
+            MockA02.return_value.AGENT_NAME = "Especialista Genomica"
+            MockA02.return_value.run.side_effect = RuntimeError("Agente 02 fuera de este test")
             MockA03.return_value.AGENT_ID = "03"
             MockA03.return_value.AGENT_NAME = "Consultor Clínico"
             MockA03.return_value.run.return_value = output_03
@@ -151,10 +159,14 @@ class TestRunRound1:
         output_03 = _make_agent_output("03", "Consultor Clínico", Priority.HIGH)
 
         with patch("backend.pipeline.orchestrator.LiteratureAnalystAgent") as MockA01, \
+             patch("backend.pipeline.orchestrator.GenomicsSpecialistAgent") as MockA02, \
              patch("backend.pipeline.orchestrator.ClinicalConsultantAgent") as MockA03:
             MockA01.return_value.AGENT_ID = "01"
             MockA01.return_value.AGENT_NAME = "Analista de Literatura"
             MockA01.return_value.run.side_effect = RuntimeError("API caída")
+            MockA02.return_value.AGENT_ID = "02"
+            MockA02.return_value.AGENT_NAME = "Especialista Genomica"
+            MockA02.return_value.run.side_effect = RuntimeError("Agente 02 fuera de este test")
             MockA03.return_value.AGENT_ID = "03"
             MockA03.return_value.AGENT_NAME = "Consultor Clínico"
             MockA03.return_value.run.return_value = output_03
@@ -168,10 +180,14 @@ class TestRunRound1:
         case = ClinicalCase(raw_text="texto", pico=_make_pico())
 
         with patch("backend.pipeline.orchestrator.LiteratureAnalystAgent") as MockA01, \
+             patch("backend.pipeline.orchestrator.GenomicsSpecialistAgent") as MockA02, \
              patch("backend.pipeline.orchestrator.ClinicalConsultantAgent") as MockA03:
             MockA01.return_value.AGENT_ID = "01"
             MockA01.return_value.AGENT_NAME = "Analista de Literatura"
             MockA01.return_value.run.side_effect = RuntimeError("fallo")
+            MockA02.return_value.AGENT_ID = "02"
+            MockA02.return_value.AGENT_NAME = "Especialista Genomica"
+            MockA02.return_value.run.side_effect = RuntimeError("Agente 02 fuera de este test")
             MockA03.return_value.AGENT_ID = "03"
             MockA03.return_value.AGENT_NAME = "Consultor Clínico"
             MockA03.return_value.run.side_effect = RuntimeError("fallo")
