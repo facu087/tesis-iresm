@@ -198,3 +198,72 @@ class TestAtribucion:
             out = agente.run("contexto")
         assert out.agent_id == "02"
         assert out.agent_name == "Especialista Genómica"
+
+    def test_hipotesis_ronda4_agente02_aparece_en_supporting_agents(self):
+        """
+        Un Report con una hipótesis del Ag02 en la Ronda 4 pasa por build_export()
+        y la hipótesis exportada lista 'Especialista Genómica' en supporting_agents.
+        """
+        from backend.models.case import ClinicalCase, PICOSynthesis
+        from backend.models.hypothesis import Hypothesis
+        from backend.models.report import DebateRound, Report
+        from backend.models.trial import ClinicalTrial
+        from backend.pipeline.report_builder import build_export
+
+        texto_hipotesis = "Evaluar variante TTR p.Val30Met como causa de amiloidosis"
+
+        h = Hypothesis(
+            text=texto_hipotesis,
+            priority=Priority.HIGH,
+            evidence_level=EvidenceLevel.II,
+            rationale="Variante patogénica en contexto clínico compatible.",
+        )
+
+        # Output de Ronda 1 (Ag02 participa)
+        out_r1 = AgentOutput(
+            agent_id="02",
+            agent_name="Especialista Genómica",
+            hypotheses=[h],
+            raw_response="{}",
+        )
+
+        # Output de Ronda 4 (revisión final del Ag02)
+        out_r4 = AgentOutput(
+            agent_id="02",
+            agent_name="Especialista Genómica",
+            hypotheses=[h],
+            raw_response="{}",
+        )
+
+        ronda4 = DebateRound(round_number=4, agent_outputs=[out_r4])
+
+        report = Report(
+            case_summary="Caso de prueba.",
+            hypotheses=[h],
+            agent_outputs=[out_r1],
+            debate_rounds=[ronda4],
+            sources_summary={"I": 0, "II": 0, "III": 0},
+        )
+
+        pico = PICOSynthesis(
+            patient_profile="Masculino 67 años",
+            chief_complaint="Polineuropatía axonal",
+            relevant_history=[],
+            negative_findings=[],
+            disease_duration="2 años",
+            current_treatments=[],
+            procedures_done=[],
+            comparison="No aplica",
+            primary_outcome="Identificar etiología",
+            secondary_outcomes=[],
+            biomarkers=[],
+            genetic_findings=[],
+            clinical_narrative="Narrativa de prueba.",
+        )
+        case = ClinicalCase(raw_text="texto", pico=pico)
+
+        structured = build_export(case, report, [], 1.0)
+        hipotesis_exportada = next(
+            h for h in structured.hypotheses if texto_hipotesis in h.text
+        )
+        assert "Especialista Genómica" in hipotesis_exportada.supporting_agents

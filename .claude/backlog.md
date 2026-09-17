@@ -108,7 +108,7 @@ Suite de tests: **82 tests, 100% passing** (`pytest tests/`)
 | 5 | Cliente Orphanet API: búsqueda de enfermedades raras | ✅ Hecho |
 | 6 | Cliente PharmGKB: relaciones fármaco-genómicas | ✅ Hecho |
 | 7 | Gestión de rate limits y fallbacks en APIs externas | ✅ Hecho |
-| 8 | Agente 02 (Especialista Genómica): prompt + llamada GPT-4o + parseo JSON | 📋 Pendiente |
+| 8 | Agente 02 (Especialista Genómica): prompt + llamada Groq + parseo JSON | ✅ Hecho (`agents/agent_02_genomics.py`, `pipeline/genomic_context.py`, `models/genomics.py`) |
 | 9 | Agente 04 (Árbitro Verificador): síntesis y verificación bibliográfica externa | ⚠️ Parcial |
 | 10 | Agente 05 (Navegador de Ensayos): búsqueda en ClinicalTrials + Orphanet | ✅ Hecho (`agents/agent_05_trials.py`, `pipeline/trial_matching.py`) |
 | 11 | Priorización de hipótesis por nivel de evidencia EBM (I, II, III) | ✅ Hecho (`pipeline/evidence.py`) |
@@ -120,6 +120,13 @@ Suite de tests: **82 tests, 100% passing** (`pytest tests/`)
 | 17 | Fix: comentarios en línea del `.env.example` se cargaban como valor de la clave | ✅ Hecho |
 | 18 | Vista de reporte: mostrar el estado de verificación de hipótesis y fuentes (EP-08) | ✅ Hecho |
 | 19 | PDF: incluir el estado de verificación en el reporte exportado (EP-07) | ✅ Hecho |
+
+> Nota (8) — El agente usa `GenomicContext` (construido antes de la Ronda 1 por
+> `pipeline/genomic_context.py`) con contexto de PharmGKB; incluye guarda anti-invención
+> (degrada a LOW con "ADVERTENCIA:" cualquier hallazgo genético no presente en el caso) y
+> modo orientación (sin variantes confirmadas). PharmGKB usa datos simulados (sin apiKey
+> real): pendiente tarjeta separada para integrar respuestas reales. ClinVar también
+> pendiente (tarjeta #71). PRs: #12 (agente) y #18 (fix regex genes con dígito intermedio).
 
 > Nota (12) — **RESUELTA**: se integró la búsqueda semántica RAG como contexto
 > bibliográfico en `backend/pipeline/orchestrator.py` (Ronda 1), y desde la tarea 16
@@ -246,7 +253,7 @@ decisiones de fondo y distinto texto. Se resolvió en el merge del PR #13.
 
 | Responsable | Tarjetas | Área / archivos |
 |---|---|---|
-| **Facundo** | #51 Agente 02 (en curso), #73 fix del regex de genes, #71 cliente ClinVar | Genómica e ingesta: `orchestrator.py`, `debate.py`, `models/case.py`, `pharmgkb.py`, `biomarker_extractor.py`, `external/clinvar.py` |
+| **Facundo** | #51 Agente 02 (✅ hecho, PR #12), #73 fix regex genes (✅ hecho, PR #18), #71 cliente ClinVar (📋 pendiente) | Genómica e ingesta: `orchestrator.py`, `debate.py`, `models/case.py`, `pharmgkb.py`, `biomarker_extractor.py`, `external/clinvar.py` |
 | **Matías** | #52 Agente 04 (Árbitro) + hallazgo G | Verificación: `verification.py`, `evidence.py`, paso 7 del router, `base_agent.parse_hypotheses()` |
 | **Fede** | #74 cliente Orphadata, hallazgos A, B y H, arreglos del PDF (portada y celdas del resumen), y los dos arreglos manuales de Trello (#65 adjunto duplicado, #63 PNG sin extensión) | RAG, frontend y calidad: `rag/retriever.py`, `tests/test_rag_integration.py`, `pdf_exporter.py`, `frontend/` |
 | **Sin asignar** | #62 Agente 06 (Sintetizador) | Va **última**: depende de que exista el Agente 04 y pisa el `pdf_exporter.py` que toca Fede. La toma quien se libere primero. |
@@ -270,7 +277,7 @@ el alcance de la tarea en la que aparecieron. Con archivo y línea, para retomar
 | C | Ningún modelo de embeddings maneja la **negación**: con "negative CMT panel" en la query, los tres modelos evaluados traen Charcot-Marie-Tooth arriba. El hallazgo negativo llega al agente por `negative_findings`, así que el razonamiento puede corregirlo, pero el recuperador no filtra por él. Limitación conocida, vale documentarla en la tesis. | `backend/rag/chroma_store.py` (docstring) |
 | D | `master` está **62 commits detrás** de `develop`: Sprints 2, 3 y 4 sin liberar. Decisión del equipo: se promueve cuando haya una versión del sistema, no por etapa. | — |
 | E | **OpenSpec**: **adoptado** (v1.11.0, rama `chore/s4-openspec`). Alcance: los 4 agentes que faltan (02, 04, 05, 06) y las reglas de clasificación EBM — sin backfillear los Sprints 1–3. Uso en `.claude/CLAUDE.md` § "Spec-driven con OpenSpec". | `openspec/config.yaml` |
-| F | El extractor de biomarcadores devuelve **`genes=['CMT']`** en el caso base: `CMT`, `FAP` y `ATTR` están en `_KNOWN_GENES`, pero son enfermedades o paneles, no genes. Además `tests/test_biomarkers.py` no es un test de pytest (es un script con `main()`, pytest recolecta 0 tests) y exige que `CMT` salga como gen. Por esto la tarjeta #68 no pasó a QA. | `backend/ingestion/biomarker_extractor.py:65-67`, `tests/test_biomarkers.py:63-66` |
+| F | ✅ **RESUELTO PARCIAL** (tarjeta #73, `fix/s4-regex-genes-digito-intermedio`, PR #18). El regex `_GENE_PATTERN` era `[A-Z]{2,6}\d{0,2}` y no detectaba genes con dígito en medio del símbolo (SCN1A, SCN9A, SH3TC2, DYNC1H1). Se reemplazó por `[A-Z][A-Z0-9]{1,7}` (convención HGNC). Se removieron los `@pytest.mark.xfail(strict=True)` de los 4 tests afectados (ahora 33 passed). **Pendiente de la tarjeta original #68**: `CMT`, `FAP` y `ATTR` siguen siendo enfermedades/paneles en `_KNOWN_GENES`; su limpieza excede el alcance del fix #73. | `backend/ingestion/biomarker_extractor.py`, `tests/test_biomarkers.py` |
 | G | `BaseAgent.parse_hypotheses()` arma `Source(**s)` con lo que manda el LLM, así que acepta `verified`, `verification_status` o `publication_types` autodeclarados. La clasificación EBM y `_annotate_source()` ya los ignoran/limpian, pero conviene sanearlos en el parseo (lo toca el Agente 04). | `backend/agents/base_agent.py:92` |
 | H | Lint del frontend con 1 error y 1 warning **previos** a la priorización EBM: `setState` síncrono en un effect (`report/page.tsx`, `useEffect` de carga del reporte) y un `eslint-disable` sin uso (`analyzing/page.tsx:120`). `next build` no corre lint, así que no bloquea el build. Sigue igual después del Agente 05: el error es del effect que lee `sessionStorage`, ajeno a la tab de ensayos. | `frontend/src/app/report/page.tsx`, `frontend/src/app/analyzing/page.tsx:120` |
 | I | **Los genes de enfermedades raras no están en la ORPHAcodes API**: expone 32 rutas y ninguna de genes (es una API de nomenclatura). `get_genes()` levanta `OrphanetGenesNoDisponibles` en vez de mentir con `[]`. Están en Orphadata, otro host y otro producto: `GET https://api.orphadata.com/rd-associated-genes/orphacodes/{code}` (200, CC-BY-4.0, sin apiKey; 404 = esa enfermedad no tiene asociación génica). Integrarlo va en **tarjeta aparte**: el Agente 05 no depende de ellos. | `backend/external/orphanet.py:255` (`get_genes`), docstring del módulo |

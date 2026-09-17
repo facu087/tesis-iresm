@@ -92,6 +92,7 @@ class ClinicalCase(BaseModel):
     raw_text: str                               # texto clínico original (ya anonimizado)
     pico: PICOSynthesis | None = None           # se completa tras el análisis PICO
     biomarkers: BiomarkerProfile | None = None  # se completa tras la extracción
+    genomic_context: GenomicContext | None = None  # se completa antes de la Ronda 1
 ```
 
 ### PICOSynthesis — `backend/models/case.py`
@@ -143,6 +144,24 @@ class BiomarkerProfile(BaseModel):
 
     def is_empty(self) -> bool: ...
     def summary(self) -> str: ...      # resumen compacto para logs y debugging
+```
+
+### GenomicContext — `backend/models/genomics.py`
+Perfil genómico determinístico que se construye antes de la Ronda 1 (sin LLM) y se
+pasa como contexto al Agente 02. Lo construye `backend/pipeline/genomic_context.py`.
+
+```python
+class GenomicContext(BaseModel):
+    variants: list[str] = []              # variantes confirmadas (ej: p.Val30Met)
+    genetic_findings: list[str] = []      # hallazgos textuales del caso
+    genes: list[str] = []                 # genes saneados (sin acrónimos clínicos)
+    discarded_symbols: frozenset[str] = frozenset()  # acrónimos filtrados
+    negative_genetic_studies: list[str] = []  # paneles negativos
+    annotations: list[PharmGKBAnnotation] = []  # relaciones fármaco-gen (PharmGKB)
+    sources: list[GenomicSource] = []     # estado de cada fuente consultada
+
+    def to_prompt_block(self) -> str: ... # formatea el contexto para el prompt
+    def is_orientation_mode(self) -> bool: ...  # True si no hay variantes confirmadas
 ```
 
 ### Hypothesis — `backend/models/hypothesis.py`
@@ -344,7 +363,7 @@ El declarado queda en `declared_evidence_level` y la explicación en `evidence_n
 | ID | Rol | Modelo (prod) | Modelo (proto) | Herramientas |
 |----|-----|---------------|----------------|--------------|
 | agente_01 | Analista de Literatura | Claude Opus | Groq `gpt-oss-120b` | PubMed API, RAG |
-| agente_02 | Especialista Genómica | GPT-4o | Groq `gpt-oss-120b` | PharmGKB, ClinVar |
+| agente_02 | Especialista Genómica ✅ | GPT-4o | Groq `gpt-oss-120b` | PharmGKB; ClinVar pendiente |
 | agente_03 | Consultor Clínico | Gemini Pro | Groq `gpt-oss-120b` | NCCN Guidelines |
 | agente_04 | Árbitro Verificador | Claude Opus | Groq `gpt-oss-120b` | PubMed, ESMO, EMA |
 | agente_05 | Navegador de Ensayos ✅ | Dedicado | Groq `gpt-oss-120b` | ClinicalTrials.gov, Orphanet |

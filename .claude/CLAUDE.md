@@ -70,7 +70,8 @@ Backend mergeado a `develop` (capa de recuperación de evidencia / RAG). Autor: 
 - [x] Verificación bibliográfica de PMIDs: título real vs. citado (backend/pipeline/verification.py)
 - [x] Vista de reporte: estado de verificación de hipótesis y fuentes (frontend/src/app/report/page.tsx)
 - [x] PDF: estado de verificación en el reporte exportado (backend/pipeline/pdf_exporter.py)
-- [ ] Agente 02 (Especialista Genómica): prompt + llamada LLM + parseo JSON
+- [x] Agente 02 (Especialista Genómica): prompt + llamada LLM + parseo JSON
+      (backend/agents/agent_02_genomics.py + backend/models/genomics.py + backend/pipeline/genomic_context.py)
 - [ ] Agente 04 (Árbitro Verificador): verificación bibliográfica de cada hipótesis
 - [x] Agente 05 (Navegador de Ensayos): ClinicalTrials.gov + Orphanet
       (backend/agents/agent_05_trials.py + backend/pipeline/trial_matching.py)
@@ -95,7 +96,7 @@ Backend mergeado a `develop` (capa de recuperación de evidencia / RAG). Autor: 
 | ID | Rol | Estado |
 |----|-----|--------|
 | 01 | Analista de Literatura | ✅ Implementado |
-| 02 | Especialista Genómica | 📋 Pendiente |
+| 02 | Especialista Genómica | ✅ Implementado |
 | 03 | Consultor Clínico | ✅ Implementado |
 | 04 | Árbitro Verificador | 📋 Pendiente |
 | 05 | Navegador de Ensayos | ✅ Implementado |
@@ -161,6 +162,10 @@ Scripts disponibles:
 - `demo_priorizacion_evidencia.py` — priorización EBM: nivel declarado vs. efectivo, estado
   y orden del reporte; genera `priorizacion.txt`, `reporte.json` y `reporte.pdf`
   (`--pubmed` verifica PMIDs reales)
+- `demo_agente02.py` — Agente 02: dos escenarios (caso base sin hallazgos genéticos y TTR
+  p.Val30Met); muestra perfil genómico, bloque enviado al LLM e hipótesis generadas con
+  guarda anti-invención; guarda `contexto_caso_base.json`, `hipotesis_caso_base.json`,
+  `contexto_ttr.json` e `hipotesis_ttr.json`
 - `demo_agente05.py` — Agente 05: entrada (candidatas, términos saneados, demografía)
   → salida (ensayos con compatibilidad, sede, excluidos por edad/sexo, enfermedades
   raras, estado de cada API y latencia); genera `navegacion.json` y `resumen.txt`.
@@ -194,6 +199,7 @@ tesis-iresm/
 │   ├── agents/
 │   │   ├── base_agent.py           ← clase base ABC con interfaz común
 │   │   ├── agent_01_literature.py  ← Analista de Literatura (Groq)
+│   │   ├── agent_02_genomics.py    ← Especialista Genómica (Groq + PharmGKB)
 │   │   ├── agent_03_clinical.py    ← Consultor Clínico (Groq)
 │   │   ├── agent_05_trials.py      ← Navegador de Ensayos (S4) — navigate(), no debate
 │   │   └── __init__.py
@@ -205,12 +211,14 @@ tesis-iresm/
 │   ├── models/
 │   │   ├── hypothesis.py       ← Hypothesis, Priority, EvidenceLevel, Source
 │   │   ├── report.py           ← AgentOutput, Report
-│   │   ├── case.py             ← ClinicalCase, PICOSynthesis
+│   │   ├── case.py             ← ClinicalCase, PICOSynthesis (+ genomic_context)
+│   │   ├── genomics.py         ← GenomicContext, PharmacogenomicAnnotation (S4)
 │   │   ├── biomarkers.py       ← BiomarkerProfile
 │   │   ├── trial.py            ← ClinicalTrial + contrato del Agente 05 (S4)
 │   │   └── __init__.py
 │   ├── pipeline/
 │   │   ├── pico.py             ← build() síntesis PICO + format_for_agents()
+│   │   ├── genomic_context.py  ← build() determinístico + enrich() async (S4)
 │   │   ├── orchestrator.py     ← distribución paralela asyncio (Ronda 1)
 │   │   ├── debate.py           ← motor de debate adversarial (Rondas 2–4)
 │   │   ├── verification.py     ← verificación de PMIDs citados contra PubMed (S4)
@@ -323,7 +331,7 @@ backfillean los Sprints 1–3. Requiere el CLI: `npm install -g @fission-ai/open
 > GPT-4o (agente 02) y Gemini Pro (agente 03).
 
 Constantes disponibles en `base_agent.py`:
-- `GROQ_MAIN = "openai/gpt-oss-120b"` — modelo principal (agentes 01, 03, 06)
+- `GROQ_MAIN = "openai/gpt-oss-120b"` — modelo principal (agentes 01, 02, 03 y 06)
 - `GROQ_FAST = "openai/gpt-oss-20b"` — tareas simples/rápidas
 
 > ⚠ Groq dio de baja los LLaMA 3.x (`llama-3.3-70b-versatile` y
