@@ -485,3 +485,79 @@ class TestEnsayosNavegados:
         texto = _texto_del_pdf(generate_pdf(report))
         assert "SIN EVALUAR" in texto
         assert "la evaluación de compatibilidad no se pudo completar" in texto
+
+
+class TestPdfConArbitraje:
+    """
+    El PDF es lo que lee el médico: el consenso, sus objeciones y la aclaración
+    de que lo produjo un panel de IA tienen que estar ahí (tarea 9.4).
+    """
+
+    @staticmethod
+    def _reporte_con_arbitraje() -> StructuredReport:
+        from backend.api.schemas import ArbitrationOut, ContradictionOut, RecitationOut
+
+        reporte = _make_report()
+        h = reporte.hypotheses[0]
+        h.arbiter_note = "Sostenida por dos agentes, con una objeción abierta."
+        h.refuting_agents = ["Consultor Clínico"]
+        h.contradictions = [ContradictionOut(
+            from_agent_name="Consultor Clínico", severity="HIGH",
+            critique_text="Sin biopsia no se sostiene.",
+        )]
+        h.recitation = "mejorada"
+        reporte.arbitration = ArbitrationOut(
+            status="ok", input_hypotheses=9, consensus_hypotheses=4, contradictions=1,
+            cited_sources=15, rag_overlap=0, retrieved_articles=5,
+            recitation=RecitationOut(executed=True, recited=3, improved=1, rejected_pmids=2),
+        )
+        return reporte
+
+    def test_genera_pdf_valido(self):
+        pdf = generate_pdf(self._reporte_con_arbitraje())
+        assert pdf.startswith(b"%PDF")
+
+    def test_la_portada_informa_la_consolidacion(self):
+        texto = _texto_del_pdf(generate_pdf(self._reporte_con_arbitraje()))
+        assert "consolidadas por el Árbitro" in texto
+        assert "9" in texto and "4" in texto
+
+    def test_la_portada_informa_el_solapamiento_con_el_rag(self):
+        """El dato que justifica que el Árbitro exista."""
+        texto = _texto_del_pdf(generate_pdf(self._reporte_con_arbitraje()))
+        assert "literatura recuperada" in texto
+
+    def test_la_portada_aclara_que_el_consenso_es_entre_agentes_de_ia(self):
+        # El salto de línea del PDF cae en cualquier lado: se normaliza antes
+        # de afirmar sobre la frase.
+        texto = " ".join(_texto_del_pdf(generate_pdf(self._reporte_con_arbitraje())).split())
+        assert "panel de agentes de inteligencia artificial" in texto
+        assert "No constituyen un diagnóstico ni una recomendación clínica" in texto
+
+    def test_el_veredicto_y_la_objecion_van_junto_a_la_hipotesis(self):
+        texto = _texto_del_pdf(generate_pdf(self._reporte_con_arbitraje()))
+        assert "Veredicto del Árbitro" in texto
+        assert "Objetada por" in texto
+        assert "Sin biopsia no se sostiene" in texto
+
+    def test_la_marca_de_recitada_aparece(self):
+        texto = _texto_del_pdf(generate_pdf(self._reporte_con_arbitraje()))
+        assert "Recitada" in texto
+
+    def test_reporte_sin_arbitraje_sigue_generando(self):
+        """No regresión: un reporte anterior al Árbitro exporta igual."""
+        reporte = _make_report()
+        assert reporte.arbitration is None
+        texto = _texto_del_pdf(generate_pdf(reporte))
+        assert "Veredicto del Árbitro" not in texto
+        assert "NEXUS" in texto
+
+    def test_arbitraje_degradado_lo_dice_en_la_portada(self):
+        from backend.api.schemas import ArbitrationOut
+
+        reporte = _make_report()
+        reporte.arbitration = ArbitrationOut(
+            status="degradado", input_hypotheses=9, consensus_hypotheses=9,
+        )
+        texto = _texto_del_pdf(generate_pdf(reporte))
+        assert "Arbitraje no disponible" in texto

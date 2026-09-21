@@ -62,7 +62,7 @@
 - [x] 9.1 Extender `api/schemas.py`: `RankedHypothesis` suma `supporting_agents` del consenso, `refuting_agents`, `contradictions`, `arbiter_note` y la marca de recitada; `StructuredReport` suma `arbitration: ArbitrationSummary | None`. Todo aditivo con default (spec `reporte-consenso`). Verificar con un test que un reporte previo, sin esos campos, sigue validando.
 - [x] 9.2 Hacer que `report_builder._rank_hypotheses()` consuma el consenso en vez del índice por texto exacto. Verificar con un test que tres hipótesis equivalentes agrupadas producen una entrada con tres agentes de respaldo.
 - [x] 9.3 Construir el `ArbitrationSummary` (entrada vs. consenso, contradicciones, recitación, solapamiento RAG). Verificar con un test de consistencia de conteos: consenso ≤ entrada y mejoradas ≤ recitadas.
-- [ ] 9.4 Actualizar `pipeline/pdf_exporter.py` con respaldo, refutación, contradicciones y resultado de la recitación, más la aclaración de que el consenso es entre agentes de IA y no es diagnóstico. **Coordinar con la tarjeta #78 de Fede, que toca el mismo archivo** (ver Risks en design.md). Verificar con `tests/test_pdf_exporter.py` y abriendo el PDF generado.
+- [x] 9.4 Actualizar `pipeline/pdf_exporter.py` con respaldo, refutación, contradicciones y resultado de la recitación, más la aclaración de que el consenso es entre agentes de IA y no es diagnóstico. **Coordinar con la tarjeta #78 de Fede, que toca el mismo archivo** (ver Risks en design.md). Verificar con `tests/test_pdf_exporter.py` y abriendo el PDF generado.
 
 ## 10. Frontend
 
@@ -72,7 +72,7 @@
 
 ## 11. Evidencia y cierre
 
-- [ ] 11.1 Crear `scripts/demo_agente04.py` que muestre entrada → salida del Árbitro: hipótesis del debate, partición del agrupamiento (qué se agrupó con qué), contradicciones detectadas, veredictos, resultado de la recitación y solapamiento RAG↔citas. Con modo `--sin-red` que use respuestas grabadas y simule la caída del LLM y de PubMed para mostrar cada fallback. Guarda artefactos en `output/demo_agente04/`.
+- [x] 11.1 Crear `scripts/demo_agente04.py` que muestre entrada → salida del Árbitro: hipótesis del debate, partición del agrupamiento (qué se agrupó con qué), contradicciones detectadas, veredictos, resultado de la recitación y solapamiento RAG↔citas. Con modo `--sin-red` que use respuestas grabadas y simule la caída del LLM y de PubMed para mostrar cada fallback. Guarda artefactos en `output/demo_agente04/`.
 - [ ] 11.2 Correr `POST /api/analyze` de punta a punta sobre el caso base (neuropatía axonal sensitivomotora, paciente masculino de 42 años) y guardar los artefactos en `output/corrida_agente04/`. Registrar los números medidos: hipótesis de entrada vs. consenso, contradicciones, recitadas, mejoradas y solapamiento RAG↔citas antes y después de recitar.
 - [ ] 11.3 Correr la suite completa: `pytest tests/ --ignore=tests/test_ingesta.py` y dejar constancia del resultado.
 - [ ] 11.4 Actualizar `.claude/architecture.md`: flujo con el Árbitro serializado, la Ronda 5 de recitación y el **criterio de parada corregido** (hoy en `architecture.md:397` describe algo inalcanzable), más el Agente 04 marcado como implementado.
