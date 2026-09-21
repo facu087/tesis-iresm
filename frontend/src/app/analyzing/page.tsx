@@ -12,6 +12,8 @@ const STEPS = [
   { icon: "🧠", label: "Síntesis PICO",                    sub: "Construcción del contexto clínico", minMs: 4000  },
   { icon: "🔬", label: "Análisis paralelo — Ronda 1",      sub: "Agentes 01, 02 y 03 en simultáneo",     minMs: 8000  },
   { icon: "⚖️", label: "Debate adversarial — Rondas 2–4", sub: "Crítica cruzada y revisión",        minMs: 12000 },
+  { icon: "🔎", label: "Verificación bibliográfica",       sub: "Los PMID citados se contrastan contra PubMed",  minMs: 5000  },
+  { icon: "🧑‍⚖️", label: "Arbitraje — Ronda 5",             sub: "Agente 04: consenso, contradicciones y recitación", minMs: 9000  },
   { icon: "📋", label: "Generación del reporte",           sub: "Agente 05: ensayos y compatibilidad · bibliografía", minMs: 1500 },
 ];
 

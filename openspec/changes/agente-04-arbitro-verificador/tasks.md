@@ -66,9 +66,9 @@
 
 ## 10. Frontend
 
-- [ ] 10.1 Actualizar `frontend/src/lib/types.ts` con los campos nuevos del reporte, todos opcionales. Verificar con `npx tsc --noEmit` en `frontend/`.
-- [ ] 10.2 Mostrar en la tab de hipótesis de `frontend/src/app/report/page.tsx` los agentes que respaldan y refutan, las contradicciones, el veredicto del Árbitro y la marca de recitada, con la aclaración sobre el consenso de IA. Verificar con `npm run build` y una captura de la vista con un reporte real inyectado por `sessionStorage`.
-- [ ] 10.3 Reflejar el paso del Árbitro en la animación de `frontend/src/app/analyzing/page.tsx`, ahora que el pipeline es más largo. Verificar visualmente durante una corrida real.
+- [x] 10.1 Actualizar `frontend/src/lib/types.ts` con los campos nuevos del reporte, todos opcionales. Verificar con `npx tsc --noEmit` en `frontend/`.
+- [x] 10.2 Mostrar en la tab de hipótesis de `frontend/src/app/report/page.tsx` los agentes que respaldan y refutan, las contradicciones, el veredicto del Árbitro y la marca de recitada, con la aclaración sobre el consenso de IA. Verificar con `npm run build` y una captura de la vista con un reporte real inyectado por `sessionStorage`.
+- [x] 10.3 Reflejar el paso del Árbitro en la animación de `frontend/src/app/analyzing/page.tsx`, ahora que el pipeline es más largo. Verificar visualmente durante una corrida real.
 
 ## 11. Evidencia y cierre
 

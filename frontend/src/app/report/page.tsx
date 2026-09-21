@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { downloadPdf } from "@/lib/api";
 import type {
+  ArbitrationSummary,
   StructuredReport,
   RankedHypothesis,
   ClinicalTrial,
@@ -120,6 +121,7 @@ export default function ReportPage() {
 
       {/* ── Verificación bibliográfica ──────────────────────────────────── */}
       {report.verification && <VerificationBanner v={report.verification} />}
+      {report.arbitration && <ArbitrationBanner a={report.arbitration} />}
 
       {/* ── PDF error ───────────────────────────────────────────────────── */}
       {downloadError && (
@@ -262,6 +264,61 @@ const SOURCE_VERDICT: Record<string, { label: string; color: string; tachado: bo
  * Sin esto, un lector ve la referencia citada y asume que es buena: la
  * contradicción queda en el dato y no llega a la pantalla.
  */
+function ArbitrationBanner({ a }: { a: ArbitrationSummary }) {
+  if (a.status === "sin_hipotesis") return null;
+
+  const degradado = a.status === "degradado";
+  const consolido = a.consensus_hypotheses < a.input_hypotheses;
+  const r = a.recitation;
+
+  return (
+    <div className={degradado ? "bg-amber-50 border-b border-amber-200" : "bg-indigo-50 border-b border-indigo-200"}>
+      <div className={`mx-auto max-w-5xl px-6 py-2.5 text-xs ${degradado ? "text-amber-800" : "text-indigo-800"}`}>
+        <span className="font-semibold">Árbitro:</span>{" "}
+        {degradado ? (
+          <>
+            el arbitraje no se pudo completar: las {a.input_hypotheses} hipótesis se
+            muestran sin consolidar, como las entregó el debate.
+          </>
+        ) : (
+          <>
+            {consolido ? (
+              <>
+                las {a.input_hypotheses} hipótesis del debate se consolidaron en{" "}
+                {a.consensus_hypotheses}.
+              </>
+            ) : (
+              <>las {a.consensus_hypotheses} hipótesis del debate son distintas entre sí.</>
+            )}
+            {a.contradictions > 0 && (
+              <> {a.contradictions} objeción{a.contradictions === 1 ? "" : "es"} quedó sin resolver.</>
+            )}
+          </>
+        )}
+        {a.cited_sources > 0 && a.retrieved_articles > 0 && (
+          <>
+            {" "}Solo {a.rag_overlap} de las {a.cited_sources} referencias citadas salieron de
+            los {a.retrieved_articles} artículos que se les recuperó de PubMed.
+          </>
+        )}
+        {r?.executed && (
+          <>
+            {" "}Se les pidió volver a citar {r.recited} hipótesis sobre literatura real:{" "}
+            {r.improved} consiguió respaldo verificable.
+            {r.rejected_pmids > 0 && (
+              <> Se descartaron {r.rejected_pmids} referencias que volvieron a inventar.</>
+            )}
+          </>
+        )}
+        <span className="block mt-0.5 text-[11px] opacity-80">
+          El consenso es entre agentes de inteligencia artificial: no es un diagnóstico
+          ni una recomendación clínica.
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function VerificationBanner({ v }: { v: VerificationSummary }) {
   if (!v.total_fuentes) return null;
 
@@ -381,9 +438,67 @@ function HypothesisCard({ h }: { h: RankedHypothesis }) {
                 Agente {ag}
               </span>
             ))}
+            {(h.refuting_agents ?? []).map((ag) => (
+              <span
+                key={`ref-${ag}`}
+                className="rounded-full bg-rose-50 px-2.5 py-0.5 text-xs text-rose-700"
+                title="Este agente objetó la hipótesis y no incorporó la crítica"
+              >
+                Objeta: {ag}
+              </span>
+            ))}
+            {h.recitation === "mejorada" && (
+              <span
+                className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs text-emerald-700"
+                title="Se le pidió volver a citar sobre la literatura recuperada y consiguió respaldo verificable"
+              >
+                Recitada: consiguió respaldo
+              </span>
+            )}
+            {h.recitation === "sin_cambio" && (
+              <span
+                className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-500"
+                title="Se le pidió volver a citar sobre la literatura recuperada y siguió sin respaldo verificable"
+              >
+                Recitada: sin respaldo
+              </span>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Veredicto del Árbitro (Agente 04) */}
+      {h.arbiter_note && (
+        <div className="rounded-xl border-l-4 border-indigo-300 bg-indigo-50/60 px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-indigo-500 mb-1">
+            Veredicto del Árbitro
+          </p>
+          <p className="text-sm text-slate-700 leading-relaxed">{h.arbiter_note}</p>
+        </div>
+      )}
+
+      {/* Objeciones que quedaron abiertas al cerrar el debate */}
+      {(h.contradictions ?? []).length > 0 && (
+        <div className="rounded-xl border border-rose-200 bg-rose-50/60 px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-rose-600 mb-2">
+            Objeciones sin resolver
+          </p>
+          <ul className="space-y-2">
+            {(h.contradictions ?? []).map((c, i) => (
+              <li key={i} className="text-sm text-slate-700 leading-relaxed">
+                <span className="font-semibold">{c.from_agent_name}</span>{" "}
+                <span className="text-xs font-semibold text-rose-600">[{c.severity}]</span>{" "}
+                {c.critique_text}
+                {c.alternative && (
+                  <span className="block text-xs text-slate-500 mt-0.5">
+                    Alternativa sugerida: {c.alternative}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Justificación */}
       <div className="rounded-xl bg-slate-50 px-4 py-3">
