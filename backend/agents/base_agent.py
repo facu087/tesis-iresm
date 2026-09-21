@@ -257,6 +257,99 @@ class BaseAgent(ABC):
         hypotheses = self.parse_hypotheses(raw)
         return self._build_output(hypotheses, raw)
 
+    # ── Ronda 5: recitación ───────────────────────────────────────
+
+    def recite(
+        self,
+        hypotheses_with_reasons: list[tuple[str, list[str]]],
+        articles: list[str],
+    ) -> dict[int, list[Source]]:
+        """
+        Ronda 5: vuelve a citar las hipótesis propias que quedaron sin respaldo.
+
+        La verificación bibliográfica mostró que los agentes inventan PMIDs en
+        lugar de usar la literatura que el RAG les recupera. Acá se les devuelve
+        el motivo concreto por el que falló cada cita —no es lo mismo haber
+        inventado un número que haber citado un artículo real con el título
+        equivocado— junto con los artículos reales, y se les pide citar sobre
+        esos.
+
+        Args:
+            hypotheses_with_reasons: (texto de la hipótesis, motivos de fallo),
+                                     en el orden en que se numeran en el prompt.
+            articles:                Bloques ya formateados de los artículos que
+                                     el RAG recuperó, con su PMID real.
+
+        Returns:
+            Dict {índice de hipótesis (0-based) → fuentes propuestas}. El índice
+            sale del número que devolvió el modelo; los fuera de rango se
+            descartan. Quien valida que los PMID pertenezcan al conjunto
+            ofrecido es `pipeline/recitation.validate_recited()`.
+        """
+        prompt = self._build_recitation_prompt(hypotheses_with_reasons, articles)
+        raw = self._call_llm(prompt)
+        return self._parse_recitation(raw, total=len(hypotheses_with_reasons))
+
+    def _build_recitation_prompt(
+        self,
+        hypotheses_with_reasons: list[tuple[str, list[str]]],
+        articles: list[str],
+    ) -> str:
+        """Arma el pedido de recitación. Sobreescribible para sumar contexto."""
+        lineas = [
+            f"Sos {self.AGENT_NAME}. Las referencias que citaste para estas hipótesis "
+            "no resistieron la verificación contra PubMed.",
+            "",
+        ]
+        for numero, (texto, motivos) in enumerate(hypotheses_with_reasons, 1):
+            lineas.append(f"{numero}. {texto}")
+            for motivo in motivos:
+                lineas.append(f"   - {motivo}")
+
+        lineas += [
+            "",
+            "Estos son los artículos REALES recuperados de PubMed para este caso:",
+            "",
+        ]
+        lineas.extend(articles)
+
+        lineas += [
+            "",
+            "Volvé a citar cada hipótesis usando ÚNICAMENTE los PMIDs de la lista de "
+            "arriba, con el título exacto tal como figura. Si para una hipótesis no "
+            "hay ningún artículo pertinente en esa lista, no la incluyas en tu "
+            "respuesta: es preferible que quede sin respaldo a que cites algo que no "
+            "corresponde. NO inventes PMIDs ni cites artículos que no estén listados.",
+            "",
+            "Respondé ÚNICAMENTE con JSON válido:",
+            '{"recitations": [{"hypothesis": 1, "sources": '
+            '[{"pmid": "12345678", "title": "Título exacto del artículo"}]}]}',
+        ]
+        return "\n".join(lineas)
+
+    def _parse_recitation(self, raw: str, total: int) -> dict[int, list[Source]]:
+        """Parsea la respuesta de recitación, descartando índices fuera de rango."""
+        data = self.extract_json(raw)
+        recitaciones: dict[int, list[Source]] = {}
+
+        for item in data.get("recitations", []):
+            if not isinstance(item, dict):
+                continue
+            numero = item.get("hypothesis")
+            if isinstance(numero, bool) or not isinstance(numero, int):
+                continue
+            if not 1 <= numero <= total:
+                continue
+            fuentes = [
+                BaseAgent._build_source(s)
+                for s in item.get("sources", [])
+                if isinstance(s, dict) and s.get("title")
+            ]
+            if fuentes:
+                recitaciones[numero - 1] = fuentes
+
+        return recitaciones
+
     def _parse_critiques(self, raw: str) -> list[Critique]:
         """Parsea el JSON de críticas devuelto por el modelo."""
         data = self.extract_json(raw)

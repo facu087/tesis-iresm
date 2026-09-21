@@ -31,11 +31,14 @@ from ..models.arbitration import (
     ArbitrationResult,
     ArbitrationStatus,
     ConsensusHypothesis,
+    RecitationOutcome,
+    RecitationSummary,
 )
-from ..models.report import AgentOutput
+from ..models.report import AgentOutput, RetrievedArticleRef
 from ..pipeline import consensus as consensus_module
+from ..pipeline import recitation
 from ..pipeline.evidence import classify_hypothesis
-from ..pipeline.verification import SourceVerification
+from ..pipeline.verification import SourceVerification, verify_sources
 from .base_agent import GROQ_MAIN, BaseAgent
 
 # Un PMID es un entero de 1 a 8 dígitos; se buscan los de 5 o más para no
@@ -96,6 +99,7 @@ REGLAS CRÍTICAS:
         self,
         entrada: ArbitrationInput,
         verifications: Mapping[str, SourceVerification] | None = None,
+        agents: Mapping[str, BaseAgent] | None = None,
     ) -> ArbitrationResult:
         """
         Consolida el resultado del debate en un consenso con veredictos.
@@ -109,11 +113,14 @@ REGLAS CRÍTICAS:
             verifications: Veredictos de `verify_report_sources()`. Vacío si la
                            verificación no pudo ejecutarse: las hipótesis quedan
                            pendientes y el consenso se arma igual.
+            agents:        Agentes del debate por `agent_id`, para la Ronda 5 de
+                           recitación. Sin ellos no se recita y el análisis
+                           termina igual.
 
         Returns:
             ArbitrationResult con el consenso y el resumen del arbitraje.
         """
-        verifications = verifications or {}
+        verifications = dict(verifications or {})
         retrieved = list(entrada.retrieved_articles)
 
         if not entrada.hypotheses:
@@ -126,18 +133,126 @@ REGLAS CRÍTICAS:
         grupos, estado = await self._group(entrada)
         consenso = consensus_module.assemble(grupos, entrada, verifications)
 
+        # Ronda 5. Va antes de los veredictos para que el veredicto describa el
+        # estado final de la hipótesis, no el que tenía antes de recitar.
+        recitacion = await self._recite_round(
+            consenso, entrada, verifications, retrieved, agents
+        )
+
         descartadas = 0
         if estado is ArbitrationStatus.OK:
             descartadas = await self._write_verdicts(consenso, entrada, verifications)
 
-        return ArbitrationResult(
-            consensus=consenso,
-            summary=consensus_module.summarize(
-                consenso, entrada, retrieved,
-                status=estado,
-                discarded_references=descartadas,
-            ),
+        resumen = consensus_module.summarize(
+            consenso, entrada, retrieved,
+            status=estado,
+            discarded_references=descartadas,
         )
+        resumen.recitation = recitacion
+        return ArbitrationResult(consensus=consenso, summary=resumen)
+
+    # ── Ronda 5: recitación ───────────────────────────────────────────
+
+    async def _recite_round(
+        self,
+        consenso: list[ConsensusHypothesis],
+        entrada: ArbitrationInput,
+        verifications: dict[str, SourceVerification],
+        retrieved: Sequence[RetrievedArticleRef],
+        agents: Mapping[str, BaseAgent] | None,
+    ) -> RecitationSummary:
+        """
+        Devuelve a sus autores las hipótesis sin respaldo, con literatura real.
+
+        Una sola iteración: lo que siga sin respaldo queda especulativo y se
+        documenta. El criterio de parada del análisis **no** es que toda
+        hipótesis alcance respaldo verificable —con 15 de 15 citas discordantes
+        eso no terminaría nunca— sino que esta ronda corra una vez.
+
+        Muta `consenso` en el lugar: las hipótesis que consiguen respaldo suman
+        la fuente nueva y quedan marcadas como recitadas.
+        """
+        resumen = RecitationSummary()
+        if not agents or not recitation.should_recite(consenso, verifications, retrieved):
+            return resumen
+
+        elegidas = recitation.select(consenso, verifications)
+        permitidos = recitation.allowed_pmids(retrieved)
+        bloques = [_article_block(a) for a in retrieved]
+
+        # Una llamada por agente, no por hipótesis: con 12k TPM de cuota, repetir
+        # el bloque de literatura en nueve prompts no entra (design D6).
+        por_agente: dict[str, list[int]] = {}
+        for indice in elegidas:
+            autor = _author_of(consenso[indice], entrada)
+            if autor and autor in agents:
+                por_agente.setdefault(autor, []).append(indice)
+
+        resumen.executed = True
+        resumen.recited = sum(len(v) for v in por_agente.values())
+        if not resumen.recited:
+            return resumen
+
+        nuevas: dict[int, list] = {}
+        for agent_id, indices in por_agente.items():
+            pedido = [
+                (
+                    consenso[i].hypothesis.text,
+                    recitation.failure_reasons(consenso[i].hypothesis, verifications),
+                )
+                for i in indices
+            ]
+            try:
+                propuestas = await asyncio.to_thread(
+                    agents[agent_id].recite, pedido, bloques
+                )
+            except Exception as exc:
+                self._log_fallback(f"recitación del agente {agent_id}", exc)
+                resumen.failed_agents.append(entrada.name_of(agent_id))
+                for i in indices:
+                    consenso[i].recitation = RecitationOutcome.FALLIDA
+                continue
+
+            for posicion, fuentes in propuestas.items():
+                if not 0 <= posicion < len(indices):
+                    continue
+                aceptadas, rechazadas = recitation.validate_recited(fuentes, permitidos)
+                resumen.rejected_pmids += rechazadas
+                if aceptadas:
+                    nuevas[indices[posicion]] = aceptadas
+
+        if not nuevas:
+            for indice in elegidas:
+                if consenso[indice].recitation is RecitationOutcome.NO_APLICA:
+                    consenso[indice].recitation = RecitationOutcome.SIN_CAMBIO
+            return resumen
+
+        # Re-verificar contra PubMed: pertenecer al conjunto ofrecido no alcanza,
+        # el título declarado tiene que corresponder al artículo.
+        todas = [s for fuentes in nuevas.values() for s in fuentes]
+        try:
+            verificaciones_nuevas = await verify_sources(todas)
+        except Exception as exc:
+            self._log_fallback("re-verificación de lo recitado", exc)
+            verificaciones_nuevas = {}
+        verifications.update(verificaciones_nuevas)
+
+        for indice, fuentes in nuevas.items():
+            item = consenso[indice]
+            item.hypothesis = item.hypothesis.model_copy(
+                update={"sources": [*item.hypothesis.sources, *fuentes]}
+            )
+            if recitation.improved(item.hypothesis, verifications):
+                item.recitation = RecitationOutcome.MEJORADA
+                resumen.improved += 1
+            else:
+                item.recitation = RecitationOutcome.SIN_CAMBIO
+
+        for indice in elegidas:
+            if consenso[indice].recitation is RecitationOutcome.NO_APLICA:
+                consenso[indice].recitation = RecitationOutcome.SIN_CAMBIO
+
+        return resumen
 
     # ── 1. Agrupación (LLM) ───────────────────────────────────────────
 
@@ -331,3 +446,30 @@ def _build_verdict_prompt(
         '{"verdicts": [{"hypothesis": 1, "verdict": "…"}]}',
     ]
     return "\n".join(lineas)
+
+
+def _author_of(item: ConsensusHypothesis, entrada: ArbitrationInput) -> str:
+    """
+    ID del agente al que se le pide recitar una hipótesis de consenso.
+
+    Es el autor del enunciado representativo: quien la escribió es quien mejor
+    puede volver a fundamentarla. Si el grupo junta hipótesis de varios agentes,
+    solo ese recita, para que los demás no reciten la misma cosa.
+
+    Se busca por texto porque la hipótesis del consenso es una copia con las
+    fuentes del grupo consolidadas, no el mismo objeto que entró.
+    """
+    for indice, hypothesis in enumerate(entrada.hypotheses):
+        if hypothesis.text == item.hypothesis.text:
+            return entrada.agent_of(indice)
+    return ""
+
+
+def _article_block(article: RetrievedArticleRef) -> str:
+    """Formatea un artículo recuperado para el prompt de recitación."""
+    partes = [f"[PMID: {article.pmid}] {article.title}"]
+    if article.journal or article.year:
+        partes.append(f"Revista: {article.journal} ({article.year})")
+    if article.excerpt:
+        partes.append(f"Resumen: {article.excerpt[:300]}")
+    return "\n".join(partes)

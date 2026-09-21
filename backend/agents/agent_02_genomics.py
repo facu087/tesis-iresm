@@ -111,6 +111,29 @@ class GenomicsSpecialistAgent(BaseAgent):
             raw_response=output.raw_response,
         )
 
+    def _build_recitation_prompt(
+        self,
+        hypotheses_with_reasons: list[tuple[str, list[str]]],
+        articles: list[str],
+    ) -> str:
+        """
+        Ronda 5: agrega el perfil genómico al pedido de recitación.
+
+        Mismo criterio que `run()`, `critique()` y `revise()`: sin el bloque
+        genómico este agente recita a ciegas sobre un caso del que conoce menos
+        que el resto.
+
+        La guarda anti-invención (`_apply_invention_guard`) **no** se aplica acá,
+        y no es un olvido: opera sobre hipótesis que declaran hallazgos genéticos,
+        y una recitación devuelve `{pmid, title}`, sin hallazgos que degradar. Esa
+        salida ya está cubierta por dos guardas más estrictas —el PMID se valida
+        contra el conjunto de artículos ofrecidos y el título se contrasta contra
+        PubMed en la re-verificación—, así que el agente no puede inventar una
+        referencia aunque quiera.
+        """
+        base = super()._build_recitation_prompt(hypotheses_with_reasons, articles)
+        return f"{base}\n\n{self._genomic_context.to_prompt_block()}"
+
     # ── Internos ──────────────────────────────────────────────────────────────
 
     def _build_context(self, clinical_context: str) -> str:
