@@ -19,7 +19,7 @@ from enum import Enum
 from pydantic import BaseModel
 
 from .hypothesis import Hypothesis
-from .report import Critique
+from .report import Critique, RetrievedArticleRef
 
 
 class ArbitrationStatus(str, Enum):
@@ -100,6 +100,9 @@ class ArbitrationInput(BaseModel):
     round_1_by_agent: dict[str, list[Hypothesis]] = {}
     final_by_agent: dict[str, list[Hypothesis]] = {}
     agent_names: dict[str, str] = {}  # agent_id → nombre legible
+    # Literatura que el RAG recuperó y ofreció en la Ronda 1: define qué PMIDs
+    # son citables en la recitación y permite medir el solapamiento.
+    retrieved_articles: list[RetrievedArticleRef] = []
 
     def agent_of(self, index: int) -> str:
         """ID del agente que propuso la hipótesis `index`, o "" si no consta."""

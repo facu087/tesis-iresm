@@ -26,12 +26,12 @@
 
 ## 5. Agente 04
 
-- [ ] 5.1 Crear `backend/agents/agent_04_arbiter.py` heredando de `BaseAgent`, con `AGENT_ID = "04"`, llamando al LLM **solo** vía `BaseAgent._call_llm()`, y exponiendo `arbitrate(ArbitrationInput) -> ArbitrationResult`. Verificar con `tests/test_agent_04_arbiter.py` (LLM mockeado, sin red) que produce un consenso a partir de un reporte de debate de prueba.
-- [ ] 5.2 Implementar el prompt de agrupación con hipótesis numeradas y salida por índices, más el mapeo de cada crítica a un grupo (D1, D2). Verificar con un test que una salida del modelo con un índice inventado no rompe y cae en la validación de 4.1.
-- [ ] 5.3 Implementar el prompt de veredictos, alimentado con el estado bibliográfico y el nivel efectivo que ya calculó `evidence.classify_hypothesis()`. Verificar con un test que un veredicto que contradice el estado calculado no altera el estado ni el nivel del resultado.
-- [ ] 5.4 Implementar las guardas de salida del modelo: descartar referencias que no estaban en la entrada, ignorar intentos de subir nivel y de descartar hipótesis, y contabilizar los descartes (spec `arbitro-consenso`). Modelarlas sobre la guarda anti-invención que **ya existe** en `agent_02_genomics.py`, con su suite `TestGuardaAntiInvencion` en `tests/test_agent_02_genomics.py` como referencia de forma, en vez de inventar un patrón nuevo. Verificar con tests dedicados para cada una de las tres guardas.
-- [ ] 5.5 Implementar el fallback completo del agente ante fallo del LLM o JSON no parseable, devolviendo el consenso degradado de 4.5. Verificar con un test que fuerza la excepción y comprueba que `arbitrate()` devuelve resultado válido y no propaga.
-- [ ] 5.6 Verificar que ningún log del agente emite texto clínico, hipótesis ni respuestas del modelo: test que captura stderr ante un fallo y comprueba que solo aparece el tipo de excepción.
+- [x] 5.1 Crear `backend/agents/agent_04_arbiter.py` heredando de `BaseAgent`, con `AGENT_ID = "04"`, llamando al LLM **solo** vía `BaseAgent._call_llm()`, y exponiendo `arbitrate(ArbitrationInput) -> ArbitrationResult`. Verificar con `tests/test_agent_04_arbiter.py` (LLM mockeado, sin red) que produce un consenso a partir de un reporte de debate de prueba.
+- [x] 5.2 Implementar el prompt de agrupación con hipótesis numeradas y salida por índices, más el mapeo de cada crítica a un grupo (D1, D2). Verificar con un test que una salida del modelo con un índice inventado no rompe y cae en la validación de 4.1.
+- [x] 5.3 Implementar el prompt de veredictos, alimentado con el estado bibliográfico y el nivel efectivo que ya calculó `evidence.classify_hypothesis()`. Verificar con un test que un veredicto que contradice el estado calculado no altera el estado ni el nivel del resultado.
+- [x] 5.4 Implementar las guardas de salida del modelo: descartar referencias que no estaban en la entrada, ignorar intentos de subir nivel y de descartar hipótesis, y contabilizar los descartes (spec `arbitro-consenso`). Modelarlas sobre la guarda anti-invención que **ya existe** en `agent_02_genomics.py`, con su suite `TestGuardaAntiInvencion` en `tests/test_agent_02_genomics.py` como referencia de forma, en vez de inventar un patrón nuevo. Verificar con tests dedicados para cada una de las tres guardas.
+- [x] 5.5 Implementar el fallback completo del agente ante fallo del LLM o JSON no parseable, devolviendo el consenso degradado de 4.5. Verificar con un test que fuerza la excepción y comprueba que `arbitrate()` devuelve resultado válido y no propaga.
+- [x] 5.6 Verificar que ningún log del agente emite texto clínico, hipótesis ni respuestas del modelo: test que captura stderr ante un fallo y comprueba que solo aparece el tipo de excepción.
 
 ## 6. Ronda 5 — recitación
 
