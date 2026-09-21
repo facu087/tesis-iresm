@@ -137,6 +137,13 @@ de literatura repetido en cada prompt — inviable con 12k TPM.
 cada PMID que citó: inexistente, o discordante con el título real) más los artículos
 recuperados. Decirle *por qué* falló su cita es lo que le da la chance de corregir.
 
+**Dónde vive el método.** En `BaseAgent`, como `critique()` y `revise()`. Con una
+salvedad: `GenomicsSpecialistAgent` sobreescribe hoy `run()`, `critique()` y `revise()`
+(`agent_02_genomics.py:84,99,101`) para enriquecer el contexto con el perfil genómico y
+aplicar su guarda anti-invención sobre la salida. La recitación necesita el mismo
+override, o el Agente 02 recita sin contexto genómico y sin guarda — justo el agente
+cuyas hipótesis son las más fáciles de inventar.
+
 ### D7 — Serializar el pipeline y absorber la latencia
 
 **Decisión.** `router.py` pasa de `gather(navegación, verificación)` a

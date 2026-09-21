@@ -105,18 +105,34 @@ con el string formateado, así que nadie puede contrastar lo citado contra lo of
   `backend/pipeline/consensus.py` (agrupación determinista, contradicciones y
   ensamblado del resultado), `backend/models/arbitration.py`,
   `tests/test_agent_04_arbiter.py`, `tests/test_consensus.py`,
+  `tests/test_base_agent.py` (`BaseAgent` no tiene suite propia hoy),
   `scripts/demo_agente04.py`.
 - **Código modificado**: `backend/agents/base_agent.py` (saneamiento del hallazgo G y
-  el método de recitación), `backend/pipeline/orchestrator.py` (conservar los
+  el método de recitación), `backend/agents/agent_02_genomics.py` (override de la
+  recitación: ya sobreescribe `run`, `critique` y `revise` para enriquecer el contexto
+  genómico y aplicar su guarda anti-invención, y la recitación necesita lo mismo),
+  `backend/pipeline/orchestrator.py` (conservar los
   `RetrievedArticle`), `backend/pipeline/debate.py` (dejar de consolidar a mano:
   `_detect_divergences()` pasa al Árbitro), `backend/pipeline/evidence.py` (criterio de
-  orden), `backend/pipeline/verification.py` (re-verificación acotada a un subconjunto),
+  orden), `backend/pipeline/verification.py` (re-verificación acotada a un subconjunto,
+  **sin cambiar la firma de `verify_report_sources(report)`**),
   `backend/pipeline/trial_matching.py` (adaptador desde el consenso),
   `backend/pipeline/report_builder.py`, `backend/pipeline/pdf_exporter.py`,
   `backend/models/report.py`, `backend/api/router.py`, `backend/api/schemas.py`,
   `frontend/src/lib/types.ts`, `frontend/src/app/report/page.tsx`,
   `frontend/src/app/analyzing/page.tsx`, `tests/test_api.py`, `tests/test_evidence.py`,
-  `tests/test_report_builder.py`, `tests/test_pdf_exporter.py`, `tests/test_debate.py`.
+  `tests/test_report_builder.py`, `tests/test_pdf_exporter.py`, `tests/test_debate.py`,
+  `tests/test_orchestrator.py` y `tests/test_agent_02_genomics.py`.
+- **Scripts de demo afectados** (relevado trazando los llamadores reales, no sólo el
+  código de producción; varios son evidencia adjunta a tarjetas ya en QA):
+  `scripts/demo_agente05.py` **se rompe** — llama `build_navigation_input()` en
+  `_correr_real()` y `_correr_sin_red()`, y ese adaptador cambia de firma (tarjeta #53).
+  `scripts/demo_verificacion.py` y `scripts/demo_priorizacion_evidencia.py` llaman
+  `verify_report_sources(report)`: no se rompen mientras esa firma se conserve, que es
+  por qué la re-verificación entra como función nueva. `scripts/demo_agente01.py`,
+  `demo_agente03.py` y `demo_base_agent.py` llaman `parse_hypotheses()`, pero ninguno
+  imprime campos de verificación, así que el saneamiento no les cambia la salida: se
+  corren igual para confirmarlo.
 - **APIs externas**: PubMed suma una segunda consulta `esummary` por análisis (la
   re-verificación de las hipótesis recitadas), en batch y sólo si hubo recitación. Groq
   suma 2 llamadas fijas (agrupación y veredictos) más 1 por agente que tenga hipótesis
