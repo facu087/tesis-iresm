@@ -98,7 +98,7 @@ REGLAS CRÍTICAS:
     async def arbitrate(
         self,
         entrada: ArbitrationInput,
-        verifications: Mapping[str, SourceVerification] | None = None,
+        verifications: dict[str, SourceVerification] | None = None,
         agents: Mapping[str, BaseAgent] | None = None,
     ) -> ArbitrationResult:
         """
@@ -113,6 +113,12 @@ REGLAS CRÍTICAS:
             verifications: Veredictos de `verify_report_sources()`. Vacío si la
                            verificación no pudo ejecutarse: las hipótesis quedan
                            pendientes y el consenso se arma igual.
+
+                           **Se actualiza en el lugar**: la Ronda 5 agrega los
+                           veredictos de las fuentes recitadas, y quien arma el
+                           reporte necesita verlos. Si se copiara, una hipótesis
+                           que consiguió respaldo al recitar aparecería igual
+                           como pendiente en el reporte final.
             agents:        Agentes del debate por `agent_id`, para la Ronda 5 de
                            recitación. Sin ellos no se recita y el análisis
                            termina igual.
@@ -120,7 +126,8 @@ REGLAS CRÍTICAS:
         Returns:
             ArbitrationResult con el consenso y el resumen del arbitraje.
         """
-        verifications = dict(verifications or {})
+        if verifications is None:
+            verifications = {}
         retrieved = list(entrada.retrieved_articles)
 
         if not entrada.hypotheses:

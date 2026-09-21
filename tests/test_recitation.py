@@ -414,3 +414,55 @@ class TestPromptDeRecitacion:
         fuentes = LiteratureAnalystAgent()._parse_recitation(raw, total=1)[0]
 
         assert fuentes[0].verified is None
+
+
+class TestLaRecitacionLlegaAlReporte:
+    """
+    Regresión: `arbitrate()` copiaba el dict de veredictos, así que los que
+    producía la Ronda 5 se perdían al volver al router.
+
+    Lo delató la corrida real del 2026-09-21: el resumen decía `improved=5` y
+    la verificación del mismo reporte decía `hipotesis_respaldadas=0`. Las dos
+    no pueden ser ciertas.
+    """
+
+    def test_los_veredictos_de_la_recitacion_vuelven_al_llamador(self, monkeypatch):
+        agente = _AgenteFalso({0: [Source(pmid=OFRECIDO, title="Fabry disease")]})
+        entrada = _entrada([_h(ATTR, [INVENTADO])], ["01"])
+        verifs = {INVENTADO: _discordante(INVENTADO)}
+
+        resultado = _correr(entrada, verifs, {"01": agente}, monkeypatch)
+
+        # El dict que pasó el llamador tiene que haber quedado con el veredicto nuevo.
+        assert OFRECIDO in verifs
+        assert verifs[OFRECIDO].status is SourceStatus.VERIFICADA
+        assert resultado.summary.recitation.improved == 1
+
+    def test_improved_y_respaldadas_no_se_contradicen(self, monkeypatch):
+        """
+        Lo que se mide en el resumen tiene que coincidir con lo que ve quien
+        arma el reporte a partir del mismo dict de veredictos.
+        """
+        from backend.pipeline.evidence import HypothesisStatus, classify_hypothesis
+
+        agente = _AgenteFalso({0: [Source(pmid=OFRECIDO, title="Fabry disease")]})
+        entrada = _entrada([_h(ATTR, [INVENTADO])], ["01"])
+        verifs = {INVENTADO: _discordante(INVENTADO)}
+
+        resultado = _correr(entrada, verifs, {"01": agente}, monkeypatch)
+
+        respaldadas = sum(
+            1 for c in resultado.consensus
+            if classify_hypothesis(c.hypothesis, verifs).status is HypothesisStatus.RESPALDADA
+        )
+        assert respaldadas == resultado.summary.recitation.improved == 1
+
+    def test_sin_recitacion_el_dict_no_se_toca(self, monkeypatch):
+        agente = _AgenteFalso()
+        entrada = _entrada([_h(ATTR, [OFRECIDO])], ["01"])
+        verifs = {OFRECIDO: _verificada(OFRECIDO)}
+        antes = dict(verifs)
+
+        _correr(entrada, verifs, {"01": agente}, monkeypatch)
+
+        assert verifs == antes
