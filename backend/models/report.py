@@ -2,6 +2,27 @@ from pydantic import BaseModel
 from .hypothesis import Hypothesis
 
 
+class RetrievedArticleRef(BaseModel):
+    """
+    Artículo que el RAG recuperó y ofreció a los agentes en la Ronda 1.
+
+    Equivalente Pydantic liviano de `rag.retriever.RetrievedArticle`, definido
+    acá a propósito: importar el dataclass del RAG metería ChromaDB en la cadena
+    de imports de `backend.models`, que hoy no depende de nada externo.
+
+    El orquestador conserva estos artículos en el `Report` porque el Árbitro los
+    necesita para dos cosas: medir cuántas de las citas de los agentes salieron
+    de la literatura que se les ofreció, y armar la ronda de recitación sobre
+    PMIDs reales.
+    """
+
+    pmid: str
+    title: str
+    journal: str = ""
+    year: str = ""
+    excerpt: str = ""
+
+
 class AgentOutput(BaseModel):
     agent_id: str
     agent_name: str
@@ -39,3 +60,7 @@ class Report(BaseModel):
     # fuera del debate. Se deja constancia para que el reporte no presente como
     # deliberación de N agentes lo que en realidad discutieron menos.
     absent_agents: list[str] = []
+
+    # Artículos que el RAG recuperó y puso en el contexto de la Ronda 1. Queda
+    # vacío si la búsqueda semántica falló o no devolvió nada: el pipeline sigue.
+    retrieved_articles: list[RetrievedArticleRef] = []

@@ -7,8 +7,8 @@
 
 ## 2. Modelos del arbitraje
 
-- [ ] 2.1 Crear `backend/models/arbitration.py` con los modelos Pydantic `ConsensusHypothesis` (hipótesis representativa, agrupadas, agentes de respaldo y refutación, contradicciones, veredicto, si fue recitada), `Contradiction`, `ArbitrationInput`, `ArbitrationResult` y `ArbitrationSummary`, todos tipados y con docstrings en español (D8). Verificar con `tests/test_arbitration_models.py` que los modelos validan y que los campos nuevos tienen default.
-- [ ] 2.2 Agregar `retrieved_articles: list[RetrievedArticle]` (o su equivalente Pydantic) a `Report` en `backend/models/report.py`, con default vacío (D5). Verificar que `tests/test_report_builder.py` sigue pasando sin tocarlo.
+- [x] 2.1 Crear `backend/models/arbitration.py` con los modelos Pydantic `ConsensusHypothesis` (hipótesis representativa, agrupadas, agentes de respaldo y refutación, contradicciones, veredicto, si fue recitada), `Contradiction`, `ArbitrationInput`, `ArbitrationResult` y `ArbitrationSummary`, todos tipados y con docstrings en español (D8). Verificar con `tests/test_arbitration_models.py` que los modelos validan y que los campos nuevos tienen default.
+- [x] 2.2 Agregar `retrieved_articles: list[RetrievedArticle]` (o su equivalente Pydantic) a `Report` en `backend/models/report.py`, con default vacío (D5). Verificar que `tests/test_report_builder.py` sigue pasando sin tocarlo.
 
 ## 3. Trazabilidad del RAG
 
