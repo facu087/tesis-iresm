@@ -89,12 +89,27 @@ class ArbitrationInput(BaseModel):
     """
 
     hypotheses: list[Hypothesis] = []
+    # ID del agente que propuso cada hipótesis, en paralelo a `hypotheses` y con
+    # la misma longitud. Explícito a propósito: deducir la autoría del orden en
+    # que se concatenaron los outputs es frágil, y de ella dependen el respaldo
+    # del consenso y el desempate del texto representativo.
+    hypothesis_agents: list[str] = []
     critiques: list[Critique] = []
     # Hipótesis por agente en la primera y la última ronda, para decidir si un
     # agente cedió ante una crítica. Clave: agent_id.
     round_1_by_agent: dict[str, list[Hypothesis]] = {}
     final_by_agent: dict[str, list[Hypothesis]] = {}
     agent_names: dict[str, str] = {}  # agent_id → nombre legible
+
+    def agent_of(self, index: int) -> str:
+        """ID del agente que propuso la hipótesis `index`, o "" si no consta."""
+        if 0 <= index < len(self.hypothesis_agents):
+            return self.hypothesis_agents[index]
+        return ""
+
+    def name_of(self, agent_id: str) -> str:
+        """Nombre legible del agente; cae al ID si no está registrado."""
+        return self.agent_names.get(agent_id, agent_id)
 
 
 class RecitationSummary(BaseModel):

@@ -18,11 +18,11 @@
 
 ## 4. Consenso determinista
 
-- [ ] 4.1 Crear `backend/pipeline/consensus.py` con la validación de la partición propuesta por el modelo: índices dentro de rango, sin repetidos, cobertura total; los faltantes se agregan como grupo propio y los repetidos se asignan al primer grupo (D1). Verificar con `tests/test_consensus.py` cubriendo partición válida, índice fuera de rango, índice repetido y omisión.
-- [ ] 4.2 Implementar la elección del texto representativo de cada grupo por regla (mejor estado → mejor nivel efectivo → menor ID de agente) (D3). Verificar con un test que construye un grupo con hipótesis de distinto estado y comprueba cuál queda como representativa.
-- [ ] 4.3 Implementar la consolidación de fuentes del grupo, deduplicando por PMID. Verificar con un test de dos hipótesis con una fuente compartida y una propia cada una.
-- [ ] 4.4 Implementar la detección de contradicciones a partir de los `Critique` de la Ronda 2, con el criterio de "el agente cedió" por containment de tokens entre Ronda 1 y Ronda 4 (D4). Verificar con `tests/test_consensus.py`: crítica HIGH mantenida → contradicción; crítica HIGH incorporada → sin contradicción; crítica MEDIUM → sin contradicción.
-- [ ] 4.5 Implementar el consenso degradado (cada hipótesis su propio grupo, sin veredicto) usado como fallback. Verificar con un test que comprueba que conserva las N hipótesis y marca el arbitraje como fallido.
+- [x] 4.1 Crear `backend/pipeline/consensus.py` con la validación de la partición propuesta por el modelo: índices dentro de rango, sin repetidos, cobertura total; los faltantes se agregan como grupo propio y los repetidos se asignan al primer grupo (D1). Verificar con `tests/test_consensus.py` cubriendo partición válida, índice fuera de rango, índice repetido y omisión.
+- [x] 4.2 Implementar la elección del texto representativo de cada grupo por regla (mejor estado → mejor nivel efectivo → menor ID de agente) (D3). Verificar con un test que construye un grupo con hipótesis de distinto estado y comprueba cuál queda como representativa.
+- [x] 4.3 Implementar la consolidación de fuentes del grupo, deduplicando por PMID. Verificar con un test de dos hipótesis con una fuente compartida y una propia cada una.
+- [x] 4.4 Implementar la detección de contradicciones a partir de los `Critique` de la Ronda 2, con el criterio de "el agente cedió" por containment de tokens entre Ronda 1 y Ronda 4 (D4). Verificar con `tests/test_consensus.py`: crítica HIGH mantenida → contradicción; crítica HIGH incorporada → sin contradicción; crítica MEDIUM → sin contradicción.
+- [x] 4.5 Implementar el consenso degradado (cada hipótesis su propio grupo, sin veredicto) usado como fallback. Verificar con un test que comprueba que conserva las N hipótesis y marca el arbitraje como fallido.
 
 ## 5. Agente 04
 
