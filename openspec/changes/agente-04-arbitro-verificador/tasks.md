@@ -1,9 +1,9 @@
 ## 1. Saneamiento de fuentes (hallazgo G)
 
-- [ ] 1.1 Restringir `BaseAgent.parse_hypotheses()` a una whitelist de campos al construir `Source` (`pmid`, `title`, `journal`, `year`, `url`), descartando en silencio `verified`, `verification_status`, `actual_title` y `publication_types` (D9).
-- [ ] 1.2 **Crear** `tests/test_base_agent.py` — hoy no existe, `BaseAgent` no tiene suite propia. Verificar que una respuesta con `verified: true` y tipos de publicación inventados produce una `Source` con esos campos en `None`/vacío, y que el resto del parseo (fences de markdown, JSON embebido, hipótesis malformada) sigue funcionando.
-- [ ] 1.3 Correr `scripts/demo_agente01.py`, `demo_agente03.py` y `demo_base_agent.py` y confirmar que su salida no cambió. Los tres llaman `parse_hypotheses()` pero ninguno imprime campos de verificación, así que no debería haber regresión visible; `demo_base_agent.py` es evidencia de una tarjeta ya aprobada por el profesor, y si su salida cambia hay que re-adjuntarla en Trello.
-- [ ] 1.4 Verificar que la suite existente sigue verde tras el cambio de parseo: `pytest tests/ --ignore=tests/test_ingesta.py` (Tesseract no está instalado en la máquina de desarrollo). Prestar atención a `tests/test_orchestrator.py` y `tests/test_api.py`, que construyen `Source(...)` a mano.
+- [x] 1.1 Restringir `BaseAgent.parse_hypotheses()` a una whitelist de campos al construir `Source` (`pmid`, `title`, `journal`, `year`, `url`), descartando en silencio `verified`, `verification_status`, `actual_title` y `publication_types` (D9).
+- [x] 1.2 **Crear** `tests/test_base_agent.py` — hoy no existe, `BaseAgent` no tiene suite propia. Verificar que una respuesta con `verified: true` y tipos de publicación inventados produce una `Source` con esos campos en `None`/vacío, y que el resto del parseo (fences de markdown, JSON embebido, hipótesis malformada) sigue funcionando.
+- [x] 1.3 Correr `scripts/demo_agente01.py`, `demo_agente03.py` y `demo_base_agent.py` y confirmar que su salida no cambió. Los tres llaman `parse_hypotheses()` pero ninguno imprime campos de verificación, así que no debería haber regresión visible; `demo_base_agent.py` es evidencia de una tarjeta ya aprobada por el profesor, y si su salida cambia hay que re-adjuntarla en Trello.
+- [x] 1.4 Verificar que la suite existente sigue verde tras el cambio de parseo: `pytest tests/ --ignore=tests/test_ingesta.py` (Tesseract no está instalado en la máquina de desarrollo). Prestar atención a `tests/test_orchestrator.py` y `tests/test_api.py`, que construyen `Source(...)` a mano.
 
 ## 2. Modelos del arbitraje
 

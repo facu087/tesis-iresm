@@ -80,6 +80,31 @@ class BaseAgent(ABC):
         )
 
     @staticmethod
+    def _build_source(declared: dict) -> Source:
+        """
+        Construye una Source con los campos que al agente le corresponde declarar.
+
+        El estado de verificación, el título real y los tipos de publicación son
+        **salida** de la verificación bibliográfica contra PubMed
+        (`pipeline/verification.py`), nunca entrada del modelo: un LLM que escribe
+        `verified: true` en su JSON no verificó nada. Antes se hacía `Source(**s)`
+        y esos campos autodeclarados viajaban en el Report interno hasta que
+        `evidence.py` y `report_builder._annotate_source()` los ignoraban aguas
+        abajo. Acá se descartan en el origen.
+
+        No falla ante campos de más: emitirlos no invalida la hipótesis, y la regla
+        del proyecto es no descartar hipótesis. Una fuente sin `title` sí sigue
+        siendo un error de validación, como antes.
+        """
+        return Source(
+            pmid=declared.get("pmid"),
+            title=declared.get("title"),  # type: ignore[arg-type]
+            journal=declared.get("journal"),
+            year=declared.get("year"),
+            url=declared.get("url"),
+        )
+
+    @staticmethod
     def parse_hypotheses(raw: str) -> list[Hypothesis]:
         """
         Parsea y valida la lista de hipótesis del JSON de respuesta.
@@ -89,7 +114,7 @@ class BaseAgent(ABC):
         hypotheses = []
 
         for h in data.get("hypotheses", []):
-            sources = [Source(**s) for s in h.get("sources", [])]
+            sources = [BaseAgent._build_source(s) for s in h.get("sources", [])]
             try:
                 hypothesis = Hypothesis(
                     text=h["text"],
