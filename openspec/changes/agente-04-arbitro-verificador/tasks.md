@@ -74,7 +74,7 @@
 
 - [x] 11.1 Crear `scripts/demo_agente04.py` que muestre entrada → salida del Árbitro: hipótesis del debate, partición del agrupamiento (qué se agrupó con qué), contradicciones detectadas, veredictos, resultado de la recitación y solapamiento RAG↔citas. Con modo `--sin-red` que use respuestas grabadas y simule la caída del LLM y de PubMed para mostrar cada fallback. Guarda artefactos en `output/demo_agente04/`.
 - [ ] 11.2 Correr `POST /api/analyze` de punta a punta sobre el caso base (neuropatía axonal sensitivomotora, paciente masculino de 42 años) y guardar los artefactos en `output/corrida_agente04/`. Registrar los números medidos: hipótesis de entrada vs. consenso, contradicciones, recitadas, mejoradas y solapamiento RAG↔citas antes y después de recitar.
-- [ ] 11.3 Correr la suite completa: `pytest tests/ --ignore=tests/test_ingesta.py` y dejar constancia del resultado.
-- [ ] 11.4 Actualizar `.claude/architecture.md`: flujo con el Árbitro serializado, la Ronda 5 de recitación y el **criterio de parada corregido** (hoy en `architecture.md:397` describe algo inalcanzable), más el Agente 04 marcado como implementado.
+- [x] 11.3 Correr la suite completa: `pytest tests/ --ignore=tests/test_ingesta.py` y dejar constancia del resultado.
+- [x] 11.4 Actualizar `.claude/architecture.md`: flujo con el Árbitro serializado, la Ronda 5 de recitación y el **criterio de parada corregido** (hoy en `architecture.md:397` describe algo inalcanzable), más el Agente 04 marcado como implementado.
 - [ ] 11.5 Actualizar `.claude/CLAUDE.md` y `.claude/backlog.md`: tarea 9 cerrada, hallazgo G resuelto, Agente 04 ✅ en la tabla de agentes, `demo_agente04.py` en la lista de scripts, y los números de la corrida real en la nota de la tarea.
 - [ ] 11.6 Adjuntar la evidencia a la tarjeta #52 de Trello (capturas de entrada → salida, `.json` y `.txt` de `output/`), actualizar su descripción con los números medidos y moverla a QA.

@@ -109,7 +109,7 @@ Suite de tests: **82 tests, 100% passing** (`pytest tests/`)
 | 6 | Cliente PharmGKB: relaciones fármaco-genómicas | ✅ Hecho |
 | 7 | Gestión de rate limits y fallbacks en APIs externas | ✅ Hecho |
 | 8 | Agente 02 (Especialista Genómica): prompt + llamada GPT-4o + parseo JSON | 📋 Pendiente |
-| 9 | Agente 04 (Árbitro Verificador): síntesis y verificación bibliográfica externa | ⚠️ Parcial |
+| 9 | Agente 04 (Árbitro Verificador): síntesis y verificación bibliográfica externa | ✅ Hecho (`agents/agent_04_arbiter.py`, `pipeline/consensus.py`, `pipeline/recitation.py`) |
 | 10 | Agente 05 (Navegador de Ensayos): búsqueda en ClinicalTrials + Orphanet | ✅ Hecho (`agents/agent_05_trials.py`, `pipeline/trial_matching.py`) |
 | 11 | Priorización de hipótesis por nivel de evidencia EBM (I, II, III) | ✅ Hecho (`pipeline/evidence.py`) |
 | 12 | Integrar contexto RAG (búsqueda semántica PubMed) a la Ronda 1 del orquestador | ✅ Hecho |
@@ -125,10 +125,30 @@ Suite de tests: **82 tests, 100% passing** (`pytest tests/`)
 > bibliográfico en `backend/pipeline/orchestrator.py` (Ronda 1), y desde la tarea 16
 > el pipeline **sí** verifica los PMIDs citados (paso 7 de `api/router.py`).
 
-> Nota (9): la tarjeta queda **parcial**. Está hecha la mitad de verificación
-> (`backend/pipeline/verification.py`): contrasta cada PMID contra PubMed y compara
-> el título real con el citado. Falta la mitad de **síntesis**: que el árbitro razone
-> sobre el conjunto de hipótesis, no solo valide citas. No mover a QA hasta eso.
+> Nota (9) — **RESUELTA**. La mitad de verificación ya estaba
+> (`pipeline/verification.py`). Se sumó la de **síntesis**: el Árbitro agrupa las
+> hipótesis equivalentes de los tres agentes en un consenso, registra quién respalda
+> y quién refuta cada una, documenta las objeciones HIGH que nadie retiró y emite un
+> veredicto por hipótesis. El pipeline se serializó a
+> `debate → verificación → Árbitro → navegación`, así que el Agente 05 busca ensayos
+> sobre el consenso y no sobre la concatenación con duplicados.
+>
+> **Ronda 5 — recitación**: las hipótesis sin respaldo vuelven a su autor con el
+> motivo por el que falló cada cita y los artículos que el RAG había recuperado. Los
+> PMID nuevos se validan contra ese conjunto **antes** de gastar una consulta a
+> PubMed, y después se re-verifican. Una sola iteración.
+>
+> Esto **corrige el criterio de parada** de `architecture.md`, que exigía que toda
+> hipótesis tuviera referencia verificable: con 15 de 15 citas discordantes no se
+> cumple nunca. Ahora el análisis termina después de recitar, mejore o no, y el
+> resultado se mide y se reporta.
+>
+> **Hallazgo G — RESUELTO** en la misma tarea: `parse_hypotheses()` armaba
+> `Source(**s)` y aceptaba `verified`, `verification_status`, `actual_title` y
+> `publication_types` autodeclarados por el LLM. Ahora se descartan en el origen.
+>
+> Evidencia: `scripts/demo_agente04.py` (y `--sin-red`, que muestra los cuatro
+> fallbacks sin conexión). Cambio OpenSpec: `agente-04-arbitro-verificador`.
 
 > Nota (16) — **por qué hizo falta**: los agentes citaban PMIDs alucinados. No eran
 > números inválidos: existían en PubMed pero apuntaban a otro artículo, así que
@@ -271,7 +291,7 @@ el alcance de la tarea en la que aparecieron. Con archivo y línea, para retomar
 | D | `master` está **62 commits detrás** de `develop`: Sprints 2, 3 y 4 sin liberar. Decisión del equipo: se promueve cuando haya una versión del sistema, no por etapa. | — |
 | E | **OpenSpec**: **adoptado** (v1.11.0, rama `chore/s4-openspec`). Alcance: los 4 agentes que faltan (02, 04, 05, 06) y las reglas de clasificación EBM — sin backfillear los Sprints 1–3. Uso en `.claude/CLAUDE.md` § "Spec-driven con OpenSpec". | `openspec/config.yaml` |
 | F | El extractor de biomarcadores devuelve **`genes=['CMT']`** en el caso base: `CMT`, `FAP` y `ATTR` están en `_KNOWN_GENES`, pero son enfermedades o paneles, no genes. Además `tests/test_biomarkers.py` no es un test de pytest (es un script con `main()`, pytest recolecta 0 tests) y exige que `CMT` salga como gen. Por esto la tarjeta #68 no pasó a QA. | `backend/ingestion/biomarker_extractor.py:65-67`, `tests/test_biomarkers.py:63-66` |
-| G | `BaseAgent.parse_hypotheses()` arma `Source(**s)` con lo que manda el LLM, así que acepta `verified`, `verification_status` o `publication_types` autodeclarados. La clasificación EBM y `_annotate_source()` ya los ignoran/limpian, pero conviene sanearlos en el parseo (lo toca el Agente 04). | `backend/agents/base_agent.py:92` |
+| G | ✅ **RESUELTO** (Agente 04). `BaseAgent.parse_hypotheses()` armaba `Source(**s)` con lo que manda el LLM, así que acepta `verified`, `verification_status` o `publication_types` autodeclarados. La clasificación EBM y `_annotate_source()` ya los ignoran/limpian, pero conviene sanearlos en el parseo (lo toca el Agente 04). | `backend/agents/base_agent.py:92` |
 | H | Lint del frontend con 1 error y 1 warning **previos** a la priorización EBM: `setState` síncrono en un effect (`report/page.tsx`, `useEffect` de carga del reporte) y un `eslint-disable` sin uso (`analyzing/page.tsx:120`). `next build` no corre lint, así que no bloquea el build. Sigue igual después del Agente 05: el error es del effect que lee `sessionStorage`, ajeno a la tab de ensayos. | `frontend/src/app/report/page.tsx`, `frontend/src/app/analyzing/page.tsx:120` |
 | I | **Los genes de enfermedades raras no están en la ORPHAcodes API**: expone 32 rutas y ninguna de genes (es una API de nomenclatura). `get_genes()` levanta `OrphanetGenesNoDisponibles` en vez de mentir con `[]`. Están en Orphadata, otro host y otro producto: `GET https://api.orphadata.com/rd-associated-genes/orphacodes/{code}` (200, CC-BY-4.0, sin apiKey; 404 = esa enfermedad no tiene asociación génica). Integrarlo va en **tarjeta aparte**: el Agente 05 no depende de ellos. | `backend/external/orphanet.py:255` (`get_genes`), docstring del módulo |
 
