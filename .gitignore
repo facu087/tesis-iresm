@@ -38,3 +38,6 @@ chroma_db/
 frontend/.next/
 frontend/node_modules/
 frontend/.env.local
+
+# Worktrees de agentes de Claude Code: repos embebidos, locales y descartables
+.claude/worktrees/
