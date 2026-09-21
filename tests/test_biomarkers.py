@@ -67,18 +67,8 @@ class TestGenesVerdaderos:
         texto = f"Se identificó una variante en el gen {gen}."
         assert gen in _extract_with_regex(texto)["genes_regex"]
 
-    @pytest.mark.xfail(
-        reason=(
-            "Defecto conocido, fuera del alcance de este fix (falsos positivos): "
-            r"_GENE_PATTERN es [A-Z]{2,6}\d{0,2}, así que un dígito EN EL MEDIO del "
-            r"símbolo corta el match y el  final no cierra. Afecta a 4 de los 51 "
-            "genes de _KNOWN_GENES, todos relevantes para el caso de la tesis "
-            "(SCN1A, SCN9A, SH3TC2, DYNC1H1). Ver tarjeta de Trello aparte."
-        ),
-        strict=True,
-    )
     @pytest.mark.parametrize("gen", ["SCN1A", "SCN9A", "SH3TC2", "DYNC1H1"])
-    def test_genes_con_digito_intermedio_no_se_detectan(self, gen):
+    def test_genes_con_digito_intermedio_se_detectan(self, gen):
         texto = f"Se identificó una variante en el gen {gen}."
         assert gen in _extract_with_regex(texto)["genes_regex"]
 
