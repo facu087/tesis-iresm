@@ -12,9 +12,9 @@
 
 ## 3. Trazabilidad del RAG
 
-- [ ] 3.1 Hacer que `orchestrator._enrich_context_with_rag()` devuelva `(contexto, articulos)` conservando los `RetrievedArticle`, sin cambiar `PubMedRetriever.get_context_for_agent()` (D5). Verificar con un test en `tests/test_rag_integration.py`, mockeado y sin red, que los artículos llegan al `Report`.
-- [ ] 3.2 Propagar los artículos recuperados hasta el `Report` que devuelve `run_round_1()`, y que el conjunto quede vacío sin romper nada cuando la búsqueda semántica falla. Verificar con un test que simula el fallo del RAG y comprueba que `retrieved_articles == []` y que el análisis continúa.
-- [ ] 3.3 Implementar la métrica de solapamiento entre PMIDs recuperados y PMIDs citados. Verificar con un test que, con fuentes citadas ajenas al conjunto recuperado, el solapamiento da 0, y con una cita del conjunto da 1.
+- [x] 3.1 Hacer que `orchestrator._enrich_context_with_rag()` devuelva `(contexto, articulos)` conservando los `RetrievedArticle`, sin cambiar `PubMedRetriever.get_context_for_agent()` (D5). Verificar con un test en `tests/test_rag_integration.py`, mockeado y sin red, que los artículos llegan al `Report`.
+- [x] 3.2 Propagar los artículos recuperados hasta el `Report` que devuelve `run_round_1()`, y que el conjunto quede vacío sin romper nada cuando la búsqueda semántica falla. Verificar con un test que simula el fallo del RAG y comprueba que `retrieved_articles == []` y que el análisis continúa.
+- [x] 3.3 Implementar la métrica de solapamiento entre PMIDs recuperados y PMIDs citados. Verificar con un test que, con fuentes citadas ajenas al conjunto recuperado, el solapamiento da 0, y con una cita del conjunto da 1.
 
 ## 4. Consenso determinista
 

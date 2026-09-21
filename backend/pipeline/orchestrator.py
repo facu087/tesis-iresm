@@ -28,7 +28,7 @@ from ..ingestion.biomarker_extractor import extract as extract_biomarkers
 from ..ingestion.normalizer import normalize
 from ..models.case import ClinicalCase
 from ..models.hypothesis import Hypothesis
-from ..models.report import AgentOutput, Report
+from ..models.report import AgentOutput, Report, RetrievedArticleRef
 from ..rag.indexer import index_from_clinical_context
 from ..rag.retriever import PubMedRetriever
 from . import genomic_context as gc_module
@@ -57,12 +57,19 @@ def _build_sources_summary(hypotheses: list[Hypothesis]) -> dict[str, int]:
 
 # ── RAG: indexación y enriquecimiento del contexto ────────────────────────────
 
-async def _enrich_context_with_rag(case: ClinicalCase, base_context: str) -> str:
+async def _enrich_context_with_rag(
+    case: ClinicalCase, base_context: str
+) -> tuple[str, list[RetrievedArticleRef]]:
     """
     Indexa literatura PubMed relevante y agrega bibliografía verificable al contexto.
 
     Si la indexación o la búsqueda fallan (red caída, cuota excedida, etc.)
     el pipeline continúa con el contexto base sin RAG.
+
+    Devuelve además los artículos recuperados: el Árbitro (Agente 04) los usa
+    para medir cuántas de las citas de los agentes salieron efectivamente de la
+    literatura que se les ofreció, y para armar la ronda de recitación sobre
+    PMIDs reales. Ante cualquier fallo la lista queda vacía y el pipeline sigue.
     """
     genes: list[str] = []
     conditions: list[str] = []
@@ -92,9 +99,23 @@ async def _enrich_context_with_rag(case: ClinicalCase, base_context: str) -> str
     # español y arrastraría la query de vuelta al problema de arriba.
     rag_query = " ".join(filter(None, [condition_en, " ".join(genes)]))
 
+    articles: list[RetrievedArticleRef] = []
     try:
         retriever = PubMedRetriever()
-        rag_context = retriever.get_context_for_agent(rag_query, max_results=5)
+        rag_context, retrieved = retriever.get_context_with_articles(
+            rag_query, max_results=5
+        )
+        articles = [
+            RetrievedArticleRef(
+                pmid=a.pmid,
+                title=a.title,
+                journal=a.journal,
+                year=a.year,
+                excerpt=a.excerpt,
+            )
+            for a in retrieved
+            if a.pmid
+        ]
     except Exception as exc:
         print(f"[NEXUS][RAG] Búsqueda semántica omitida: {exc}", file=sys.stderr)
         rag_context = (
@@ -103,7 +124,7 @@ async def _enrich_context_with_rag(case: ClinicalCase, base_context: str) -> str
             "Usá evidence_level: 'III' para hipótesis sin respaldo bibliográfico verificado."
         )
 
-    return f"{base_context}\n\n{rag_context}"
+    return f"{base_context}\n\n{rag_context}", articles
 
 
 # ── Ronda 1: análisis paralelo ─────────────────────────────────────────────────
@@ -123,7 +144,7 @@ async def run_round_1(case: ClinicalCase) -> Report:
 
     # RAG y perfil genómico se construyen en paralelo antes de la Ronda 1
     ctx_base = gc_module.build(case)
-    context, genomic_ctx = await asyncio.gather(
+    (context, retrieved_articles), genomic_ctx = await asyncio.gather(
         _enrich_context_with_rag(case, base_context),
         gc_module.enrich(ctx_base),
     )
@@ -161,6 +182,7 @@ async def run_round_1(case: ClinicalCase) -> Report:
         hypotheses=all_hypotheses,
         agent_outputs=valid_outputs,
         sources_summary=_build_sources_summary(all_hypotheses),
+        retrieved_articles=retrieved_articles,
     )
 
 
