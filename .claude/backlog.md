@@ -149,6 +149,24 @@ Suite de tests: **82 tests, 100% passing** (`pytest tests/`)
 >
 > Evidencia: `scripts/demo_agente04.py` (y `--sin-red`, que muestra los cuatro
 > fallbacks sin conexión). Cambio OpenSpec: `agente-04-arbitro-verificador`.
+>
+> **Medido en la corrida real del 2026-09-21** sobre el caso base (450 s, sin ningún
+> fallback): **14 hipótesis del debate → 8 de consenso**; **19 de 19 referencias
+> citadas resultaron discordantes** contra PubMed (ninguna verificada); **0 de 19
+> citas salieron de los 5 artículos que el RAG les puso en el prompt**; 3 objeciones
+> quedaron sin resolver; 0 referencias inventadas por el Árbitro.
+> **Ronda 5: 8 hipótesis recitaron, 5 consiguieron respaldo verificable y 0 PMIDs
+> fueron rechazados** — puestos frente a la literatura real y con el motivo por el que
+> falló cada cita, los agentes sí citan del conjunto ofrecido. No es incapacidad de
+> citar: sin el material delante, inventan. Es el resultado que justifica la ronda.
+>
+> ⚠ **FALTA UNA CORRIDA LIMPIA** para adjuntar a la tarjeta #52. Los números de arriba
+> salen de una corrida que tenía el bug de propagación de los veredictos de la Ronda 5
+> (corregido en `e9bd486`): el arbitraje y la verificación son correctos, pero el
+> reporte exportado mostraba 0 hipótesis respaldadas. La corrida siguiente, ya con el
+> fix, confirmó que el reporte muestra las respaldadas, pero se agotó la **cuota diaria**
+> de Groq (197.800/200.000 TPD) y el debate se cayó desde la Ronda 2. Hay que correr una
+> vez más, con la cuota repuesta, y regenerar la evidencia.
 
 > Nota (16) — **por qué hizo falta**: los agentes citaban PMIDs alucinados. No eran
 > números inválidos: existían en PubMed pero apuntaban a otro artículo, así que
