@@ -46,22 +46,22 @@
 
 ## 7. Orden EBM con respaldo del consenso
 
-- [ ] 7.1 Agregar a `evidence.prioritize()` el criterio de cantidad de agentes de respaldo, después del nivel efectivo y antes de la prioridad, como parámetro opcional con default 1 (D8, spec `clasificacion-evidencia-ebm` modificada). Verificar con los escenarios nuevos de la spec en `tests/test_evidence.py`.
-- [ ] 7.2 Verificar explícitamente la no regresión: un reporte armado sin arbitraje ordena igual que antes del cambio. Test dedicado en `tests/test_evidence.py`.
+- [x] 7.1 Agregar a `evidence.prioritize()` el criterio de cantidad de agentes de respaldo, después del nivel efectivo y antes de la prioridad, como parámetro opcional con default 1 (D8, spec `clasificacion-evidencia-ebm` modificada). Verificar con los escenarios nuevos de la spec en `tests/test_evidence.py`.
+- [x] 7.2 Verificar explícitamente la no regresión: un reporte armado sin arbitraje ordena igual que antes del cambio. Test dedicado en `tests/test_evidence.py`.
 
 ## 8. Integración en el pipeline
 
-- [ ] 8.1 Reemplazar la consolidación manual de `debate.run_debate()` y mover `_detect_divergences()` al Árbitro, dejando que el debate entregue las hipótesis sin consolidar. Verificar que `tests/test_debate.py` sigue verde con los ajustes correspondientes.
-- [ ] 8.2 Serializar `api/router.py`: `debate → verificación → Árbitro → navegación`, reemplazando el `asyncio.gather` de los pasos 6 y 7 (D7). Verificar con `tests/test_api.py` que `POST /api/analyze` responde 200 con todo mockeado.
-- [ ] 8.3 Adaptar `trial_matching.build_navigation_input()` para recibir las hipótesis de consenso sin tocar el Agente 05. Verificar con `tests/test_trial_matching.py` que la entrada se arma desde el consenso y que un consenso degradado también funciona.
-- [ ] 8.3b Actualizar `scripts/demo_agente05.py`, que llama `build_navigation_input()` en `_correr_real()` y `_correr_sin_red()` y se rompe con la firma nueva. Es la evidencia de la tarjeta #53, ya en QA: correr las dos variantes (con red y `--sin-red`) y confirmar que producen los mismos artefactos que antes. Si la salida cambia, re-adjuntarla en #53.
-- [ ] 8.4 Agregar la red de seguridad del router alrededor del Árbitro, con el mismo patrón que `_navigate_trials_safe()`. Verificar con un test que una excepción inesperada del Árbitro no rompe `POST /api/analyze`.
+- [x] 8.1 Reemplazar la consolidación manual de `debate.run_debate()` y mover `_detect_divergences()` al Árbitro, dejando que el debate entregue las hipótesis sin consolidar. Verificar que `tests/test_debate.py` sigue verde con los ajustes correspondientes.
+- [x] 8.2 Serializar `api/router.py`: `debate → verificación → Árbitro → navegación`, reemplazando el `asyncio.gather` de los pasos 6 y 7 (D7). Verificar con `tests/test_api.py` que `POST /api/analyze` responde 200 con todo mockeado.
+- [x] 8.3 Adaptar `trial_matching.build_navigation_input()` para recibir las hipótesis de consenso sin tocar el Agente 05. Verificar con `tests/test_trial_matching.py` que la entrada se arma desde el consenso y que un consenso degradado también funciona.
+- [x] 8.3b ~~Actualizar `scripts/demo_agente05.py`~~ — **no hizo falta**: `build_navigation_input(case, hypotheses, statuses=None)` ya estaba diseñado para recibir el consenso (design D3 del Agente 05), así que no cambió de firma y el demo sigue andando sin tocarlo. Queda correrlo en la tarea 11.3 para confirmarlo. Es la evidencia de la tarjeta #53, ya en QA: correr las dos variantes (con red y `--sin-red`) y confirmar que producen los mismos artefactos que antes. Si la salida cambia, re-adjuntarla en #53.
+- [x] 8.4 Agregar la red de seguridad del router alrededor del Árbitro, con el mismo patrón que `_navigate_trials_safe()`. Verificar con un test que una excepción inesperada del Árbitro no rompe `POST /api/analyze`.
 
 ## 9. Reporte exportado
 
-- [ ] 9.1 Extender `api/schemas.py`: `RankedHypothesis` suma `supporting_agents` del consenso, `refuting_agents`, `contradictions`, `arbiter_note` y la marca de recitada; `StructuredReport` suma `arbitration: ArbitrationSummary | None`. Todo aditivo con default (spec `reporte-consenso`). Verificar con un test que un reporte previo, sin esos campos, sigue validando.
-- [ ] 9.2 Hacer que `report_builder._rank_hypotheses()` consuma el consenso en vez del índice por texto exacto. Verificar con un test que tres hipótesis equivalentes agrupadas producen una entrada con tres agentes de respaldo.
-- [ ] 9.3 Construir el `ArbitrationSummary` (entrada vs. consenso, contradicciones, recitación, solapamiento RAG). Verificar con un test de consistencia de conteos: consenso ≤ entrada y mejoradas ≤ recitadas.
+- [x] 9.1 Extender `api/schemas.py`: `RankedHypothesis` suma `supporting_agents` del consenso, `refuting_agents`, `contradictions`, `arbiter_note` y la marca de recitada; `StructuredReport` suma `arbitration: ArbitrationSummary | None`. Todo aditivo con default (spec `reporte-consenso`). Verificar con un test que un reporte previo, sin esos campos, sigue validando.
+- [x] 9.2 Hacer que `report_builder._rank_hypotheses()` consuma el consenso en vez del índice por texto exacto. Verificar con un test que tres hipótesis equivalentes agrupadas producen una entrada con tres agentes de respaldo.
+- [x] 9.3 Construir el `ArbitrationSummary` (entrada vs. consenso, contradicciones, recitación, solapamiento RAG). Verificar con un test de consistencia de conteos: consenso ≤ entrada y mejoradas ≤ recitadas.
 - [ ] 9.4 Actualizar `pipeline/pdf_exporter.py` con respaldo, refutación, contradicciones y resultado de la recitación, más la aclaración de que el consenso es entre agentes de IA y no es diagnóstico. **Coordinar con la tarjeta #78 de Fede, que toca el mismo archivo** (ver Risks en design.md). Verificar con `tests/test_pdf_exporter.py` y abriendo el PDF generado.
 
 ## 10. Frontend

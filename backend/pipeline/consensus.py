@@ -23,7 +23,7 @@ from ..models.arbitration import (
     Contradiction,
 )
 from ..models.hypothesis import EvidenceLevel, Hypothesis, Source
-from ..models.report import Critique, RetrievedArticleRef
+from ..models.report import Critique, Report, RetrievedArticleRef
 from .evidence import HypothesisStatus, classify_hypothesis
 from .verification import SourceVerification, source_key
 
@@ -421,4 +421,65 @@ def summarize(
         rag_overlap=solapan,
         retrieved_articles=len(retrieved),
         discarded_references=discarded_references,
+    )
+
+
+# ── Adaptador desde el reporte del debate ─────────────────────────────────────
+
+def build_arbitration_input(report: Report) -> ArbitrationInput:
+    """
+    Arma el contrato de entrada del Árbitro desde el reporte del debate.
+
+    Mismo criterio que `trial_matching.build_navigation_input()` para el Agente
+    05: el agente no conoce el `Report` ni el router, recibe un contrato neutral.
+
+    La atribución hipótesis → agente sale de la última ronda con outputs, que es
+    de donde `run_debate()` toma las hipótesis finales. Si no hubo debate (un
+    solo agente), sale de la Ronda 1.
+
+    Args:
+        report: Report final de `debate.run_debate()`.
+
+    Returns:
+        ArbitrationInput con las hipótesis, su autoría, las críticas de la ronda
+        de crítica cruzada, las rondas por agente y la literatura recuperada.
+    """
+    rondas_con_output = [r for r in report.debate_rounds if r.agent_outputs]
+    finales = rondas_con_output[-1].agent_outputs if rondas_con_output else report.agent_outputs
+
+    final_by_agent = {o.agent_id: list(o.hypotheses) for o in finales}
+    round_1_by_agent = {o.agent_id: list(o.hypotheses) for o in report.agent_outputs}
+    agent_names = {o.agent_id: o.agent_name for o in report.agent_outputs}
+    for output in finales:
+        agent_names.setdefault(output.agent_id, output.agent_name)
+
+    # `run_debate()` concatena las hipótesis de la última ronda en ese mismo
+    # orden, así que recorrer los outputs reconstruye la autoría posición a
+    # posición. Si por lo que sea no coinciden, se completa con "" y el consenso
+    # simplemente no atribuye esa hipótesis, en vez de atribuirla mal.
+    hypotheses: list[Hypothesis] = []
+    hypothesis_agents: list[str] = []
+    for output in finales:
+        for hypothesis in output.hypotheses:
+            hypotheses.append(hypothesis)
+            hypothesis_agents.append(output.agent_id)
+
+    if [h.text for h in hypotheses] != [h.text for h in report.hypotheses]:
+        # El reporte manda: es lo que se verificó y lo que se va a exportar.
+        hypotheses = list(report.hypotheses)
+        por_texto = {
+            h.text: output.agent_id for output in finales for h in output.hypotheses
+        }
+        hypothesis_agents = [por_texto.get(h.text, "") for h in hypotheses]
+
+    critiques = [c for r in report.debate_rounds for c in r.critiques]
+
+    return ArbitrationInput(
+        hypotheses=hypotheses,
+        hypothesis_agents=hypothesis_agents,
+        critiques=critiques,
+        round_1_by_agent=round_1_by_agent,
+        final_by_agent=final_by_agent,
+        agent_names=agent_names,
+        retrieved_articles=list(report.retrieved_articles),
     )
