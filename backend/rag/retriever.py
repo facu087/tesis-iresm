@@ -136,6 +136,51 @@ class PubMedRetriever:
 
         return articles
 
+    def get_context_with_articles(
+        self,
+        query: str,
+        max_results: int = 5,
+        min_score: float = _MIN_RELEVANCE_SCORE,
+    ) -> tuple[str, list[RetrievedArticle]]:
+        """
+        Igual que `get_context_for_agent()`, pero devuelve también los artículos.
+
+        El contexto formateado alcanza para el prompt, pero el Árbitro (Agente 04)
+        necesita los objetos: con ellos mide cuántas de las citas de los agentes
+        salieron de la literatura que se les ofreció, y arma la ronda de
+        recitación sobre PMIDs reales. Antes se descartaban.
+
+        Args:
+            query: Query clínico para buscar literatura relevante
+            max_results: Máximo de artículos a incluir en el contexto
+            min_score: Score mínimo de relevancia
+
+        Returns:
+            (contexto formateado para el prompt, artículos recuperados). La lista
+            queda vacía si no hubo resultados relevantes.
+        """
+        articles = self.search(query, max_results=max_results, min_score=min_score)
+
+        if not articles:
+            return (
+                "LITERATURA CIENTÍFICA DISPONIBLE:\n"
+                "No se encontraron artículos relevantes en la base local de PubMed. "
+                "Basá tus hipótesis en tu conocimiento clínico y marcá las fuentes "
+                "con evidence_level: 'III' si no tenés respaldo bibliográfico verificado."
+            ), []
+
+        lines = ["LITERATURA CIENTÍFICA RELEVANTE (fuente: PubMed):"]
+        for i, article in enumerate(articles, 1):
+            lines.append(f"\n--- Referencia {i} ---")
+            lines.append(article.to_prompt_block())
+
+        lines.append(
+            "\nINSTRUCCIÓN: Cuando cites estas referencias, usá el PMID exacto "
+            "provisto. No inventes PMIDs adicionales."
+        )
+
+        return "\n".join(lines), articles
+
     def get_context_for_agent(
         self,
         query: str,
@@ -156,27 +201,10 @@ class PubMedRetriever:
         Returns:
             String con los artículos formateados para el prompt
         """
-        articles = self.search(query, max_results=max_results, min_score=min_score)
-
-        if not articles:
-            return (
-                "LITERATURA CIENTÍFICA DISPONIBLE:\n"
-                "No se encontraron artículos relevantes en la base local de PubMed. "
-                "Basá tus hipótesis en tu conocimiento clínico y marcá las fuentes "
-                "con evidence_level: 'III' si no tenés respaldo bibliográfico verificado."
-            )
-
-        lines = ["LITERATURA CIENTÍFICA RELEVANTE (fuente: PubMed):"]
-        for i, article in enumerate(articles, 1):
-            lines.append(f"\n--- Referencia {i} ---")
-            lines.append(article.to_prompt_block())
-
-        lines.append(
-            "\nINSTRUCCIÓN: Cuando cites estas referencias, usá el PMID exacto "
-            "provisto. No inventes PMIDs adicionales."
+        context, _ = self.get_context_with_articles(
+            query, max_results=max_results, min_score=min_score
         )
-
-        return "\n".join(lines)
+        return context
 
     def get_pmids_for_hypothesis(
         self,

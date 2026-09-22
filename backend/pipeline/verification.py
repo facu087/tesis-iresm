@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import sys
 import unicodedata
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -149,7 +150,24 @@ async def verify_report_sources(report: Report) -> dict[str, SourceVerification]
         red devuelve todas las fuentes como NO_VERIFICABLE: nunca se descarta
         una referencia por un problema de infraestructura.
     """
-    sources = collect_sources(report)
+    return await verify_sources(collect_sources(report))
+
+
+async def verify_sources(sources: Sequence[Source]) -> dict[str, SourceVerification]:
+    """
+    Verifica un conjunto cualquiera de fuentes contra PubMed.
+
+    Es el cuerpo de `verify_report_sources()`, extraído para poder re-verificar
+    solo las fuentes que produjo la ronda de recitación sin rehacer el reporte
+    entero ni volver a consultar por los PMIDs que ya se verificaron.
+
+    Args:
+        sources: Fuentes a verificar. Pueden repetirse: se deduplican.
+
+    Returns:
+        Dict {clave de fuente → SourceVerification}, igual que
+        `verify_report_sources()`.
+    """
     if not sources:
         return {}
 

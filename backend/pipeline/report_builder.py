@@ -11,13 +11,17 @@ síntesis LLM-asistida. El contrato del JSON (StructuredReport) no cambia.
 from datetime import datetime, timezone
 
 from ..api.schemas import (
+    ArbitrationOut,
     CaseSummarySection,
+    ContradictionOut,
     DebateSummary,
     RankedHypothesis,
+    RecitationOut,
     ReportMetadata,
     StructuredReport,
     VerificationSummary,
 )
+from ..models.arbitration import ArbitrationResult, ConsensusHypothesis
 from ..models.case import ClinicalCase
 from ..models.hypothesis import Source
 from ..models.report import Report
@@ -63,21 +67,80 @@ def _annotate_source(
 
 
 def _rank_hypotheses(
-    report: Report, verifications: dict[str, SourceVerification]
+    report: Report,
+    verifications: dict[str, SourceVerification],
+    arbitration: ArbitrationResult | None = None,
 ) -> list[RankedHypothesis]:
     """
-    Clasifica y ordena las hipótesis finales con las reglas EBM de
-    `evidence.prioritize()` (estado → nivel efectivo → prioridad → fuentes
-    verificadas) y determina qué agentes las respaldaron en Ronda 1 y en la
-    última ronda del debate.
+    Clasifica y ordena las hipótesis del reporte con las reglas EBM de
+    `evidence.prioritize()` (estado → nivel efectivo → respaldo del consenso →
+    prioridad → fuentes verificadas).
+
+    Con arbitraje, las hipótesis son las de consenso y el respaldo sale del
+    agrupamiento del Árbitro. Sin arbitraje se cae al índice por texto exacto,
+    que es lo que había antes: como cada agente redacta distinto, ese índice
+    casi siempre devuelve un solo agente, y el respaldo múltiple que mostraba el
+    reporte era en buena medida un artefacto de coincidencia literal de strings.
     """
-    # Índice: texto de hipótesis → agentes que la propusieron (Ronda 1)
+    if arbitration is not None and arbitration.consensus:
+        return _rank_from_consensus(arbitration.consensus, verifications)
+    return _rank_from_debate(report, verifications)
+
+
+def _rank_from_consensus(
+    consensus: list[ConsensusHypothesis],
+    verifications: dict[str, SourceVerification],
+) -> list[RankedHypothesis]:
+    """Arma las hipótesis del reporte desde el consenso del Árbitro."""
+    hypotheses = [item.hypothesis for item in consensus]
+    por_texto = {item.hypothesis.text: item for item in consensus}
+    orden = prioritize(
+        hypotheses, verifications,
+        support_counts=[item.support_count for item in consensus],
+    )
+
+    ranked: list[RankedHypothesis] = []
+    for i, (h, evaluacion) in enumerate(orden):
+        item = por_texto.get(h.text)
+        ranked.append(
+            RankedHypothesis(
+                rank=i + 1,
+                text=h.text,
+                priority=h.priority.value,
+                evidence_level=evaluacion.effective_level.value,
+                rationale=h.rationale,
+                supporting_agents=list(item.supporting_agents) if item else [],
+                sources=[_annotate_source(s, verifications) for s in h.sources],
+                status=evaluacion.status.value,
+                verified_sources=evaluacion.verified_sources,
+                declared_evidence_level=evaluacion.declared_level.value,
+                evidence_note=evaluacion.note,
+                refuting_agents=list(item.refuting_agents) if item else [],
+                contradictions=[
+                    ContradictionOut(
+                        from_agent_name=c.from_agent_name,
+                        severity=c.severity,
+                        critique_text=c.critique_text,
+                        alternative=c.alternative,
+                    )
+                    for c in (item.contradictions if item else [])
+                ],
+                arbiter_note=item.verdict if item else "",
+                recitation=item.recitation.value if item else "no_aplica",
+            )
+        )
+    return ranked
+
+
+def _rank_from_debate(
+    report: Report, verifications: dict[str, SourceVerification]
+) -> list[RankedHypothesis]:
+    """Camino sin arbitraje: se conserva para que un reporte viejo se arme igual."""
     agent_support: dict[str, list[str]] = {}
     for output in report.agent_outputs:
         for h in output.hypotheses:
             agent_support.setdefault(h.text, []).append(output.agent_name)
 
-    # Si hay rondas de debate, sumar agentes de Ronda 4 (revisiones finales)
     if report.debate_rounds:
         last_round = report.debate_rounds[-1]
         for output in last_round.agent_outputs:
@@ -93,14 +156,10 @@ def _rank_hypotheses(
                 rank=i + 1,
                 text=h.text,
                 priority=h.priority.value,
-                # Nivel efectivo: el declarado, topeado por la evidencia verificada.
                 evidence_level=evaluacion.effective_level.value,
                 rationale=h.rationale,
                 supporting_agents=agent_support.get(h.text, []),
                 sources=[_annotate_source(s, verifications) for s in h.sources],
-                # Sin ninguna referencia que resista la verificación la hipótesis
-                # queda especulativa (o pendiente si PubMed no respondió), pero
-                # se conserva y se muestra.
                 status=evaluacion.status.value,
                 verified_sources=evaluacion.verified_sources,
                 declared_evidence_level=evaluacion.declared_level.value,
@@ -108,6 +167,28 @@ def _rank_hypotheses(
             )
         )
     return ranked
+
+
+def _build_arbitration_out(arbitration: ArbitrationResult) -> ArbitrationOut:
+    """Traduce el resumen del arbitraje al contrato de exportación."""
+    resumen = arbitration.summary
+    return ArbitrationOut(
+        status=resumen.status.value,
+        input_hypotheses=resumen.input_hypotheses,
+        consensus_hypotheses=resumen.consensus_hypotheses,
+        contradictions=resumen.contradictions,
+        cited_sources=resumen.cited_sources,
+        rag_overlap=resumen.rag_overlap,
+        retrieved_articles=resumen.retrieved_articles,
+        discarded_references=resumen.discarded_references,
+        recitation=RecitationOut(
+            executed=resumen.recitation.executed,
+            recited=resumen.recitation.recited,
+            improved=resumen.recitation.improved,
+            rejected_pmids=resumen.recitation.rejected_pmids,
+            failed_agents=list(resumen.recitation.failed_agents),
+        ),
+    )
 
 
 def _build_bibliography(
@@ -156,18 +237,39 @@ def _build_verification_summary(
     )
 
 
-def _build_debate_summary(report: Report) -> DebateSummary:
-    total_critiques = sum(
-        len(r.critiques) for r in report.debate_rounds
-    )
-    has_high_divergences = any(
-        "HIGH" in d for d in report.divergences
-    )
+def _build_debate_summary(
+    report: Report, arbitration: ArbitrationResult | None = None
+) -> DebateSummary:
+    """
+    Resume el debate para el reporte.
+
+    Las divergencias salen del Árbitro cuando arbitró: sus contradicciones
+    identifican al agente que objetó y citan su argumento, mientras que
+    `debate._detect_divergences()` solo detectaba solapamiento de palabras.
+    Sin arbitraje —o con el arbitraje degradado— se usan las del debate, que
+    siguen calculándose para no dejar la sección vacía.
+    """
+    total_critiques = sum(len(r.critiques) for r in report.debate_rounds)
+
+    if arbitration is not None and arbitration.consensus:
+        divergences = [
+            f"{c.from_agent_name} objetó [{c.severity}] la hipótesis "
+            f'"{item.hypothesis.text[:120]}": {c.critique_text}'
+            for item in arbitration.consensus
+            for c in item.contradictions
+        ]
+    else:
+        divergences = list(report.divergences)
+
     return DebateSummary(
         rounds_completed=len(report.debate_rounds) + 1,  # +1 por Ronda 1
         total_critiques=total_critiques,
-        divergences=report.divergences,
-        consensus_reached=not has_high_divergences,
+        divergences=divergences,
+        # Solo una objeción HIGH sin resolver rompe el consenso; una MEDIUM es
+        # parte normal del debate. Vale para los dos caminos: las
+        # contradicciones del Árbitro ya vienen filtradas a HIGH y lo declaran
+        # en el texto.
+        consensus_reached=not any("HIGH" in d for d in divergences),
     )
 
 
@@ -192,6 +294,7 @@ def build_export(
     processing_time: float,
     verifications: dict[str, SourceVerification] | None = None,
     navigation: TrialNavigationResult | None = None,
+    arbitration: ArbitrationResult | None = None,
 ) -> StructuredReport:
     """
     Ensambla el StructuredReport de exportación a partir de los outputs del pipeline.
@@ -207,12 +310,16 @@ def build_export(
         navigation:       Resultado del Agente 05 (Navegador de Ensayos). Si se
                           omite, `trial_search` queda nulo y el reporte se
                           renderiza como antes del agente.
+        arbitration:      Resultado del Agente 04 (Árbitro Verificador). Si se
+                          omite, las hipótesis son las del debate sin consolidar
+                          y `arbitration` queda nulo, igual que en un reporte
+                          anterior al Árbitro.
 
     Returns:
         StructuredReport listo para serializar a JSON o exportar a PDF.
     """
     verifications = verifications or {}
-    hypotheses = _rank_hypotheses(report, verifications)
+    hypotheses = _rank_hypotheses(report, verifications, arbitration)
 
     return StructuredReport(
         metadata=ReportMetadata(
@@ -222,10 +329,11 @@ def build_export(
         ),
         case_summary=_build_case_summary(case, report),
         hypotheses=hypotheses,
-        debate_summary=_build_debate_summary(report),
+        debate_summary=_build_debate_summary(report, arbitration),
         clinical_trials=trials,
         bibliography=_build_bibliography(report, verifications),
         verification=_build_verification_summary(verifications, hypotheses),
         rare_diseases=list(navigation.rare_diseases) if navigation else [],
         trial_search=navigation.summary if navigation else None,
+        arbitration=_build_arbitration_out(arbitration) if arbitration else None,
     )

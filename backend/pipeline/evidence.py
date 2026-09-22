@@ -281,22 +281,36 @@ def classify_hypothesis(
 def prioritize(
     hypotheses: Sequence[Hypothesis],
     verifications: Mapping[str, SourceVerification],
+    support_counts: Sequence[int] | None = None,
 ) -> list[tuple[Hypothesis, EvidenceAssessment]]:
     """
     Clasifica y ordena las hipótesis para el reporte.
 
     Criterios, en orden de precedencia: estado (respaldada → pendiente →
-    especulativa), nivel efectivo (I → III), prioridad declarada (HIGH → LOW),
-    cantidad de fuentes verificadas (mayor primero) y orden original. Al ir el
-    estado primero, las hipótesis de un mismo estado quedan contiguas.
+    especulativa), nivel efectivo (I → III), cantidad de agentes que respaldan
+    la hipótesis en el consenso (mayor primero), prioridad declarada (HIGH →
+    LOW), cantidad de fuentes verificadas (mayor primero) y orden original. Al
+    ir el estado primero, las hipótesis de un mismo estado quedan contiguas.
+
+    El respaldo del consenso pesa más que la prioridad porque la prioridad la
+    autodeclara un único agente, mientras que la cantidad de agentes que
+    sostienen una hipótesis es una señal que produjo el debate.
 
     Args:
-        hypotheses:    Hipótesis finales del pipeline, en el orden entregado.
-        verifications: Veredictos de `verify_report_sources()`.
+        hypotheses:     Hipótesis finales del pipeline, en el orden entregado.
+        verifications:  Veredictos de `verify_report_sources()`.
+        support_counts: Agentes que respaldan cada hipótesis, en paralelo a
+                        `hypotheses`. Si se omite, todas cuentan con uno y el
+                        orden resultante es el mismo que antes del Árbitro.
 
     Returns:
         Lista de pares (hipótesis, evaluación) ya ordenada. Ninguna se descarta.
     """
+    def respaldo(indice: int) -> int:
+        if support_counts is None or indice >= len(support_counts):
+            return 1
+        return support_counts[indice]
+
     evaluadas = [
         (indice, hipotesis, classify_hypothesis(hipotesis, verifications))
         for indice, hipotesis in enumerate(hypotheses)
@@ -305,6 +319,7 @@ def prioritize(
         key=lambda item: (
             _STATUS_RANK[item[2].status],
             _LEVEL_RANK[item[2].effective_level],
+            -respaldo(item[0]),
             _PRIORITY_RANK.get(item[1].priority, len(_PRIORITY_RANK)),
             -item[2].verified_sources,
             item[0],

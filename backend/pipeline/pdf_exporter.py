@@ -96,6 +96,9 @@ _SUSTITUCIONES = str.maketrans({
     " ": " ", " ": " ", " ": " ", " ": " ",
     "…": "...", "≤": "<=", "≥": ">=", "×": "x",
     "−": "-", "­": "",
+    # Helvetica no tiene flechas: sin esto ReportLab dibuja un glifo
+    # equivocado en vez de la flecha, en la portada que lee el médico.
+    "→": "->", "←": "<-", "↔": "<->",
 })
 
 
@@ -218,6 +221,25 @@ def _cover(report: StructuredReport, s: dict) -> list:
         stats.append(["Hipótesis pendientes de verificación", str(v.hipotesis_pendientes)])
     if v and v.hipotesis_topeadas:
         stats.append(["Hipótesis con nivel de evidencia topeado", str(v.hipotesis_topeadas)])
+    a = report.arbitration
+    if a and a.status != "sin_hipotesis":
+        if a.consensus_hypotheses < a.input_hypotheses:
+            stats.append([
+                "Hipótesis del debate consolidadas por el Árbitro",
+                f"de {a.input_hypotheses} a {a.consensus_hypotheses}",
+            ])
+        if a.contradictions:
+            stats.append(["Objeciones sin resolver", str(a.contradictions)])
+        if a.retrieved_articles and a.cited_sources:
+            stats.append([
+                "Citas provenientes de la literatura recuperada",
+                f"{a.rag_overlap} de {a.cited_sources}",
+            ])
+        if a.recitation.executed:
+            stats.append([
+                "Hipótesis que recitaron sobre literatura real",
+                f"{a.recitation.improved} de {a.recitation.recited} con respaldo",
+            ])
     stats += [
         ["Rondas de debate", str(report.debate_summary.rounds_completed)],
         ["Tiempo de procesamiento", f"{report.metadata.processing_time_seconds:.1f} s"],
@@ -264,6 +286,32 @@ def _cover(report: StructuredReport, s: dict) -> list:
                 )
             elems.append(_par(f"<font color='{_hex(_RED)}'>{aviso}</font>", s["disclaimer"]))
             elems.append(Spacer(1, 0.5 * cm))
+
+    # El consenso es entre modelos de lenguaje: el médico tiene que saberlo
+    # antes de leer las hipótesis, no después.
+    if a and a.status != "sin_hipotesis":
+        if a.status == "degradado":
+            elems.append(_par(
+                f"<font color='{_hex(_ORANGE)}'><b>Arbitraje no disponible:</b> "
+                f"las {a.input_hypotheses} hipótesis se presentan sin consolidar, "
+                f"tal como las entregó el debate.</font>",
+                s["disclaimer"],
+            ))
+        else:
+            aviso_arbitro = (
+                "<b>Sobre el consenso:</b> el agrupamiento de hipótesis y los "
+                "veredictos los produjo un panel de agentes de inteligencia "
+                "artificial debatiendo entre sí. No constituyen un diagnóstico ni "
+                "una recomendación clínica: la decisión es del médico responsable."
+            )
+            if a.retrieved_articles and a.cited_sources and a.rag_overlap < a.cited_sources:
+                aviso_arbitro += (
+                    f" Solo {a.rag_overlap} de las {a.cited_sources} referencias que "
+                    f"citaron los agentes provienen de los {a.retrieved_articles} "
+                    f"artículos que el sistema les recuperó de PubMed."
+                )
+            elems.append(_par(aviso_arbitro, s["disclaimer"]))
+        elems.append(Spacer(1, 0.5 * cm))
 
     elems.append(_par(report.metadata.disclaimer, s["disclaimer"]))
     elems.append(PageBreak())
@@ -388,6 +436,42 @@ def _hypothesis_block(h: RankedHypothesis, s: dict) -> list:
         color = _ORANGE if topeada else _GRAY
         elems.append(_par(
             f"<font color='{_hex(color)}'><i>Nivel de evidencia:</i> {h.evidence_note}</font>",
+            s["small"],
+        ))
+
+    # Veredicto del Árbitro (Agente 04).
+    if h.arbiter_note:
+        elems.append(_par(
+            f"<font color='{_hex(_NEXUS_BLUE)}'><i>Veredicto del Árbitro:</i> "
+            f"{h.arbiter_note}</font>",
+            s["small"],
+        ))
+
+    if h.recitation == "mejorada":
+        elems.append(_par(
+            f"<font color='{_hex(_GREEN)}'><i>Recitada:</i> se le pidió volver a citar "
+            f"sobre la literatura recuperada y consiguió respaldo verificable.</font>",
+            s["small"],
+        ))
+    elif h.recitation == "sin_cambio":
+        elems.append(_par(
+            f"<font color='{_hex(_GRAY)}'><i>Recitada:</i> se le pidió volver a citar "
+            f"sobre la literatura recuperada y siguió sin respaldo verificable.</font>",
+            s["small"],
+        ))
+
+    # Objeciones de peso que ningún agente retiró. Van junto a la hipótesis: un
+    # consenso presentado sin su objeción es un consenso mal reportado.
+    if h.refuting_agents:
+        elems.append(_par(
+            f"<font color='{_hex(_RED)}'><i>Objetada por:</i> "
+            f"{', '.join(h.refuting_agents)}</font>",
+            s["small"],
+        ))
+    for contra in h.contradictions[:2]:
+        elems.append(_par(
+            f"<font color='{_hex(_RED)}'>· {contra.from_agent_name} "
+            f"[{contra.severity}]: {contra.critique_text}</font>",
             s["small"],
         ))
 

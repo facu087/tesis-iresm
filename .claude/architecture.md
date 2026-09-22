@@ -44,15 +44,14 @@ Documentos clínicos (PDF / imágenes)
     │  Cada agente recibe outputs de los demás │
     │  y genera críticas específicas           │
     │                                          │
-    │  RONDA 5 — Síntesis del árbitro          │
     └──────────────────┬───────────────────────┘
                        │
                        ▼
               ┌─────────────────┐
-              │   Agente 04     │
-              │   Árbitro       │  Verifica cada hipótesis
-              │   Verificador   │  contra PubMed
-              │   Claude Opus   │  Clasifica nivel evidencia
+              │   Agente 04     │  Verifica cada PMID contra PubMed
+              │   Árbitro       │  Agrupa las hipótesis equivalentes
+              │   Verificador   │  Documenta las objeciones abiertas
+              │   Claude Opus   │  RONDA 5: recita sobre literatura real
               └────────┬────────┘  Sin respaldo → especulativa (III)
                        │
                        ▼
@@ -70,14 +69,22 @@ Documentos clínicos (PDF / imágenes)
               └─────────────────┘
 ```
 
-> **Estado real del flujo (Sprint 4).** El Agente 04 todavía no existe como agente:
-> su mitad de verificación corre en `pipeline/verification.py`. Hasta que exista,
-> el Agente 05 **no** va después del Árbitro sino **en paralelo con la verificación**
-> (`asyncio.gather` en `api/router.py`): ambos dependen solo del reporte final del
-> debate y usan APIs distintas (ClinicalTrials.gov/Orphanet vs. PubMed). Cuando el
-> Árbitro exista, el orden pasa a ser `árbitro → navigate(consenso)` cambiando solo
-> el adaptador de entrada (`pipeline/trial_matching.build_navigation_input`), no el
-> agente. El Agente 06 sigue siendo `pipeline/report_builder.py` + `pdf_exporter.py`.
+> **Estado real del flujo (Sprint 4).** El Agente 04 **ya existe**
+> (`agents/agent_04_arbiter.py`) y el pipeline quedó serializado como describe el
+> diagrama: `debate → verificación → árbitro → navegación de ensayos`
+> (`api/router.py`). El Agente 05 recibe ahora las hipótesis de **consenso**, no
+> la concatenación del debate; `pipeline/trial_matching.build_navigation_input()`
+> no cambió, porque ya estaba diseñado para esto.
+>
+> El Árbitro es **híbrido**: el LLM solo propone qué hipótesis son equivalentes
+> —devolviendo índices, nunca texto— y redacta los veredictos. La verificación
+> (`pipeline/verification.py`), la clasificación EBM (`pipeline/evidence.py`), la
+> validación del agrupamiento, la elección del enunciado representativo y la
+> detección de contradicciones son deterministas y viven en
+> `pipeline/consensus.py`. El LLM nunca descarta una hipótesis, nunca introduce
+> referencias y nunca altera un nivel de evidencia.
+>
+> El Agente 06 sigue siendo `pipeline/report_builder.py` + `pdf_exporter.py`.
 
 ---
 
@@ -346,7 +353,7 @@ El declarado queda en `declared_evidence_level` y la explicación en `evidence_n
 | agente_01 | Analista de Literatura | Claude Opus | Groq `gpt-oss-120b` | PubMed API, RAG |
 | agente_02 | Especialista Genómica | GPT-4o | Groq `gpt-oss-120b` | PharmGKB, ClinVar |
 | agente_03 | Consultor Clínico | Gemini Pro | Groq `gpt-oss-120b` | NCCN Guidelines |
-| agente_04 | Árbitro Verificador | Claude Opus | Groq `gpt-oss-120b` | PubMed, ESMO, EMA |
+| agente_04 | Árbitro Verificador ✅ | Claude Opus | Groq `gpt-oss-120b` | PubMed |
 | agente_05 | Navegador de Ensayos ✅ | Dedicado | Groq `gpt-oss-120b` | ClinicalTrials.gov, Orphanet |
 | agente_06 | Sintetizador | Claude Opus | Groq `gpt-oss-120b` | ReportLab, python-docx |
 
@@ -382,22 +389,40 @@ Rondas 3-4: Los agentes responden a las críticas
           → ajustan o defienden sus hipótesis
           → con argumentación bibliográfica
 
-Ronda 5:  El Árbitro recibe todos los outputs
-          → resuelve divergencias con soporte bibliográfico
-          → documenta las irresolubles
-          → construye el consenso preliminar
-
-Verificación final:
-          → Árbitro cruza cada hipótesis contra PubMed
+Verificación:
+          → se cruza cada PMID citado contra PubMed y se compara el
+            título real con el declarado
           → Sin soporte = especulativa (nivel III, no se descarta)
           → Sin respuesta de PubMed = pendiente (nivel III)
-          → Con soporte = verificada (incluida en reporte)
+          → Con soporte = respaldada
+
+Arbitraje: El Árbitro recibe todos los outputs
+          → agrupa las hipótesis equivalentes en un consenso
+          → documenta las objeciones HIGH que nadie retiró
+          → emite un veredicto por hipótesis
+
+Ronda 5:  Recitación acotada
+          → las hipótesis sin respaldo vuelven a su autor con el motivo
+            por el que falló cada cita y los artículos que el RAG había
+            recuperado
+          → los PMID nuevos se validan contra ese conjunto antes de
+            consultar PubMed, y después se re-verifican
+          → UNA sola iteración
 ```
 
 ### Criterio de parada
-El debate finaliza cuando **todas las hipótesis del consenso tienen al menos
-una referencia bibliográfica verificable**, independientemente de si los
-agentes están de acuerdo entre sí. Las divergencias irresolubles se documentan.
+El análisis termina **después de la ronda de recitación**, tenga o no respaldo
+cada hipótesis. Las que sigan sin respaldo quedan etiquetadas como especulativas
+y se reportan: ninguna se descarta. Las divergencias irresolubles se documentan.
+
+> **Corregido el 2026-09-21.** Antes decía que el debate finalizaba cuando *todas*
+> las hipótesis del consenso tuvieran una referencia verificable. Ese criterio no
+> se cumple nunca: en la corrida real del 2026-09-15 sobre el caso de la tesis,
+> **las 15 citas de los agentes resultaron discordantes** contra PubMed, y ninguno
+> de los PMIDs citados coincidía con los que el RAG les había puesto en el prompt.
+> Condicionar la finalización a algo inalcanzable habría dejado el pipeline en un
+> bucle. La recitación es el intento acotado de mejorar esas citas; su resultado
+> se mide y se reporta, mejore o no.
 
 ---
 

@@ -49,6 +49,58 @@ export interface RankedHypothesis {
   declared_evidence_level?: EvidenceLevel | null;
   /** Explicación de por qué la hipótesis quedó con su nivel efectivo. */
   evidence_note?: string;
+
+  /* Consenso del Árbitro (Agente 04). Opcionales: un reporte anterior al
+     Árbitro llega sin ellos y la vista lo renderiza como antes. */
+  /** Agentes que objetaron la hipótesis y no incorporaron la crítica. */
+  refuting_agents?: string[];
+  contradictions?: Contradiction[];
+  /** Veredicto del Árbitro, en lenguaje llano. */
+  arbiter_note?: string;
+  recitation?: RecitationOutcome;
+}
+
+/** Objeción de peso que quedó sin resolver al cerrar el debate. */
+export interface Contradiction {
+  from_agent_name: string;
+  severity: "HIGH" | "MEDIUM" | "LOW";
+  critique_text: string;
+  alternative?: string | null;
+}
+
+/** Qué pasó con la hipótesis en la Ronda 5 de recitación. */
+export type RecitationOutcome =
+  | "no_aplica"
+  | "mejorada"
+  | "sin_cambio"
+  | "fallida";
+
+/** Resultado de la Ronda 5: se les pidió volver a citar sobre literatura real. */
+export interface RecitationSummary {
+  executed: boolean;
+  recited: number;
+  improved: number;
+  rejected_pmids: number;
+  failed_agents: string[];
+}
+
+/**
+ * Resumen del arbitraje (Agente 04).
+ *
+ * `rag_overlap` sobre `cited_sources` es el número que justifica que el Árbitro
+ * exista: cuántas de las citas de los agentes salieron de la literatura que el
+ * RAG les había puesto en el prompt.
+ */
+export interface ArbitrationSummary {
+  status: "ok" | "degradado" | "sin_hipotesis";
+  input_hypotheses: number;
+  consensus_hypotheses: number;
+  contradictions: number;
+  cited_sources: number;
+  rag_overlap: number;
+  retrieved_articles: number;
+  discarded_references: number;
+  recitation: RecitationSummary;
 }
 
 export interface CaseSummarySection {
@@ -164,6 +216,9 @@ export interface StructuredReport {
      la vista renderiza los ensayos como antes. */
   rare_diseases?: RareDiseaseMatch[];
   trial_search?: TrialSearchSummary | null;
+  /* Agente 04. Nulo o ausente = reporte anterior al Árbitro: las hipótesis
+     vienen del debate sin consolidar y la vista no muestra el consenso. */
+  arbitration?: ArbitrationSummary | null;
 }
 
 /** Error estructurado que devuelve FastAPI */

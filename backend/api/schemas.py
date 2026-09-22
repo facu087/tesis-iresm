@@ -57,6 +57,52 @@ class RankedHypothesis(BaseModel):
     declared_evidence_level: str | None = None  # I | II | III
     evidence_note: str = ""
 
+    # Consenso del Árbitro (Agente 04). Aditivo: un reporte anterior al Árbitro
+    # llega con estas listas vacías y se renderiza como antes.
+    refuting_agents: list[str] = []
+    contradictions: list["ContradictionOut"] = []
+    arbiter_note: str = ""           # veredicto del Árbitro, en lenguaje llano
+    recitation: str = "no_aplica"    # no_aplica | mejorada | sin_cambio | fallida
+
+
+class ContradictionOut(BaseModel):
+    """Objeción de peso que quedó sin resolver al cerrar el debate."""
+
+    from_agent_name: str
+    severity: str            # HIGH | MEDIUM | LOW
+    critique_text: str
+    alternative: str | None = None
+
+
+class RecitationOut(BaseModel):
+    """Resultado de la Ronda 5: qué pasó cuando se les pidió volver a citar."""
+
+    executed: bool = False
+    recited: int = 0         # hipótesis que entraron en la recitación
+    improved: int = 0        # las que consiguieron respaldo gracias a ella
+    rejected_pmids: int = 0  # fuentes descartadas por PMID fuera del conjunto
+    failed_agents: list[str] = []
+
+
+class ArbitrationOut(BaseModel):
+    """
+    Resumen del arbitraje (Agente 04).
+
+    `rag_overlap` sobre `cited_sources` es el número que justifica que el
+    Árbitro exista: cuántas de las citas de los agentes salieron de la
+    literatura que el RAG les había puesto en el prompt.
+    """
+
+    status: str = "ok"               # ok | degradado | sin_hipotesis
+    input_hypotheses: int = 0        # las que entregó el debate
+    consensus_hypotheses: int = 0    # los grupos resultantes
+    contradictions: int = 0
+    cited_sources: int = 0
+    rag_overlap: int = 0
+    retrieved_articles: int = 0
+    discarded_references: int = 0
+    recitation: RecitationOut = RecitationOut()
+
 
 class DebateSummary(BaseModel):
     rounds_completed: int
@@ -107,3 +153,8 @@ class StructuredReport(BaseModel):
     # estados en "sin_consulta" haría que un reporte viejo con ensayos afirme
     # que no se consultó nada.
     trial_search: TrialSearchSummary | None = None
+
+    # Agente 04 — Árbitro Verificador. Nullable por el mismo motivo que
+    # `trial_search`: None significa "reporte anterior al Árbitro", y es lo que
+    # le dice al frontend y al PDF que las hipótesis vienen sin consolidar.
+    arbitration: ArbitrationOut | None = None

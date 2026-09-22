@@ -224,6 +224,7 @@ async def run_debate(case: ClinicalCase, round_1_report: Report) -> Report:
             divergences=[],
             sources_summary=round_1_report.sources_summary,
             absent_agents=absent_agents,
+            retrieved_articles=round_1_report.retrieved_articles,
         )
 
     # ── Ronda 2: críticas ─────────────────────────────────────────
@@ -256,4 +257,7 @@ async def run_debate(case: ClinicalCase, round_1_report: Report) -> Report:
         divergences=divergences,
         sources_summary=sources_summary,
         absent_agents=absent_agents,
+        # El Árbitro los necesita al final del pipeline: si el debate no los
+        # propaga, la literatura que el RAG ofreció se pierde acá.
+        retrieved_articles=round_1_report.retrieved_articles,
     )

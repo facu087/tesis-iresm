@@ -321,3 +321,68 @@ class TestPrioritize:
         hipotesis = [_hypothesis(f"H{i}", sources=[_source(str(i))]) for i in range(5)]
         v = _verifications(*(_verdict(str(i), SourceStatus.DISCORDANTE) for i in range(5)))
         assert len(prioritize(hipotesis, v)) == 5
+
+
+class TestOrdenPorRespaldoDelConsenso:
+    """
+    El respaldo del consenso entra como criterio de orden, después del nivel
+    efectivo y antes de la prioridad (spec clasificacion-evidencia-ebm,
+    modificada por el cambio agente-04-arbitro-verificador).
+
+    Pesa más que la prioridad porque la prioridad la autodeclara un único
+    agente, mientras que la cantidad de agentes que sostienen una hipótesis es
+    una señal que produjo el debate.
+    """
+
+    def test_el_respaldo_pesa_mas_que_la_prioridad(self):
+        tres_agentes = _hypothesis(text="La sostienen tres", priority=Priority.MEDIUM)
+        un_agente = _hypothesis(text="La sostiene uno", priority=Priority.HIGH)
+
+        orden = prioritize([un_agente, tres_agentes], {}, support_counts=[1, 3])
+
+        assert orden[0][0].text == "La sostienen tres"
+
+    def test_el_nivel_efectivo_sigue_pesando_mas_que_el_respaldo(self):
+        nivel_ii = _hypothesis(
+            text="Nivel II con un agente", declared=II, sources=[_source("111")],
+        )
+        nivel_iii = _hypothesis(
+            text="Nivel III con tres agentes", declared=III, sources=[_source("222")],
+        )
+        verifs = {
+            "111": _verdict("111", types=["Randomized Controlled Trial"]),
+            "222": _verdict("222", types=["Case Reports"]),
+        }
+
+        orden = prioritize([nivel_iii, nivel_ii], verifs, support_counts=[3, 1])
+
+        assert orden[0][0].text == "Nivel II con un agente"
+
+    def test_desempate_por_prioridad_a_igual_respaldo(self):
+        media = _hypothesis(text="Prioridad media", priority=Priority.MEDIUM)
+        alta = _hypothesis(text="Prioridad alta", priority=Priority.HIGH)
+
+        orden = prioritize([media, alta], {}, support_counts=[2, 2])
+
+        assert orden[0][0].text == "Prioridad alta"
+
+    def test_sin_support_counts_el_orden_no_cambia(self):
+        """No regresión: un reporte armado sin arbitraje ordena igual que antes."""
+        a = _hypothesis(text="Prioridad alta", priority=Priority.HIGH)
+        b = _hypothesis(text="Prioridad media", priority=Priority.MEDIUM)
+
+        assert [h.text for h, _ in prioritize([b, a], {})] == \
+               [h.text for h, _ in prioritize([b, a], {}, support_counts=[1, 1])]
+
+    def test_support_counts_incompleto_no_rompe(self):
+        """Ante una lista más corta, las que faltan cuentan como un agente."""
+        a = _hypothesis(text="A", priority=Priority.MEDIUM)
+        b = _hypothesis(text="B", priority=Priority.MEDIUM)
+
+        orden = prioritize([a, b], {}, support_counts=[3])
+
+        assert orden[0][0].text == "A"
+
+    def test_no_descarta_ninguna_hipotesis(self):
+        hs = [_hypothesis(text=f"H{i}") for i in range(4)]
+        assert len(prioritize(hs, {}, support_counts=[1, 2, 3, 1])) == 4

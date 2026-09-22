@@ -71,18 +71,32 @@ Backend mergeado a `develop` (capa de recuperación de evidencia / RAG). Autor: 
 - [x] Vista de reporte: estado de verificación de hipótesis y fuentes (frontend/src/app/report/page.tsx)
 - [x] PDF: estado de verificación en el reporte exportado (backend/pipeline/pdf_exporter.py)
 - [ ] Agente 02 (Especialista Genómica): prompt + llamada LLM + parseo JSON
-- [ ] Agente 04 (Árbitro Verificador): verificación bibliográfica de cada hipótesis
+- [x] Agente 04 (Árbitro Verificador): consenso, contradicciones y Ronda 5 de recitación
+      (backend/agents/agent_04_arbiter.py + pipeline/consensus.py + pipeline/recitation.py)
 - [x] Agente 05 (Navegador de Ensayos): ClinicalTrials.gov + Orphanet
       (backend/agents/agent_05_trials.py + backend/pipeline/trial_matching.py)
 - [ ] Agente 06 (Sintetizador): reporte final — reemplaza a `pipeline/report_builder.py`
 - [x] Priorización de hipótesis por nivel de evidencia EBM (I, II, III) (backend/pipeline/evidence.py)
 
-> El RAG, el verificador de PMIDs y el Agente 05 ya corren en el flujo de
-> `POST /api/analyze`: el RAG enriquece el contexto de la Ronda 1
-> (`pipeline/orchestrator.py`, `_enrich_context_with_rag`), y la navegación de
-> ensayos y la verificación corren en paralelo después del debate
-> (`asyncio.gather` en `api/router.py`). Falta la parte de **síntesis** del
-> Agente 04 y los agentes 02 y 06.
+> El pipeline de `POST /api/analyze` quedó **serializado**:
+> `debate → verificación → Árbitro (04) → navegación de ensayos (05)`. El RAG
+> enriquece el contexto de la Ronda 1 y ahora **conserva** los artículos
+> recuperados en el `Report`, que es lo que permite medir si los agentes citan
+> la literatura que se les da. Falta el Agente 06.
+>
+> El Agente 04 es **híbrido**: el LLM solo propone qué hipótesis son
+> equivalentes —devolviendo índices, nunca texto— y redacta los veredictos. La
+> validación del agrupamiento, la elección del enunciado representativo, la
+> detección de contradicciones y la clasificación EBM son deterministas
+> (`pipeline/consensus.py`, `pipeline/evidence.py`). El LLM nunca descarta una
+> hipótesis, nunca introduce referencias y nunca altera un nivel de evidencia.
+>
+> **Ronda 5 — recitación**: las hipótesis sin respaldo vuelven a su autor con el
+> motivo por el que falló cada cita y los artículos que el RAG recuperó, para que
+> vuelvan a citar sobre literatura real. Una sola iteración; lo que siga sin
+> respaldo queda especulativo. Esto **reemplaza** el criterio de parada que
+> figuraba en `architecture.md` ("toda hipótesis con referencia verificable"),
+> que con 15 de 15 citas discordantes no se cumplía nunca.
 >
 > El Agente 05 es **híbrido**: el LLM solo traduce hipótesis a términos de
 > condición en inglés y etiqueta compatibilidad (`alta`/`media`/`baja`); la
@@ -97,7 +111,7 @@ Backend mergeado a `develop` (capa de recuperación de evidencia / RAG). Autor: 
 | 01 | Analista de Literatura | ✅ Implementado |
 | 02 | Especialista Genómica | 📋 Pendiente |
 | 03 | Consultor Clínico | ✅ Implementado |
-| 04 | Árbitro Verificador | 📋 Pendiente |
+| 04 | Árbitro Verificador | ✅ Implementado |
 | 05 | Navegador de Ensayos | ✅ Implementado |
 | 06 | Sintetizador | 📋 Pendiente |
 
@@ -161,6 +175,11 @@ Scripts disponibles:
 - `demo_priorizacion_evidencia.py` — priorización EBM: nivel declarado vs. efectivo, estado
   y orden del reporte; genera `priorizacion.txt`, `reporte.json` y `reporte.pdf`
   (`--pubmed` verifica PMIDs reales)
+- `demo_agente04.py` — Agente 04: entrada (hipótesis del debate con su autor y las
+  críticas) → salida (partición del agrupamiento, contradicciones, veredictos, Ronda 5
+  y solapamiento entre lo que el RAG recuperó y lo que los agentes citaron); genera
+  `arbitraje.json` y `resumen.txt`. `--sin-red` simula cuatro caídas (LLM al agrupar,
+  LLM devolviendo texto libre, LLM citando un PMID inventado, PubMed sin responder)
 - `demo_agente05.py` — Agente 05: entrada (candidatas, términos saneados, demografía)
   → salida (ensayos con compatibilidad, sede, excluidos por edad/sexo, enfermedades
   raras, estado de cada API y latencia); genera `navegacion.json` y `resumen.txt`.
@@ -195,6 +214,7 @@ tesis-iresm/
 │   │   ├── base_agent.py           ← clase base ABC con interfaz común
 │   │   ├── agent_01_literature.py  ← Analista de Literatura (Groq)
 │   │   ├── agent_03_clinical.py    ← Consultor Clínico (Groq)
+│   │   ├── agent_04_arbiter.py     ← Árbitro Verificador (S4) — arbitrate(), no debate
 │   │   ├── agent_05_trials.py      ← Navegador de Ensayos (S4) — navigate(), no debate
 │   │   └── __init__.py
 │   ├── ingestion/
@@ -207,6 +227,7 @@ tesis-iresm/
 │   │   ├── report.py           ← AgentOutput, Report
 │   │   ├── case.py             ← ClinicalCase, PICOSynthesis
 │   │   ├── biomarkers.py       ← BiomarkerProfile
+│   │   ├── arbitration.py      ← consenso, contradicciones y resumen del Agente 04 (S4)
 │   │   ├── trial.py            ← ClinicalTrial + contrato del Agente 05 (S4)
 │   │   └── __init__.py
 │   ├── pipeline/
@@ -215,6 +236,9 @@ tesis-iresm/
 │   │   ├── debate.py           ← motor de debate adversarial (Rondas 2–4)
 │   │   ├── verification.py     ← verificación de PMIDs citados contra PubMed (S4)
 │   │   ├── evidence.py         ← clasificación EBM: tope de nivel, estado y orden (S4)
+│   │   ├── consensus.py        ← lógica determinista del Agente 04: partición,
+│   │   │                          representante, contradicciones, solapamiento RAG (S4)
+│   │   ├── recitation.py       ← Ronda 5: qué se recita y qué se acepta (S4)
 │   │   ├── trial_matching.py   ← lógica determinista del Agente 05: términos,
 │   │   │                          filtros edad/sexo, Orphanet, orden (S4)
 │   │   ├── report_builder.py   ← generación de JSON estructurado del reporte
