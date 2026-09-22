@@ -150,23 +150,30 @@ Suite de tests: **82 tests, 100% passing** (`pytest tests/`)
 > Evidencia: `scripts/demo_agente04.py` (y `--sin-red`, que muestra los cuatro
 > fallbacks sin conexión). Cambio OpenSpec: `agente-04-arbitro-verificador`.
 >
-> **Medido en la corrida real del 2026-09-21** sobre el caso base (450 s, sin ningún
-> fallback): **14 hipótesis del debate → 8 de consenso**; **19 de 19 referencias
-> citadas resultaron discordantes** contra PubMed (ninguna verificada); **0 de 19
-> citas salieron de los 5 artículos que el RAG les puso en el prompt**; 3 objeciones
-> quedaron sin resolver; 0 referencias inventadas por el Árbitro.
-> **Ronda 5: 8 hipótesis recitaron, 5 consiguieron respaldo verificable y 0 PMIDs
-> fueron rechazados** — puestos frente a la literatura real y con el motivo por el que
-> falló cada cita, los agentes sí citan del conjunto ofrecido. No es incapacidad de
-> citar: sin el material delante, inventan. Es el resultado que justifica la ronda.
+> **Medido en la corrida real del 2026-09-22** sobre el caso base (456 s, arbitraje
+> `ok`, sin un solo fallback):
 >
-> ⚠ **FALTA UNA CORRIDA LIMPIA** para adjuntar a la tarjeta #52. Los números de arriba
-> salen de una corrida que tenía el bug de propagación de los veredictos de la Ronda 5
-> (corregido en `e9bd486`): el arbitraje y la verificación son correctos, pero el
-> reporte exportado mostraba 0 hipótesis respaldadas. La corrida siguiente, ya con el
-> fix, confirmó que el reporte muestra las respaldadas, pero se agotó la **cuota diaria**
-> de Groq (197.800/200.000 TPD) y el debate se cayó desde la Ronda 2. Hay que correr una
-> vez más, con la cuota repuesta, y regenerar la evidencia.
+> - **14 hipótesis del debate → 7 de consenso.** La mitad eran la misma afirmación
+>   dicha con distinta redacción por agentes distintos.
+> - **14 de 14 referencias citadas por los agentes resultaron discordantes** contra
+>   PubMed: el PMID existe pero corresponde a otro artículo.
+> - **0 de 14 citas salieron de los 5 artículos que el RAG les puso en el prompt.**
+>   Los agentes ignoran por completo la literatura que se les recupera.
+> - 2 objeciones de peso quedaron sin resolver; 0 referencias inventadas por el Árbitro.
+> - **Ronda 5: 7 hipótesis recitaron, 3 consiguieron respaldo verificable, 0 PMIDs
+>   rechazados.**
+>
+> **Las 3 fuentes verificadas del reporte final salieron todas de la recitación.**
+> Sin la Ronda 5 este caso habría terminado con cero respaldo bibliográfico. Puestos
+> frente a la literatura real y con el motivo por el que falló cada cita, los agentes
+> sí citan del conjunto ofrecido: no es incapacidad de citar, es que sin el material
+> delante inventan. Es el resultado que justifica la ronda.
+>
+> Resultado final: 3 hipótesis respaldadas, 0 pendientes, 4 especulativas (ninguna se
+> descarta), 6 con el nivel EBM topeado, 10 ensayos clínicos.
+>
+> Evidencia en `output/evidencia/52/`: `corrida_real.txt`, `reporte.json`,
+> `reporte.pdf`, `demo_agente04.txt` y `fallbacks.txt`.
 
 > Nota (16) — **por qué hizo falta**: los agentes citaban PMIDs alucinados. No eran
 > números inválidos: existían en PubMed pero apuntaban a otro artículo, así que
