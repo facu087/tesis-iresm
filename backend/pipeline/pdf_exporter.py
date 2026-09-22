@@ -96,6 +96,9 @@ _SUSTITUCIONES = str.maketrans({
     " ": " ", " ": " ", " ": " ", " ": " ",
     "…": "...", "≤": "<=", "≥": ">=", "×": "x",
     "−": "-", "­": "",
+    # Helvetica no tiene flechas: sin esto ReportLab dibuja un glifo
+    # equivocado en vez de la flecha, en la portada que lee el médico.
+    "→": "->", "←": "<-", "↔": "<->",
 })
 
 
@@ -223,7 +226,7 @@ def _cover(report: StructuredReport, s: dict) -> list:
         if a.consensus_hypotheses < a.input_hypotheses:
             stats.append([
                 "Hipótesis del debate consolidadas por el Árbitro",
-                f"{a.input_hypotheses} → {a.consensus_hypotheses}",
+                f"de {a.input_hypotheses} a {a.consensus_hypotheses}",
             ])
         if a.contradictions:
             stats.append(["Objeciones sin resolver", str(a.contradictions)])

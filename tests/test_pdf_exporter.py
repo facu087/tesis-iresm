@@ -561,3 +561,48 @@ class TestPdfConArbitraje:
         )
         texto = _texto_del_pdf(generate_pdf(reporte))
         assert "Arbitraje no disponible" in texto
+
+
+class TestCaracteresNoSoportados:
+    """
+    Helvetica no tiene flechas ni varios signos tipográficos. Sin sanear, ReportLab
+    dibuja un glifo equivocado en el documento que lee el médico.
+
+    Salió preparando la evidencia de la tarjeta #52: la portada mostraba un
+    glifo de ligadura donde debía decir la flecha de consolidación.
+    """
+
+    def test_la_flecha_no_llega_cruda_al_pdf(self):
+        from backend.api.schemas import ArbitrationOut
+
+        reporte = _make_report()
+        reporte.arbitration = ArbitrationOut(
+            status="ok", input_hypotheses=14, consensus_hypotheses=7,
+        )
+        texto = _texto_del_pdf(generate_pdf(reporte))
+
+        assert "→" not in texto
+        assert "de 14 a 7" in " ".join(texto.split())
+
+    def test_la_tabla_de_sustituciones_cubre_las_flechas(self):
+        from backend.pipeline.pdf_exporter import _limpiar
+
+        assert _limpiar("14 → 7") == "14 -> 7"
+        assert _limpiar("a ← b") == "a <- b"
+
+    def test_el_texto_de_una_hipotesis_se_sanea(self):
+        """
+        Los títulos de PubMed traen guiones largos, comillas tipográficas y
+        signos matemáticos. El texto que pasa por `_par()` se sanea.
+
+        El em-dash y las comillas sí existen en Helvetica, así que no se rompen;
+        la sustitución es defensa en profundidad. La flecha es el caso que
+        genuinamente no tiene glifo, y lo cubre el test de arriba.
+        """
+        reporte = _make_report()
+        reporte.hypotheses[0].text = (
+            "Amiloidosis ATTR \u2014 variante \u201cVal30Met\u201d con seguimiento \u2265 24 meses"
+        )
+        texto = " ".join(_texto_del_pdf(generate_pdf(reporte)).split())
+
+        assert "Amiloidosis ATTR - variante \"Val30Met\" con seguimiento >= 24 meses" in texto
