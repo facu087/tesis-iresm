@@ -291,20 +291,29 @@ function ArbitrationBanner({ a }: { a: ArbitrationSummary }) {
               <>las {a.consensus_hypotheses} hipótesis del debate son distintas entre sí.</>
             )}
             {a.contradictions > 0 && (
-              <> {a.contradictions} objeción{a.contradictions === 1 ? "" : "es"} quedó sin resolver.</>
+              <>
+                {" "}
+                {a.contradictions === 1
+                  ? "Una objeción quedó sin resolver."
+                  : `${a.contradictions} objeciones quedaron sin resolver.`}
+              </>
             )}
           </>
         )}
         {a.cited_sources > 0 && a.retrieved_articles > 0 && (
           <>
-            {" "}Solo {a.rag_overlap} de las {a.cited_sources} referencias citadas salieron de
-            los {a.retrieved_articles} artículos que se les recuperó de PubMed.
+            {" "}
+            {a.rag_overlap === 0
+              ? `Ninguna de las ${a.cited_sources} referencias citadas salió de los ${a.retrieved_articles} artículos que se les recuperó de PubMed.`
+              : `Solo ${a.rag_overlap} de las ${a.cited_sources} referencias citadas salieron de los ${a.retrieved_articles} artículos que se les recuperó de PubMed.`}
           </>
         )}
         {r?.executed && (
           <>
-            {" "}Se les pidió volver a citar {r.recited} hipótesis sobre literatura real:{" "}
-            {r.improved} consiguió respaldo verificable.
+            {" "}Se les pidió volver a citar {r.recited}{" "}
+            {r.recited === 1 ? "hipótesis" : "hipótesis"} sobre literatura real:{" "}
+            {r.improved === 1 ? "1 consiguió" : `${r.improved} consiguieron`} respaldo
+            verificable.
             {r.rejected_pmids > 0 && (
               <> Se descartaron {r.rejected_pmids} referencias que volvieron a inventar.</>
             )}
