@@ -76,9 +76,31 @@
 
 ## 4. Techo de tokens por tarea
 
-- [ ] 4.1 Crear el mapa `tarea → (modelo, techo)` en un módulo de configuración, de modo que se pueda revisar qué usa cada llamada sin recorrer los agentes (D6). Verificar que todos los sitios de llamada lo consultan.
-- [ ] 4.2 Asignar el techo de cada tarea con holgura sobre su salida esperada, reemplazando el 4096 fijo. Verificar corriendo el caso de prueba y comprobando que **ninguna** respuesta quedó truncada por alcanzar su techo (`finish_reason`).
-- [ ] 4.3 Registrar en la telemetría cuando una respuesta se corta por techo, para detectar un techo mal puesto. Verificar con un test de techo deliberadamente bajo.
+- [x] 4.1 Crear el mapa `tarea → (modelo, techo)` en un módulo de configuración, de modo que se pueda revisar qué usa cada llamada sin recorrer los agentes (D6). Verificar que todos los sitios de llamada lo consultan.
+      Hecho: `backend/agents/model_tasks.py` (`TASK_BUDGETS`, `get_budget()`).
+      `BaseAgent._call_llm()` ahora exige `task: str` (kw-only) y resuelve modelo/techo
+      del mapa, no de `self.MODEL`. Los 12 sitios de llamada lo consultan: `run()` de
+      los agentes 01/02/03, `critique()`/`revise()`/`recite()` de `BaseAgent`,
+      `_group()`/`_write_verdicts()` del Agente 04, `_plan_terms()`/`_evaluate()` del
+      Agente 05, `pico.build()` y `biomarker_extractor._extract_with_llm()`. Test:
+      `tests/test_model_tasks.py`.
+- [x] 4.2 Asignar el techo de cada tarea con holgura sobre su salida esperada, reemplazando el 4096 fijo. Verificar corriendo el caso de prueba y comprobando que **ninguna** respuesta quedó truncada por alcanzar su techo (`finish_reason`).
+      **Parcial.** Asignación hecha con criterio explícito por tarea (ver docstring de
+      `model_tasks.py`): `arbitro_agrupacion` baja a 512 (la salida son solo índices,
+      sin relación con la cantidad de hipótesis) — sin evidencia de una corrida real,
+      es una estimación razonada, no medida. `agente05_planificacion_terminos` baja a
+      1024 con el mismo criterio. Las tareas de razonamiento clínico y
+      `agente05_evaluacion_compatibilidad` **conservan el 4096/2048/1024 histórico**
+      a propósito: el análisis de peor caso de la evaluación de compatibilidad (hasta
+      10 ensayos × fundamento de hasta 600 caracteres + hasta 5 criterios) no deja
+      holgura para bajarlo sin evidencia. **Pendiente para el orquestador**: correr el
+      caso de prueba real y confirmar que ningún `finish_reason` es `"length"` con
+      estos techos (bloqueado por la restricción de cuota de esta sesión).
+- [x] 4.3 Registrar en la telemetría cuando una respuesta se corta por techo, para detectar un techo mal puesto. Verificar con un test de techo deliberadamente bajo.
+      Hecho: `call_provider()` marca `truncated=True` cuando `finish_reason == "length"`.
+      Test: `TestCallProviderTelemetria::test_respuesta_cortada_por_techo_se_marca_truncada`
+      (`tests/test_base_agent.py`) y `TestLlamadasFallidasYSinDatos::
+      test_llamada_truncada_por_techo_queda_marcada` (`tests/test_telemetry.py`).
 
 ## 5. Modelo por tarea
 

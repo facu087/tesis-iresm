@@ -275,7 +275,9 @@ REGLAS CRÍTICAS:
         """
         total = len(entrada.hypotheses)
         try:
-            raw = await asyncio.to_thread(self._call_llm, _build_grouping_prompt(entrada))
+            raw = await asyncio.to_thread(
+                self._call_llm, _build_grouping_prompt(entrada), task="arbitro_agrupacion"
+            )
             datos = self.extract_json(raw)
         except Exception as exc:
             self._log_fallback("agrupación de hipótesis", exc)
@@ -323,7 +325,7 @@ REGLAS CRÍTICAS:
 
         try:
             prompt = _build_verdict_prompt(consenso, verifications)
-            raw = await asyncio.to_thread(self._call_llm, prompt)
+            raw = await asyncio.to_thread(self._call_llm, prompt, task="arbitro_veredictos")
             datos = self.extract_json(raw)
         except Exception as exc:
             # Sin veredictos el consenso igual sirve: tiene respaldo, refutación

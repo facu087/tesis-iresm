@@ -17,6 +17,7 @@ import httpx
 import pytest
 from groq import RateLimitError as GroqRateLimitError
 
+from backend.agents import model_tasks
 from backend.agents.base_agent import BaseAgent, call_provider
 from backend.models.hypothesis import EvidenceLevel, Priority
 from backend.telemetry import usage
@@ -263,7 +264,13 @@ class TestCallProvider:
                 )
         assert cliente.chat.completions.create.call_count == 4  # 1 + 3 reintentos
 
-    def test_call_llm_delega_en_call_provider_con_el_modelo_del_agente(self, monkeypatch):
+    def test_call_llm_delega_en_call_provider_con_el_presupuesto_de_la_tarea(self, monkeypatch):
+        """
+        `_call_llm()` resuelve modelo y techo desde `model_tasks` según la
+        `task` que le pasa el llamador (D6), no desde `self.MODEL`: la
+        política vigente vive en un solo mapa, consultable sin recorrer los
+        agentes.
+        """
         capturado = {}
 
         def falso(**kwargs):
@@ -275,18 +282,45 @@ class TestCallProvider:
         class AgenteDePrueba(BaseAgent):
             AGENT_ID = "99"
             AGENT_NAME = "Agente de Prueba"
-            MODEL = "modelo-del-agente"
+            MODEL = "modelo-del-agente"  # no debe usarse: manda el mapa de tareas
             SYSTEM_PROMPT = "prompt de sistema"
 
             def run(self, clinical_context: str):  # pragma: no cover - no se usa
                 raise NotImplementedError
 
-        resultado = AgenteDePrueba()._call_llm("mensaje de usuario")
+        resultado = AgenteDePrueba()._call_llm("mensaje de usuario", task="agente01_hipotesis")
         assert resultado == "respuesta"
-        assert capturado["model"] == "modelo-del-agente"
+        assert capturado["model"] == model_tasks.GROQ_MAIN
+        assert capturado["max_tokens"] == model_tasks.get_budget("agente01_hipotesis").max_tokens
         assert capturado["system_prompt"] == "prompt de sistema"
         assert capturado["user_message"] == "mensaje de usuario"
         assert capturado["agent_id"] == "99"
+        assert capturado["task"] == "agente01_hipotesis"
+
+    def test_call_llm_sin_task_falla(self):
+        """`task` es obligatorio: todo sitio de llamada declara su tarea (D6)."""
+        class AgenteDePrueba(BaseAgent):
+            AGENT_ID = "99"
+            AGENT_NAME = "Agente de Prueba"
+            SYSTEM_PROMPT = "s"
+
+            def run(self, clinical_context: str):  # pragma: no cover
+                raise NotImplementedError
+
+        with pytest.raises(TypeError):
+            AgenteDePrueba()._call_llm("mensaje")  # type: ignore[call-arg]
+
+    def test_call_llm_con_tarea_desconocida_falla_claro(self):
+        class AgenteDePrueba(BaseAgent):
+            AGENT_ID = "99"
+            AGENT_NAME = "Agente de Prueba"
+            SYSTEM_PROMPT = "s"
+
+            def run(self, clinical_context: str):  # pragma: no cover
+                raise NotImplementedError
+
+        with pytest.raises(KeyError):
+            AgenteDePrueba()._call_llm("mensaje", task="tarea_que_no_existe")
 
 
 class TestCallProviderTelemetria:

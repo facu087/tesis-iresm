@@ -195,7 +195,7 @@ def _entrada(hypotheses, agents_ids, articulos=None) -> ArbitrationInput:
 def _instalar_llm(monkeypatch, *respuestas):
     cola = list(respuestas)
 
-    def fake(self_agent, prompt):  # noqa: ANN001
+    def fake(self_agent, prompt, **kwargs):  # noqa: ANN001
         return cola.pop(0) if cola else json.dumps({"groups": []})
 
     monkeypatch.setattr("backend.agents.base_agent.BaseAgent._call_llm", fake)

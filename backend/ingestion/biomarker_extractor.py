@@ -15,8 +15,11 @@ Usa dos estrategias combinadas:
 import json
 import re
 
-from ..agents.base_agent import GROQ_MAIN, call_provider
+from ..agents import model_tasks
+from ..agents.base_agent import call_provider
 from ..models.biomarkers import BiomarkerProfile
+
+_TASK = "biomarcadores_extraccion"
 
 # ── Patrones de reconocimiento rápido ────────────────────────────────────────
 
@@ -155,13 +158,15 @@ def _extract_with_llm(text: str) -> dict:
     La llamada pasa por `call_provider()` (control de costos, S4 — D1): antes
     este módulo instanciaba el cliente de Groq por su cuenta, sin reintento
     ante rate limit y con su consumo fuera de cualquier contabilidad futura.
+    El modelo y el techo salen de `model_tasks.TASK_BUDGETS` (D6).
     """
+    budget = model_tasks.get_budget(_TASK)
     raw = call_provider(
         system_prompt=SYSTEM_PROMPT_LLM,
         user_message=f"Extraé las entidades biomédicas del siguiente texto clínico:\n\n{text}",
-        model=GROQ_MAIN,
-        max_tokens=1024,
-        task="biomarcadores_extraccion",
+        model=budget.model,
+        max_tokens=budget.max_tokens,
+        task=_TASK,
         temperature=0.1,
     ).strip()
 

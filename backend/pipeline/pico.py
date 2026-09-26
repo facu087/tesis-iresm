@@ -11,8 +11,11 @@ import re
 
 from pydantic import ValidationError
 
-from ..agents.base_agent import GROQ_MAIN, call_provider
+from ..agents import model_tasks
+from ..agents.base_agent import call_provider
 from ..models.case import ClinicalCase, PICOSynthesis
+
+_TASK = "pico_sintesis"
 
 SYSTEM_PROMPT = """Eres un médico especialista en metodología de investigación clínica.
 Tu tarea es analizar un caso clínico y construir una síntesis estructurada en formato PICO.
@@ -90,17 +93,20 @@ def build(case: ClinicalCase) -> ClinicalCase:
     La llamada al proveedor pasa por `call_provider()` (control de costos,
     S4 — D1): antes este módulo instanciaba el cliente de Groq por su cuenta,
     lo que dejaba su consumo fuera de cualquier contabilidad futura y
-    triplicaba el punto de swap de proveedor.
+    triplicaba el punto de swap de proveedor. El modelo y el techo de tokens
+    salen de `model_tasks.TASK_BUDGETS` (D6), no de una constante local: es
+    el mismo mapa que consultan los agentes.
     """
+    budget = model_tasks.get_budget(_TASK)
     raw = call_provider(
         system_prompt=SYSTEM_PROMPT,
         user_message=(
             "Construí la síntesis PICO para el siguiente caso clínico:\n\n"
             f"{case.raw_text}"
         ),
-        model=GROQ_MAIN,
-        max_tokens=2048,
-        task="pico_sintesis",
+        model=budget.model,
+        max_tokens=budget.max_tokens,
+        task=_TASK,
         temperature=0.1,
     )
     case.pico = _parse_pico(raw)

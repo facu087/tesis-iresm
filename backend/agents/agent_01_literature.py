@@ -58,7 +58,8 @@ Generá entre 3 y 6 hipótesis ordenadas de mayor a menor prioridad."""
     def run(self, clinical_context: str) -> AgentOutput:
         raw = self._call_llm(
             f"Analizá el siguiente caso clínico y generá hipótesis de investigación:\n\n"
-            f"{clinical_context}"
+            f"{clinical_context}",
+            task="agente01_hipotesis",
         )
         hypotheses = self.parse_hypotheses(raw)
         return self._build_output(hypotheses, raw)

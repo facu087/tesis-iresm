@@ -21,14 +21,13 @@ from abc import ABC, abstractmethod
 from pydantic import ValidationError
 
 from ..models.hypothesis import EvidenceLevel, Hypothesis, Priority, Source
-from ..telemetry import usage as usage_telemetry
 from ..models.report import AgentOutput, Critique
-
-# Modelos disponibles
-# Groq dio de baja los LLaMA 3.x (llama-3.3-70b-versatile / llama-3.1-8b-instant):
-# la API devuelve 404 model_not_found. Reemplazados por los gpt-oss disponibles.
-GROQ_MAIN = "openai/gpt-oss-120b"  # Agentes 01, 03, 06
-GROQ_FAST = "openai/gpt-oss-20b"   # Agente rápido para tareas simples
+from ..telemetry import usage as usage_telemetry
+from . import model_tasks
+# GROQ_MAIN/GROQ_FAST viven en model_tasks.py junto con el mapa tarea → (modelo,
+# techo) que las usa; se re-exportan acá porque `agents/__init__.py` y varios
+# agentes ya las importan desde `base_agent`.
+from .model_tasks import GROQ_FAST, GROQ_MAIN
 
 
 def call_provider(
@@ -247,17 +246,25 @@ class BaseAgent(ABC):
 
     # ── Llamada al LLM ────────────────────────────────────────────
 
-    def _call_llm(self, user_message: str) -> str:
+    def _call_llm(self, user_message: str, *, task: str) -> str:
         """
-        Llama al modelo configurado en self.MODEL vía `call_provider()`.
-        Devuelve el texto crudo de la respuesta.
+        Llama al proveedor vía `call_provider()`, con el modelo y el techo de
+        tokens de `task` (control de costos, S4 — D6). Devuelve el texto
+        crudo de la respuesta.
+
+        `task` reemplaza a `self.MODEL` para decidir el modelo real de la
+        llamada: `self.MODEL` sigue siendo un atributo obligatorio de cada
+        agente (documentación de qué modelo usa "por defecto"), pero la
+        política vigente vive en `model_tasks.TASK_BUDGETS`, consultable sin
+        recorrer los agentes.
         """
+        budget = model_tasks.get_budget(task)
         return call_provider(
             system_prompt=self.SYSTEM_PROMPT,
             user_message=user_message,
-            model=self.MODEL,
-            max_tokens=4096,
-            task=self.AGENT_ID or "agente",
+            model=budget.model,
+            max_tokens=budget.max_tokens,
+            task=task,
             agent_id=self.AGENT_ID,
             agent_name=self.AGENT_NAME,
         )
@@ -316,7 +323,7 @@ class BaseAgent(ABC):
             '      "alternative": "alternativa sugerida o null"\n'
             "    }\n  ]\n}"
         )
-        raw = self._call_llm(prompt)
+        raw = self._call_llm(prompt, task="debate_critica")
         return self._parse_critiques(raw)
 
     def revise(
@@ -343,7 +350,7 @@ class BaseAgent(ABC):
             "Respondé ÚNICAMENTE con JSON en el formato estándar de hipótesis:\n"
             '{\n  "hypotheses": [...]\n}'
         )
-        raw = self._call_llm(prompt)
+        raw = self._call_llm(prompt, task="debate_revision")
         hypotheses = self.parse_hypotheses(raw)
         return self._build_output(hypotheses, raw)
 
@@ -377,7 +384,7 @@ class BaseAgent(ABC):
             ofrecido es `pipeline/recitation.validate_recited()`.
         """
         prompt = self._build_recitation_prompt(hypotheses_with_reasons, articles)
-        raw = self._call_llm(prompt)
+        raw = self._call_llm(prompt, task="debate_recitacion")
         return self._parse_recitation(raw, total=len(hypotheses_with_reasons))
 
     def _build_recitation_prompt(
