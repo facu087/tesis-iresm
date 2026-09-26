@@ -21,6 +21,7 @@ from abc import ABC, abstractmethod
 from pydantic import ValidationError
 
 from ..models.hypothesis import EvidenceLevel, Hypothesis, Priority, Source
+from ..telemetry import usage as usage_telemetry
 from ..models.report import AgentOutput, Critique
 
 # Modelos disponibles
@@ -76,6 +77,12 @@ def call_provider(
     Reintenta hasta 3 veces con backoff incremental ante errores 429 (rate
     limit del tier gratuito de Groq). Agota los reintentos y relanza la
     última excepción si el proveedor sigue devolviendo 429.
+
+    Cada intento —falle o no— queda contabilizado en el registro de
+    telemetría activo (control de costos, Sprint 4 — D2), para que el costo
+    de los reintentos también sea visible. Sin un registro abierto (un script
+    de demo, un test) esto no hace nada: la telemetría nunca es condición
+    para que una llamada funcione.
     """
     from groq import Groq, RateLimitError
 
@@ -84,6 +91,7 @@ def call_provider(
     last_exc: Exception | None = None
 
     for attempt, delay in enumerate(delays + [None], start=1):
+        inicio = time.perf_counter()
         try:
             response = client.chat.completions.create(
                 model=model,
@@ -94,8 +102,11 @@ def call_provider(
                 max_tokens=max_tokens,
                 temperature=temperature,
             )
-            return response.choices[0].message.content
         except RateLimitError as exc:
+            usage_telemetry.record_call(
+                task=task, model=model, agent_id=agent_id, agent_name=agent_name,
+                ok=False, latency_seconds=time.perf_counter() - inicio,
+            )
             last_exc = exc
             if delay is None:
                 break
@@ -105,6 +116,28 @@ def call_provider(
                 file=sys.stderr,
             )
             time.sleep(delay)
+            continue
+        except Exception:
+            # Cualquier otra falla (auth, red, error del proveedor) también
+            # queda contabilizada, aunque acá no se reintenta: solo el 429
+            # tiene backoff propio.
+            usage_telemetry.record_call(
+                task=task, model=model, agent_id=agent_id, agent_name=agent_name,
+                ok=False, latency_seconds=time.perf_counter() - inicio,
+            )
+            raise
+
+        latencia = time.perf_counter() - inicio
+        choice = response.choices[0]
+        consumo = getattr(response, "usage", None)
+        usage_telemetry.record_call(
+            task=task, model=model, agent_id=agent_id, agent_name=agent_name,
+            ok=True, latency_seconds=latencia,
+            prompt_tokens=getattr(consumo, "prompt_tokens", None) if consumo else None,
+            completion_tokens=getattr(consumo, "completion_tokens", None) if consumo else None,
+            truncated=getattr(choice, "finish_reason", None) == "length",
+        )
+        return choice.message.content
 
     raise last_exc  # type: ignore[misc]
 

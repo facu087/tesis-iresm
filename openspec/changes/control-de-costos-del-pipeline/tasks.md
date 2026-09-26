@@ -21,22 +21,58 @@
 
 ## 2. Telemetría
 
-- [ ] 2.1 Crear `backend/telemetry/usage.py` con el registro por llamada (paso, modelo, tokens de entrada y salida, latencia, si falló) y el contexto por análisis basado en `contextvars`, que se propaga a corrutinas y a `asyncio.to_thread()` (D2). Verificar con `tests/test_telemetry.py` que dos análisis concurrentes no mezclan sus conteos.
-- [ ] 2.2 Instrumentar la función compartida de 1.1 para que registre cada llamada en el contexto activo, y que **no haga nada** si no hay contexto (un demo o un test no deben fallar por eso). Verificar con un test que llama sin contexto abierto.
-- [ ] 2.3 Registrar también las llamadas **fallidas** y los reintentos por 429, para que el costo de los reintentos sea visible. Verificar con un test que fuerza un fallo y comprueba que queda contabilizado.
-- [ ] 2.4 Registrar como "sin datos de consumo" las respuestas donde el proveedor no informe `usage`, en vez de omitirlas. Verificar con un test de respuesta sin `usage`.
-- [ ] 2.5 Implementar el identificador **aleatorio** por análisis, nunca derivado del texto clínico (D3). Verificar con un test que analiza dos veces el mismo texto y comprueba que los identificadores difieren.
-- [ ] 2.6 Implementar la escritura JSONL en `output/costos.jsonl`, una línea por análisis con total, desglose por agente y costo estimado (D4). Verificar con un test que corre tres análisis y comprueba que quedan tres líneas parseables.
-- [ ] 2.7 **Test de privacidad**: correr un análisis con el caso base y verificar que el registro no contiene ninguna palabra del texto clínico, ni del prompt, ni de la respuesta del modelo. Es un requisito de la spec, no un extra.
-- [ ] 2.8 Garantizar que un fallo al escribir el registro no rompe el análisis: `POST /api/analyze` responde igual y avisa por stderr. Verificar con un test que apunta el registro a una ruta no escribible.
-- [ ] 2.9 Emitir el resumen legible por stderr al terminar el análisis (llamadas, tokens, costo estimado). Verificar capturando stderr en un test.
+> Implementado junto con la sección 3: el resumen JSONL de 2.6 necesita costo
+> estimado, y eso requiere `pricing.py`. Un solo bloque de trabajo, dos commits
+> lógicos en tasks.md.
+
+- [x] 2.1 Crear `backend/telemetry/usage.py` con el registro por llamada (paso, modelo, tokens de entrada y salida, latencia, si falló) y el contexto por análisis basado en `contextvars`, que se propaga a corrutinas y a `asyncio.to_thread()` (D2). Verificar con `tests/test_telemetry.py` que dos análisis concurrentes no mezclan sus conteos.
+      Hecho: `AnalysisUsage` + `_current: ContextVar`. Test:
+      `test_dos_analisis_concurrentes_no_mezclan_conteos` (dos `asyncio.Task`) y
+      `test_el_contexto_se_propaga_a_asyncio_to_thread`.
+- [x] 2.2 Instrumentar la función compartida de 1.1 para que registre cada llamada en el contexto activo, y que **no haga nada** si no hay contexto (un demo o un test no deben fallar por eso). Verificar con un test que llama sin contexto abierto.
+      Hecho: `call_provider()` llama a `usage_telemetry.record_call()` en cada intento.
+      Test: `TestCallProviderTelemetria::test_sin_registro_activo_no_falla`.
+- [x] 2.3 Registrar también las llamadas **fallidas** y los reintentos por 429, para que el costo de los reintentos sea visible. Verificar con un test que fuerza un fallo y comprueba que queda contabilizado.
+      Hecho: cada intento (429 o cualquier otra excepción) se registra `ok=False`
+      antes de reintentar o relanzar. Tests:
+      `test_reintento_por_rate_limit_deja_un_intento_fallido_y_uno_exitoso`,
+      `test_fallo_no_reintentable_tambien_queda_contabilizado`.
+- [x] 2.4 Registrar como "sin datos de consumo" las respuestas donde el proveedor no informe `usage`, en vez de omitirlas. Verificar con un test de respuesta sin `usage`.
+      Hecho: `prompt_tokens`/`completion_tokens` quedan `None` cuando `response.usage`
+      es `None`. Test: `test_respuesta_sin_usage_se_registra_marcada`.
+- [x] 2.5 Implementar el identificador **aleatorio** por análisis, nunca derivado del texto clínico (D3). Verificar con un test que analiza dos veces el mismo texto y comprueba que los identificadores difieren.
+      Hecho: `secrets.token_hex(8)` en `AnalysisUsage.__init__`. Tests en
+      `TestIdentificadorAleatorio`.
+- [x] 2.6 Implementar la escritura JSONL en `output/costos.jsonl`, una línea por análisis con total, desglose por agente y costo estimado (D4). Verificar con un test que corre tres análisis y comprueba que quedan tres líneas parseables.
+      Hecho: `close_registry()` → `_append_jsonl()`. Test:
+      `test_tres_analisis_dejan_tres_lineas_parseables`.
+- [x] 2.7 **Test de privacidad**: correr un análisis con el caso base y verificar que el registro no contiene ninguna palabra del texto clínico, ni del prompt, ni de la respuesta del modelo. Es un requisito de la spec, no un extra.
+      Hecho: `tests/test_telemetry.py::TestPrivacidad` (estructural: `record_call()`
+      no acepta prompt/respuesta como parámetro) + `tests/test_router_telemetry.py
+      ::TestPrivacidadDelRegistroEnUnAnalisisReal` (análisis completo end-to-end
+      por el router, LLM y APIs externas mockeadas, resumen inspeccionado en disco).
+- [x] 2.8 Garantizar que un fallo al escribir el registro no rompe el análisis: `POST /api/analyze` responde igual y avisa por stderr. Verificar con un test que apunta el registro a una ruta no escribible.
+      Hecho: `close_registry()` atrapa `OSError` de `_append_jsonl()`. Test:
+      `TestResilenciaDeEscritura::test_ruta_no_escribible_no_rompe_y_avisa`.
+- [x] 2.9 Emitir el resumen legible por stderr al terminar el análisis (llamadas, tokens, costo estimado). Verificar capturando stderr en un test.
+      Hecho: `_print_summary()`. Test: `TestResumenPorConsola`.
 
 ## 3. Tarifas y estimación de costo
 
-- [ ] 3.1 Crear `backend/telemetry/pricing.py` con la tabla de tarifas por modelo, configurable, con Groq en cero por defecto y los modelos de la arquitectura de destino comentados (D5). Verificar con `tests/test_telemetry.py`.
-- [ ] 3.2 Implementar el cálculo del costo estimado por análisis y por agente. Verificar con un test de tarifas conocidas y conteos conocidos.
-- [ ] 3.3 Un modelo sin tarifa configurada reporta costo cero y queda señalado, sin lanzar excepción. Verificar con un test dedicado.
-- [ ] 3.4 Permitir recalcular el costo de un registro ya guardado con otra tabla de tarifas — es lo que responde "¿cuánto costaría con Claude Opus?" sin correr nada. Verificar con un test sobre un registro de ejemplo.
+- [x] 3.1 Crear `backend/telemetry/pricing.py` con la tabla de tarifas por modelo, configurable, con Groq en cero por defecto y los modelos de la arquitectura de destino comentados (D5). Verificar con `tests/test_telemetry.py`.
+      Hecho: `DEFAULT_PRICES` con `openai/gpt-oss-120b`/`20b` en 0.0, Claude Opus /
+      GPT-4o / Gemini Pro comentados con la fuente de verdad de modelos
+      (`.claude/CLAUDE.md`).
+- [x] 3.2 Implementar el cálculo del costo estimado por análisis y por agente. Verificar con un test de tarifas conocidas y conteos conocidos.
+      Hecho: `pricing.estimate_cost()` + `usage.build_summary()` (agrega por
+      `(agent_id, agent_name, model)`). Test: `test_estimate_cost_con_tarifas_conocidas`.
+- [x] 3.3 Un modelo sin tarifa configurada reporta costo cero y queda señalado, sin lanzar excepción. Verificar con un test dedicado.
+      Hecho: `estimate_cost()` devuelve `(0.0, False)`; `build_summary()` junta los
+      modelos sin tarifa en `totals["unpriced_models"]`. Test:
+      `test_resumen_senala_modelo_sin_tarifa`.
+- [x] 3.4 Permitir recalcular el costo de un registro ya guardado con otra tabla de tarifas — es lo que responde "¿cuánto costaría con Claude Opus?" sin correr nada. Verificar con un test sobre un registro de ejemplo.
+      Hecho: `usage.recalculate(record, price_table)` (no muta el original). Test:
+      `TestRecalcular::test_recalcula_el_costo_de_un_registro_guardado`.
 
 ## 4. Techo de tokens por tarea
 
