@@ -2,6 +2,18 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import ScrollReveal from "@/components/ScrollReveal";
 import { PIPELINE_STEPS, PIPELINE_SUMMARY } from "@/lib/pipelineSteps";
+import {
+  BookIcon,
+  DnaIcon,
+  PulseIcon,
+  ScaleIcon,
+  CompassIcon,
+  DocumentIcon,
+  ShieldCheckIcon,
+  LayersIcon,
+  SearchIcon,
+  DebateIcon,
+} from "@/components/icons";
 
 export const metadata: Metadata = {
   title: "NEXUS — Sistema de Soporte Investigativo Clínico",
@@ -22,6 +34,12 @@ export default function LandingPage() {
         </ScrollReveal>
         <ScrollReveal>
           <HowItWorksSection />
+        </ScrollReveal>
+        <ScrollReveal>
+          <AgentsSection />
+        </ScrollReveal>
+        <ScrollReveal>
+          <FeaturesSection />
         </ScrollReveal>
       </main>
     </div>
@@ -179,6 +197,185 @@ function HowItWorksSection() {
             </li>
           ))}
         </ol>
+      </div>
+    </section>
+  );
+}
+
+/* ── Agentes ───────────────────────────────────────────────────────────── */
+
+/**
+ * Descripciones verificadas contra el código y la documentación fuente de
+ * verdad (design D8): `backend/agents/agent_02_genomics.py`,
+ * `.claude/architecture.md` y `.claude/backlog.md` — no `.claude/CLAUDE.md`,
+ * desactualizado en el estado del Agente 02. El único agente sin capacidad
+ * activa descripta es el 06: el reporte final lo arma hoy un módulo
+ * determinista (`pipeline/report_builder.py`), no un agente propio.
+ */
+const AGENTS = [
+  {
+    id: "01",
+    name: "Analista de Literatura",
+    Icon: BookIcon,
+    description:
+      "Genera hipótesis a partir de literatura médica publicada, con búsqueda semántica sobre PubMed (RAG) como contexto.",
+    pending: false,
+  },
+  {
+    id: "02",
+    name: "Especialista Genómica",
+    Icon: DnaIcon,
+    description:
+      "Analiza el caso desde la genética y la biología molecular, con contexto farmacogenómico de PharmGKB. Una guarda anti-invención degrada cualquier hipótesis que cite un hallazgo genético que no está en el caso.",
+    pending: false,
+  },
+  {
+    id: "03",
+    name: "Consultor Clínico",
+    Icon: PulseIcon,
+    description:
+      "Razona desde la práctica clínica: diagnóstico diferencial, causas tratables a descartar primero y guías de sociedades médicas.",
+    pending: false,
+  },
+  {
+    id: "04",
+    name: "Árbitro Verificador",
+    Icon: ScaleIcon,
+    description:
+      "Verifica cada referencia citada contra PubMed, agrupa las hipótesis equivalentes en un consenso y documenta las objeciones sin resolver. Pide una recitación (Ronda 5) a las hipótesis sin respaldo.",
+    pending: false,
+  },
+  {
+    id: "05",
+    name: "Navegador de Ensayos",
+    Icon: CompassIcon,
+    description:
+      "Busca ensayos clínicos activos en ClinicalTrials.gov y enfermedades raras compatibles en Orphanet, con una compatibilidad orientativa que nunca excluye resultados.",
+    pending: false,
+  },
+  {
+    id: "06",
+    name: "Sintetizador",
+    Icon: DocumentIcon,
+    description:
+      "Va a ensamblar el reporte final asistido por un agente dedicado. Hoy ese reporte lo arma un módulo determinista, sin agente propio todavía.",
+    pending: true,
+  },
+] as const;
+
+function AgentsSection() {
+  return (
+    <section
+      id="agentes"
+      aria-labelledby="agentes-heading"
+      className="border-t border-border"
+    >
+      <div className="mx-auto max-w-5xl px-6 py-16 sm:py-20">
+        <p className="text-xs font-semibold uppercase tracking-widest text-fg-muted">
+          Agentes
+        </p>
+        <h2
+          id="agentes-heading"
+          className="mt-2 max-w-2xl text-2xl font-semibold tracking-tight sm:text-3xl"
+        >
+          Seis agentes especializados, un solo consenso.
+        </h2>
+
+        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {AGENTS.map((agent) => (
+            <div
+              key={agent.id}
+              className={`rounded-2xl border p-6 ${
+                agent.pending
+                  ? "border-dashed border-border text-fg-muted"
+                  : "border-border"
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <agent.Icon className="h-6 w-6 shrink-0" />
+                {agent.pending && (
+                  <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold tracking-wide text-fg-muted uppercase">
+                    En desarrollo
+                  </span>
+                )}
+              </div>
+              <p className="mt-4 text-sm font-semibold text-fg">
+                Agente {agent.id} · {agent.name}
+              </p>
+              <p className="mt-1.5 text-sm text-fg-muted">
+                {agent.description}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── Funcionalidades clave ─────────────────────────────────────────────── */
+
+const FEATURES = [
+  {
+    Icon: ShieldCheckIcon,
+    title: "Verificación bibliográfica",
+    description:
+      "Cada referencia citada por los agentes se contrasta contra PubMed —título real contra título citado— antes de mostrarla en el reporte.",
+  },
+  {
+    Icon: LayersIcon,
+    title: "Clasificación EBM (I, II, III)",
+    description:
+      "Las hipótesis se priorizan por nivel de evidencia según el tipo de publicación verificado en PubMed, nunca por lo que el agente declara sin respaldo.",
+  },
+  {
+    Icon: SearchIcon,
+    title: "Navegación de ensayos clínicos",
+    description:
+      "Búsqueda de ensayos activos en ClinicalTrials.gov y enfermedades raras compatibles en Orphanet, con compatibilidad orientativa por caso.",
+  },
+  {
+    Icon: DebateIcon,
+    title: "Debate adversarial multi-agente",
+    description:
+      "Los agentes exponen sus hipótesis, se critican entre sí en varias rondas y ajustan su postura antes de llegar a un consenso.",
+  },
+] as const;
+
+function FeaturesSection() {
+  return (
+    <section
+      id="funcionalidades"
+      aria-labelledby="funcionalidades-heading"
+      className="border-t border-border"
+    >
+      <div className="mx-auto max-w-5xl px-6 py-16 sm:py-20">
+        <p className="text-xs font-semibold uppercase tracking-widest text-fg-muted">
+          Funcionalidades clave
+        </p>
+        <h2
+          id="funcionalidades-heading"
+          className="mt-2 max-w-2xl text-2xl font-semibold tracking-tight sm:text-3xl"
+        >
+          Evidencia verificable en cada paso, no solo en el resultado.
+        </h2>
+
+        <div className="mt-10 grid gap-4 sm:grid-cols-2">
+          {FEATURES.map((feature) => (
+            <div
+              key={feature.title}
+              className="rounded-2xl border border-border p-6"
+            >
+              <feature.Icon className="h-6 w-6" />
+              <p className="mt-4 text-sm font-semibold text-fg">
+                {feature.title}
+              </p>
+              <p className="mt-1.5 text-sm text-fg-muted">
+                {feature.description}
+              </p>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );

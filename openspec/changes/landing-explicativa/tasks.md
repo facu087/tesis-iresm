@@ -22,8 +22,8 @@
 
 ## 5. Landing — agentes y funcionalidades clave
 
-- [ ] 5.1 Construir la grilla de los 6 agentes con iconos SVG inline (sin emoji), marcando explícitamente al Agente 06 como pendiente/en desarrollo y describiendo a los Agentes 01, 02, 03, 04 y 05 con una capacidad real e implementada (design D8) — el Agente 02 se describe por su análisis genómico/molecular con guarda anti-invención sobre contexto que incluye anotaciones de PharmGKB; verificar releyendo `backend/agents/agent_02_genomics.py`, `.claude/architecture.md` y `.claude/backlog.md` contra el texto final (no `.claude/CLAUDE.md`, desactualizado en el estado del Agente 02 — ver design D8), confirmando que el único agente pendiente descrito como tal es el 06
-- [ ] 5.2 Construir la sección de funcionalidades clave (3–5 tarjetas: verificación bibliográfica contra PubMed, clasificación EBM I/II/III, navegación de ensayos ClinicalTrials.gov + Orphanet, debate adversarial multi-agente) con iconos SVG inline; verificar con `npm run build`
+- [x] 5.1 Construir la grilla de los 6 agentes con iconos SVG inline (sin emoji), marcando explícitamente al Agente 06 como pendiente/en desarrollo y describiendo a los Agentes 01, 02, 03, 04 y 05 con una capacidad real e implementada (design D8) — el Agente 02 se describe por su análisis genómico/molecular con guarda anti-invención sobre contexto que incluye anotaciones de PharmGKB; verificar releyendo `backend/agents/agent_02_genomics.py`, `.claude/architecture.md` y `.claude/backlog.md` contra el texto final (no `.claude/CLAUDE.md`, desactualizado en el estado del Agente 02 — ver design D8), confirmando que el único agente pendiente descrito como tal es el 06
+- [x] 5.2 Construir la sección de funcionalidades clave (3–5 tarjetas: verificación bibliográfica contra PubMed, clasificación EBM I/II/III, navegación de ensayos ClinicalTrials.gov + Orphanet, debate adversarial multi-agente) con iconos SVG inline; verificar con `npm run build`
 
 ## 6. Landing — CTA, footer y accesibilidad de interacción
 
