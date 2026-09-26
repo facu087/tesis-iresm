@@ -49,16 +49,15 @@ El sistema SHALL dirigir a `/analizar`, y no a `/`, cualquier acción interna de
 - **THEN** el sistema navega a `/analizar`
 
 ### Requirement: Representación fiel del estado de los agentes
-La página de inicio SHALL describir como operativa únicamente la capacidad de los
-agentes ya implementados (01 Analista de Literatura, 03 Consultor Clínico, 04
-Árbitro Verificador y 05 Navegador de Ensayos) y MUST NOT presentar al Agente 02
-(Especialista Genómica) ni al Agente 06 (Sintetizador) como funcionalidades activas
-del sistema.
+La página de inicio SHALL describir como operativa la capacidad de los agentes ya
+implementados (01 Analista de Literatura, 02 Especialista Genómica, 03 Consultor
+Clínico, 04 Árbitro Verificador y 05 Navegador de Ensayos) y MUST NOT presentar al
+Agente 06 (Sintetizador) como una funcionalidad activa del sistema.
 
-#### Scenario: Agentes pendientes marcados como no operativos
+#### Scenario: Agente pendiente marcado como no operativo
 - **WHEN** la página de inicio enumera los seis agentes del sistema
-- **THEN** el Agente 02 y el Agente 06 aparecen identificados como pendientes o en
-  desarrollo, y ninguno de los dos se describe con una capacidad activa
+- **THEN** el Agente 06 aparece identificado como pendiente o en desarrollo, y los
+  Agentes 01 a 05 se describen cada uno con una capacidad real e implementada
 
 ### Requirement: Disclaimer de alcance clínico visible sin desplazamiento
 El sistema SHALL mostrar, sin necesidad de que el usuario haga scroll, un texto que

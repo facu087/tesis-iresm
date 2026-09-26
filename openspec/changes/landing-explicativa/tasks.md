@@ -22,7 +22,7 @@
 
 ## 5. Landing — agentes y funcionalidades clave
 
-- [ ] 5.1 Construir la grilla de los 6 agentes con iconos SVG inline (sin emoji), marcando explícitamente a los Agentes 02 y 06 como pendientes/en desarrollo y describiendo a los Agentes 01, 03, 04 y 05 con una capacidad real e implementada (design D8); verificar releyendo `.claude/CLAUDE.md` y `.claude/backlog.md` contra el texto final, confirmando que ningún agente pendiente se describe como activo
+- [ ] 5.1 Construir la grilla de los 6 agentes con iconos SVG inline (sin emoji), marcando explícitamente al Agente 06 como pendiente/en desarrollo y describiendo a los Agentes 01, 02, 03, 04 y 05 con una capacidad real e implementada (design D8) — el Agente 02 se describe por su análisis genómico/molecular con guarda anti-invención sobre contexto que incluye anotaciones de PharmGKB; verificar releyendo `backend/agents/agent_02_genomics.py`, `.claude/architecture.md` y `.claude/backlog.md` contra el texto final (no `.claude/CLAUDE.md`, desactualizado en el estado del Agente 02 — ver design D8), confirmando que el único agente pendiente descrito como tal es el 06
 - [ ] 5.2 Construir la sección de funcionalidades clave (3–5 tarjetas: verificación bibliográfica contra PubMed, clasificación EBM I/II/III, navegación de ensayos ClinicalTrials.gov + Orphanet, debate adversarial multi-agente) con iconos SVG inline; verificar con `npm run build`
 
 ## 6. Landing — CTA, footer y accesibilidad de interacción
@@ -37,4 +37,4 @@
 
 ## 8. Documentación
 
-- [ ] 8.1 Actualizar `.claude/CLAUDE.md` (Sprint 4: sumar la landing y la ruta `/analizar` al árbol de carpetas del frontend) y `.claude/backlog.md` (EP-08: nueva tarea con las decisiones D1–D11 resumidas); verificar con `openspec validate landing-explicativa --strict` y `npm run build`
+- [ ] 8.1 Actualizar `.claude/CLAUDE.md` (Sprint 4: sumar la landing y la ruta `/analizar` al árbol de carpetas del frontend, y corregir la tabla de numeración de agentes para que el 02 figure como implementado, no pendiente — ver design D8) y `.claude/backlog.md` (EP-08: nueva tarea con las decisiones D1–D11 resumidas); verificar con `openspec validate landing-explicativa --strict` y `npm run build`

@@ -49,7 +49,7 @@ Estado actual relevado antes de proponer:
   consecuencia de esta landing; sería su propio cambio de infraestructura.
 - Agregar el disclaimer completo a `/analyzing` o `/report` (hoy no lo tienen);
   ver Open Questions.
-- Implementar o simular el Agente 02 o el Agente 06 en la landing.
+- Implementar o simular el Agente 06 en la landing.
 - Cambiar el backend, la API o el contrato `StructuredReport`.
 
 ## Decisions
@@ -133,11 +133,23 @@ Se reemplazan los emoji de la grilla de agentes y se usan SVG inline (stroke,
 se suma ninguna librería de iconos (coherente con "sin librerías de UI" del stack).
 
 ### D8. Precisión sobre el estado de los agentes (no es una opción de estilo)
-Los Agentes 01, 03, 04 y 05 se describen con una capacidad real e implementada
-(verificación de PMIDs contra PubMed, clasificación EBM I/II/III, Ronda 5 de
-recitación, navegación ClinicalTrials.gov + Orphanet). Los Agentes 02 y 06 se
-marcan como pendientes/en desarrollo, sin describir ninguna capacidad activa,
-siguiendo la tabla de estado de `.claude/CLAUDE.md` y `.claude/architecture.md`.
+Los Agentes 01, 02, 03, 04 y 05 se describen con una capacidad real e implementada:
+01 análisis de literatura, 02 análisis genómico/molecular con guarda anti-invención
+(degrada a LOW toda hipótesis que cite un hallazgo genético no presente en el
+caso) sobre un contexto que incluye anotaciones farmacogenómicas de PharmGKB, 03
+consulta clínica, 04 verificación de PMIDs contra PubMed y clasificación EBM
+I/II/III, 05 navegación ClinicalTrials.gov + Orphanet. Solo el Agente 06
+(Sintetizador) se marca como pendiente/en desarrollo, sin describir ninguna
+capacidad activa: el reporte final lo sigue armando `pipeline/report_builder.py`,
+no un agente.
+
+**Corrección de fuente (2026-09-25):** `.claude/CLAUDE.md` está desactualizado en
+este punto — todavía lista al Agente 02 como pendiente. El Agente 02
+(`backend/agents/agent_02_genomics.py`, `GenomicsSpecialistAgent`) está mergeado
+(PR #12, 2026-09-16) y cableado en `pipeline/orchestrator.py`, `pipeline/debate.py`
+y `api/router.py`: participa en Ronda 1, críticas, revisión y Ronda 5 igual que
+01/03/04/05. La landing NO sigue la tabla de `CLAUDE.md` para este agente; sigue
+el código. La tarea 8.1 de `tasks.md` corrige también esa tabla.
 
 - *Alternativa descartada — describir los 6 agentes por igual*: presentaría al
   evaluador (Juan Lencina, profesor) capacidades que no existen todavía en el
