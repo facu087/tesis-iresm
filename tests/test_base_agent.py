@@ -2,17 +2,22 @@
 Tests de la clase base de agentes (backend/agents/base_agent.py).
 
 Cubre el parseo de la respuesta del LLM: extracción del JSON, construcción de
-hipótesis y, sobre todo, el **saneamiento de las fuentes** (hallazgo G). Ningún
-test llama a un LLM ni a la red: las respuestas se construyen a mano.
+hipótesis y, sobre todo, el **saneamiento de las fuentes** (hallazgo G). Cubre
+también `call_provider()`, el punto único de llamada al proveedor (S4, control
+de costos): reintentos ante 429 y delegación de `_call_llm()`. Ningún test
+llama a un LLM ni a la red: las respuestas se construyen a mano.
 
 Caso de prueba base: neuropatía axonal sensitivomotora, paciente masculino de 42 años.
 """
 
 import json
+from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
+from groq import RateLimitError as GroqRateLimitError
 
-from backend.agents.base_agent import BaseAgent
+from backend.agents.base_agent import BaseAgent, call_provider
 from backend.models.hypothesis import EvidenceLevel, Priority
 
 _HIPOTESIS_BASE = (
@@ -190,3 +195,94 @@ class TestParseHypotheses:
         ]})
         textos = [h.text for h in BaseAgent.parse_hypotheses(raw)]
         assert textos == ["Hipótesis 0", "Hipótesis 1", "Hipótesis 2"]
+
+
+# ── call_provider(): punto único de llamada al proveedor (S4) ─────────────────
+
+def _fake_response(content: str, *, prompt_tokens=10, completion_tokens=5,
+                    finish_reason="stop") -> MagicMock:
+    """Imita lo justo de la respuesta de Groq que usa call_provider()."""
+    response = MagicMock()
+    response.choices = [MagicMock(message=MagicMock(content=content), finish_reason=finish_reason)]
+    response.usage = MagicMock(prompt_tokens=prompt_tokens, completion_tokens=completion_tokens)
+    return response
+
+
+def _rate_limit_error() -> GroqRateLimitError:
+    request = httpx.Request("POST", "https://api.groq.com/openai/v1/chat/completions")
+    response = httpx.Response(429, request=request)
+    return GroqRateLimitError("rate limited (simulado)", response=response, body=None)
+
+
+class TestCallProvider:
+    """
+    `call_provider()` es el único lugar que instancia `Groq(api_key=...)`
+    (D1): `_call_llm()`, `pico.build()` y `_extract_with_llm()` delegan acá.
+    """
+
+    def test_devuelve_el_contenido_de_la_respuesta(self, monkeypatch):
+        monkeypatch.setenv("GROQ_API_KEY", "clave-de-prueba")
+        cliente = MagicMock()
+        cliente.chat.completions.create.return_value = _fake_response("hola")
+        with patch("groq.Groq", return_value=cliente):
+            resultado = call_provider(
+                system_prompt="sistema", user_message="usuario",
+                model="modelo-x", max_tokens=123, task="tarea_de_prueba",
+            )
+        assert resultado == "hola"
+        _, kwargs = cliente.chat.completions.create.call_args
+        assert kwargs["model"] == "modelo-x"
+        assert kwargs["max_tokens"] == 123
+
+    def test_reintenta_ante_rate_limit_y_despues_responde(self, monkeypatch):
+        monkeypatch.setenv("GROQ_API_KEY", "clave-de-prueba")
+        monkeypatch.setattr("time.sleep", lambda *_: None)
+        cliente = MagicMock()
+        cliente.chat.completions.create.side_effect = [
+            _rate_limit_error(), _fake_response("segundo intento"),
+        ]
+        with patch("groq.Groq", return_value=cliente):
+            resultado = call_provider(
+                system_prompt="s", user_message="u", model="m",
+                max_tokens=10, task="tarea_de_prueba",
+            )
+        assert resultado == "segundo intento"
+        assert cliente.chat.completions.create.call_count == 2
+
+    def test_agota_reintentos_y_relanza(self, monkeypatch):
+        monkeypatch.setenv("GROQ_API_KEY", "clave-de-prueba")
+        monkeypatch.setattr("time.sleep", lambda *_: None)
+        cliente = MagicMock()
+        cliente.chat.completions.create.side_effect = _rate_limit_error()
+        with patch("groq.Groq", return_value=cliente):
+            with pytest.raises(GroqRateLimitError):
+                call_provider(
+                    system_prompt="s", user_message="u", model="m",
+                    max_tokens=10, task="tarea_de_prueba",
+                )
+        assert cliente.chat.completions.create.call_count == 4  # 1 + 3 reintentos
+
+    def test_call_llm_delega_en_call_provider_con_el_modelo_del_agente(self, monkeypatch):
+        capturado = {}
+
+        def falso(**kwargs):
+            capturado.update(kwargs)
+            return "respuesta"
+
+        monkeypatch.setattr("backend.agents.base_agent.call_provider", falso)
+
+        class AgenteDePrueba(BaseAgent):
+            AGENT_ID = "99"
+            AGENT_NAME = "Agente de Prueba"
+            MODEL = "modelo-del-agente"
+            SYSTEM_PROMPT = "prompt de sistema"
+
+            def run(self, clinical_context: str):  # pragma: no cover - no se usa
+                raise NotImplementedError
+
+        resultado = AgenteDePrueba()._call_llm("mensaje de usuario")
+        assert resultado == "respuesta"
+        assert capturado["model"] == "modelo-del-agente"
+        assert capturado["system_prompt"] == "prompt de sistema"
+        assert capturado["user_message"] == "mensaje de usuario"
+        assert capturado["agent_id"] == "99"

@@ -4,10 +4,20 @@
 
 ## 1. Punto de llamada compartido
 
-- [ ] 1.1 Extraer la llamada al proveedor de `BaseAgent._call_llm()` a una función compartida que reciba system prompt, mensaje, modelo, techo de tokens y una etiqueta del paso de origen, conservando el reintento ante 429 con el backoff actual (D1). `_call_llm()` pasa a delegar en ella. Verificar que la suite completa sigue verde: `pytest tests/ --ignore=tests/test_ingesta.py`.
-- [ ] 1.2 Migrar `pipeline/pico.py:93` a la función compartida, conservando su techo actual de 2048 y su manejo de errores. Verificar con `tests/test_pico.py` y corriendo `scripts/demo_pico.py`.
-- [ ] 1.3 Migrar `ingestion/biomarker_extractor.py:156` a la función compartida, conservando su techo de 1024. Verificar con `tests/test_biomarkers.py` y `scripts/demo_biomarcadores.py`.
-- [ ] 1.4 Verificar que **ningún** módulo instancia `Groq(api_key=...)` fuera del punto compartido: `grep -rn "Groq(api_key" backend/` debe devolver una sola línea. Es la condición del requisito "toda llamada queda contabilizada".
+- [x] 1.1 Extraer la llamada al proveedor de `BaseAgent._call_llm()` a una función compartida que reciba system prompt, mensaje, modelo, techo de tokens y una etiqueta del paso de origen, conservando el reintento ante 429 con el backoff actual (D1). `_call_llm()` pasa a delegar en ella. Verificar que la suite completa sigue verde: `pytest tests/ --ignore=tests/test_ingesta.py`.
+      Hecho: `call_provider()` en `backend/agents/base_agent.py`. Test nuevo:
+      `tests/test_base_agent.py::TestCallProvider`. Suite completa verde (ver 7.4).
+- [x] 1.2 Migrar `pipeline/pico.py:93` a la función compartida, conservando su techo actual de 2048 y su manejo de errores. Verificar con `tests/test_pico.py` y corriendo `scripts/demo_pico.py`.
+      Hecho: `pico.build()` delega en `call_provider(task="pico_sintesis")`. `tests/test_pico.py`
+      verde (solo prueba el parser, no llama LLM). `demo_pico.py` **no se corrió**: llama al LLM
+      real (restricción de cuota de esta sesión); queda pendiente para el orquestador.
+- [x] 1.3 Migrar `ingestion/biomarker_extractor.py:156` a la función compartida, conservando su techo de 1024. Verificar con `tests/test_biomarkers.py` y `scripts/demo_biomarcadores.py`.
+      Hecho: `_extract_with_llm()` delega en `call_provider(task="biomarcadores_extraccion")`.
+      `tests/test_biomarkers.py` verde (LLM mockeado). `demo_biomarcadores.py` **no se corrió**:
+      llama al LLM real; queda pendiente para el orquestador.
+- [x] 1.4 Verificar que **ningún** módulo instancia `Groq(api_key=...)` fuera del punto compartido: `grep -rn "Groq(api_key" backend/` debe devolver una sola línea. Es la condición del requisito "toda llamada queda contabilizada".
+      Verificado: `rg -n "Groq\(api_key" backend/` devuelve exactamente
+      `backend/agents/base_agent.py:82` (dentro de `call_provider()`).
 
 ## 2. Telemetría
 

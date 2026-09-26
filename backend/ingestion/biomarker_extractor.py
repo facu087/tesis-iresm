@@ -13,12 +13,9 @@ Usa dos estrategias combinadas:
 """
 
 import json
-import os
 import re
 
-from groq import Groq
-
-from ..agents.base_agent import GROQ_MAIN
+from ..agents.base_agent import GROQ_MAIN, call_provider
 from ..models.biomarkers import BiomarkerProfile
 
 # ── Patrones de reconocimiento rápido ────────────────────────────────────────
@@ -152,20 +149,21 @@ def _extract_with_regex(text: str) -> dict:
 
 
 def _extract_with_llm(text: str) -> dict:
-    """Extracción semántica con LLM para capturar entidades no previstas."""
-    client = Groq(api_key=os.environ["GROQ_API_KEY"])
+    """
+    Extracción semántica con LLM para capturar entidades no previstas.
 
-    response = client.chat.completions.create(
+    La llamada pasa por `call_provider()` (control de costos, S4 — D1): antes
+    este módulo instanciaba el cliente de Groq por su cuenta, sin reintento
+    ante rate limit y con su consumo fuera de cualquier contabilidad futura.
+    """
+    raw = call_provider(
+        system_prompt=SYSTEM_PROMPT_LLM,
+        user_message=f"Extraé las entidades biomédicas del siguiente texto clínico:\n\n{text}",
         model=GROQ_MAIN,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT_LLM},
-            {"role": "user", "content": f"Extraé las entidades biomédicas del siguiente texto clínico:\n\n{text}"},
-        ],
         max_tokens=1024,
+        task="biomarcadores_extraccion",
         temperature=0.1,
-    )
-
-    raw = response.choices[0].message.content.strip()
+    ).strip()
 
     # Limpiar markdown fences si los hay
     if raw.startswith("```"):

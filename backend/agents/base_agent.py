@@ -14,6 +14,7 @@ está implementada aquí y es heredada por todos los agentes.
 import json
 import os
 import re
+import sys
 import time
 from abc import ABC, abstractmethod
 
@@ -27,6 +28,85 @@ from ..models.report import AgentOutput, Critique
 # la API devuelve 404 model_not_found. Reemplazados por los gpt-oss disponibles.
 GROQ_MAIN = "openai/gpt-oss-120b"  # Agentes 01, 03, 06
 GROQ_FAST = "openai/gpt-oss-20b"   # Agente rápido para tareas simples
+
+
+def call_provider(
+    *,
+    system_prompt: str,
+    user_message: str,
+    model: str,
+    max_tokens: int,
+    task: str,
+    agent_id: str | None = None,
+    agent_name: str | None = None,
+    temperature: float = 0.3,
+) -> str:
+    """
+    Punto único de llamada al proveedor del modelo de lenguaje (control de
+    costos, Sprint 4 — D1).
+
+    Antes de este cambio, tres lugares instanciaban el cliente de Groq por su
+    cuenta: `BaseAgent._call_llm()`, `pipeline/pico.py` y
+    `ingestion/biomarker_extractor.py`. Cada uno repetía su propio reintento y
+    su propio manejo de errores, y el swap de proveedor había que hacerlo tres
+    veces. Ahora los tres delegan acá: es el único lugar del sistema que
+    instancia el cliente del proveedor, así que es también el único lugar que
+    hay que tocar para contar el consumo de una llamada o para cambiar de
+    proveedor.
+
+    Args:
+        system_prompt: Prompt de sistema del agente o del módulo que llama.
+        user_message:  Mensaje de usuario ya armado para esta tarea.
+        model:         Modelo del proveedor a usar (p. ej. GROQ_MAIN o
+                       GROQ_FAST).
+        max_tokens:    Techo de tokens de la respuesta, propio de la tarea que
+                       llama: no hay un valor único para todo el sistema.
+        task:          Etiqueta de la tarea que originó la llamada (p. ej.
+                       "agente01_hipotesis", "pico_sintesis"). Identifica el
+                       paso de origen para quien lea los logs.
+        agent_id:      ID del agente que llama, si corresponde. `None` para
+                       llamadas que no vienen de un agente (PICO,
+                       biomarcadores).
+        agent_name:    Nombre legible del agente que llama, si corresponde.
+        temperature:   Temperatura de muestreo del modelo.
+
+    Returns:
+        Texto crudo de la respuesta del modelo.
+
+    Reintenta hasta 3 veces con backoff incremental ante errores 429 (rate
+    limit del tier gratuito de Groq). Agota los reintentos y relanza la
+    última excepción si el proveedor sigue devolviendo 429.
+    """
+    from groq import Groq, RateLimitError
+
+    client = Groq(api_key=os.environ["GROQ_API_KEY"])
+    delays = [8, 20, 40]  # segundos de espera entre reintentos
+    last_exc: Exception | None = None
+
+    for attempt, delay in enumerate(delays + [None], start=1):
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_message},
+                ],
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
+            return response.choices[0].message.content
+        except RateLimitError as exc:
+            last_exc = exc
+            if delay is None:
+                break
+            print(
+                f"[NEXUS] {task}: rate limit (intento {attempt}/3). "
+                f"Reintentando en {delay}s…",
+                file=sys.stderr,
+            )
+            time.sleep(delay)
+
+    raise last_exc  # type: ignore[misc]
 
 
 class BaseAgent(ABC):
@@ -136,41 +216,18 @@ class BaseAgent(ABC):
 
     def _call_llm(self, user_message: str) -> str:
         """
-        Llama al modelo configurado en self.MODEL vía Groq.
+        Llama al modelo configurado en self.MODEL vía `call_provider()`.
         Devuelve el texto crudo de la respuesta.
-        Reintenta hasta 3 veces con backoff incremental ante errores 429
-        (rate limit del tier gratuito de Groq: 12k TPM).
         """
-        from groq import Groq, RateLimitError
-
-        client = Groq(api_key=os.environ["GROQ_API_KEY"])
-        delays = [8, 20, 40]  # segundos de espera entre reintentos
-        last_exc: Exception | None = None
-
-        for attempt, delay in enumerate(delays + [None], start=1):
-            try:
-                response = client.chat.completions.create(
-                    model=self.MODEL,
-                    messages=[
-                        {"role": "system", "content": self.SYSTEM_PROMPT},
-                        {"role": "user", "content": user_message},
-                    ],
-                    max_tokens=4096,
-                    temperature=0.3,
-                )
-                return response.choices[0].message.content
-            except RateLimitError as exc:
-                last_exc = exc
-                if delay is None:
-                    break
-                print(
-                    f"[NEXUS] Agente {self.AGENT_NAME}: rate limit (intento {attempt}/3). "
-                    f"Reintentando en {delay}s…",
-                    file=__import__("sys").stderr,
-                )
-                time.sleep(delay)
-
-        raise last_exc  # type: ignore[misc]
+        return call_provider(
+            system_prompt=self.SYSTEM_PROMPT,
+            user_message=user_message,
+            model=self.MODEL,
+            max_tokens=4096,
+            task=self.AGENT_ID or "agente",
+            agent_id=self.AGENT_ID,
+            agent_name=self.AGENT_NAME,
+        )
 
     # ── Interfaz pública ──────────────────────────────────────────
 
