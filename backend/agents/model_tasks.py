@@ -76,14 +76,17 @@ TASK_BUDGETS: dict[str, TaskBudget] = {
     "pico_sintesis": TaskBudget(GROQ_MAIN, 2048),          # techo original de pico.py
     "biomarcadores_extraccion": TaskBudget(GROQ_MAIN, 1024),  # techo original del extractor
 
-    # ── Salida acotada y validada deterministicamente por código (D6). Acá
-    # arranca en GROQ_MAIN: el modelo por tarea se decide en la sección 5. ──
-    "arbitro_agrupacion": TaskBudget(GROQ_MAIN, 512),
-    "agente05_planificacion_terminos": TaskBudget(GROQ_MAIN, 1024),
+    # ── Salida acotada y validada deterministicamente por código (D6):
+    # GROQ_FAST. Una respuesta peor del modelo chico cae en una validación
+    # existente (consensus.normalize_partition() / pipeline.trial_matching),
+    # nunca en un resultado incorrecto que nadie detecte. ───────────────────
+    "arbitro_agrupacion": TaskBudget(GROQ_FAST, 512),
+    "agente05_planificacion_terminos": TaskBudget(GROQ_FAST, 1024),
     # Hasta MAX_TRIALS=10 ensayos, cada uno con fundamento (hasta 600 chars)
     # y hasta 5 criterios a verificar: el techo histórico no tiene holgura de
-    # sobra en el peor caso, así que se conserva sin cambios.
-    "agente05_evaluacion_compatibilidad": TaskBudget(GROQ_MAIN, 4096),
+    # sobra en el peor caso, así que se conserva sin cambios; solo baja el
+    # modelo.
+    "agente05_evaluacion_compatibilidad": TaskBudget(GROQ_FAST, 4096),
 }
 
 

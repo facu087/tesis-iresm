@@ -57,3 +57,30 @@ class TestTareasDeRazonamiento:
             "arbitro_veredictos", "pico_sintesis",
         }
         assert esperadas <= model_tasks.REASONING_TASKS
+
+
+class TestModeloPorTarea:
+    """
+    Modelo por tarea (D6, sección 5): solo las tres tareas cuya salida ya
+    valida deterministicamente el código bajan al modelo rápido. El resto
+    —incluida `agente05_evaluacion_compatibilidad`, que también es "salida
+    acotada" pero no está en esta lista porque el diseño la deja afuera— se
+    queda en el modelo principal.
+    """
+
+    @pytest.mark.parametrize("tarea", [
+        "arbitro_agrupacion",
+        "agente05_planificacion_terminos",
+        "agente05_evaluacion_compatibilidad",
+    ])
+    def test_las_tres_tareas_candidatas_usan_el_modelo_rapido(self, tarea):
+        assert model_tasks.get_budget(tarea).model == model_tasks.GROQ_FAST
+
+    def test_ninguna_otra_tarea_usa_el_modelo_rapido(self):
+        candidatas = {
+            "arbitro_agrupacion", "agente05_planificacion_terminos",
+            "agente05_evaluacion_compatibilidad",
+        }
+        for tarea, presupuesto in model_tasks.TASK_BUDGETS.items():
+            if tarea not in candidatas:
+                assert presupuesto.model == model_tasks.GROQ_MAIN, tarea

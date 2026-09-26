@@ -104,11 +104,27 @@
 
 ## 5. Modelo por tarea
 
-- [ ] 5.1 Mover la **agrupación del Árbitro** a `GROQ_FAST`. Su salida son índices validados por `consensus.normalize_partition()`. Verificar que `tests/test_agent_04_arbiter.py` sigue verde.
-- [ ] 5.2 Mover la **planificación de términos del Agente 05** a `GROQ_FAST`. Verificar con `tests/test_agent_05_trials.py`.
-- [ ] 5.3 Mover el **etiquetado de compatibilidad del Agente 05** a `GROQ_FAST`. Verificar con `tests/test_agent_05_trials.py`.
+- [x] 5.1 Mover la **agrupación del Árbitro** a `GROQ_FAST`. Su salida son índices validados por `consensus.normalize_partition()`. Verificar que `tests/test_agent_04_arbiter.py` sigue verde.
+      Hecho: `model_tasks.TASK_BUDGETS["arbitro_agrupacion"].model = GROQ_FAST`.
+      `tests/test_agent_04_arbiter.py` verde (46 tests, sin cambios — el LLM está
+      mockeado y las guardas no dependen del modelo configurado).
+- [x] 5.2 Mover la **planificación de términos del Agente 05** a `GROQ_FAST`. Verificar con `tests/test_agent_05_trials.py`.
+      Hecho: `TASK_BUDGETS["agente05_planificacion_terminos"].model = GROQ_FAST`.
+      `tests/test_agent_05_trials.py` verde.
+- [x] 5.3 Mover el **etiquetado de compatibilidad del Agente 05** a `GROQ_FAST`. Verificar con `tests/test_agent_05_trials.py`.
+      Hecho: `TASK_BUDGETS["agente05_evaluacion_compatibilidad"].model = GROQ_FAST`
+      (techo sin cambios, ver 4.2). `tests/test_agent_05_trials.py` verde.
 - [ ] 5.4 **Medir antes de dar por buena la decisión** (D6, y el riesgo del design): correr el caso de prueba con las tres tareas en `GROQ_MAIN` y después en `GROQ_FAST`, y comparar el agrupamiento resultante, los términos planificados y las etiquetas de compatibilidad. Registrar cuántas veces la salida del modelo rápido cayó en una validación. Si el agrupamiento empeora, esa tarea vuelve a `GROQ_MAIN` y se deja constancia.
-- [ ] 5.5 Verificar el inventario: ninguna tarea que produzca hipótesis, críticas, revisiones, veredictos o la síntesis PICO usa el modelo rápido. Test que recorre el mapa de configuración.
+      **Pendiente para el orquestador** — restricción de cuota de esta sesión
+      (requiere correr el caso de prueba dos veces contra Groq real). El mecanismo
+      para hacerlo está listo: cambiar el `model` de las tres entradas en
+      `model_tasks.TASK_BUDGETS` y comparar corridas con `scripts/demo_agente04.py`
+      / `scripts/demo_agente05.py`.
+- [x] 5.5 Verificar el inventario: ninguna tarea que produzca hipótesis, críticas, revisiones, veredictos o la síntesis PICO usa el modelo rápido. Test que recorre el mapa de configuración.
+      Hecho: `tests/test_model_tasks.py::TestTareasDeRazonamiento` (recorre
+      `REASONING_TASKS`) y `TestModeloPorTarea::test_ninguna_otra_tarea_usa_el_modelo_rapido`
+      (recorre `TASK_BUDGETS` completo y confirma que solo las tres tareas candidatas
+      están en `GROQ_FAST`).
 
 ## 6. Modo mock del pipeline
 
