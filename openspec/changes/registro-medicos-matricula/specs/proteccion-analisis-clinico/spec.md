@@ -44,6 +44,33 @@ sobre los datos clínicos del reporte en lugar de dejar un endpoint sin proteger
 - **WHEN** se llama a `POST /api/report/pdf` sin una sesión autenticada
 - **THEN** el sistema rechaza la solicitud sin generar el PDF
 
+### Requirement: Validación de origen en el análisis y la exportación
+`POST /api/analyze` y `POST /api/report/pdf` SHALL validar el encabezado
+`Origin` de la solicitud (usando `Referer` como respaldo si `Origin` no está
+presente) contra la lista de orígenes permitidos configurada, y SHALL rechazar
+con 403 toda solicitud cuyo origen falte o no coincida con esa lista, incluso si
+trae una cookie de sesión válida. Esta validación SHALL aplicarse
+independientemente del tipo de contenido de la solicitud (`multipart/form-data`
+incluido), porque una solicitud `multipart/form-data` no dispara verificación de
+origen por parte de CORS.
+
+#### Scenario: Solicitud multipart con origen ajeno y sesión válida
+- **WHEN** se envía un `POST /api/analyze` con datos `multipart/form-data`, una
+  cookie de sesión válida de un médico verificado, y un encabezado `Origin` que no
+  pertenece a la lista de orígenes permitidos
+- **THEN** el sistema rechaza la solicitud con 403 sin ejecutar el pipeline
+
+#### Scenario: Solicitud con origen permitido continúa la verificación normal
+- **WHEN** se envía un `POST /api/analyze` con un encabezado `Origin` que sí
+  pertenece a la lista de orígenes permitidos
+- **THEN** el sistema continúa con las verificaciones de sesión y estado de la
+  cuenta descriptas en los demás requisitos de este capability
+
+#### Scenario: Exportación a PDF con origen ajeno
+- **WHEN** se envía un `POST /api/report/pdf` con un encabezado `Origin` que no
+  pertenece a la lista de orígenes permitidos
+- **THEN** el sistema rechaza la solicitud con 403 sin generar el PDF
+
 ### Requirement: La aplicación no es el límite de seguridad
 El sistema SHALL aplicar estas exigencias de forma independiente de cualquier
 comportamiento del frontend. Ocultar un botón o una ruta en la interfaz SHALL NOT

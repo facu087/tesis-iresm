@@ -103,3 +103,15 @@ en ese almacenamiento.
 #### Scenario: El registro de cuentas no incluye datos clínicos
 - **WHEN** se inspecciona el almacenamiento de cuentas de médicos
 - **THEN** no contiene texto clínico de pacientes ni reportes del pipeline
+
+### Requirement: Validación de origen en el registro
+`POST /api/registro` (alta y reenvío tras un rechazo) SHALL validar el
+encabezado `Origin` de la solicitud (con `Referer` como respaldo si `Origin` no
+está presente) contra la lista de orígenes permitidos configurada, y SHALL
+rechazar con 403 toda solicitud cuyo origen falte o no coincida.
+
+#### Scenario: Registro con origen ajeno
+- **WHEN** se envía un `POST /api/registro` con un encabezado `Origin` que no
+  pertenece a la lista de orígenes permitidos
+- **THEN** el sistema rechaza la solicitud con 403 sin crear ni modificar
+  ninguna cuenta

@@ -84,3 +84,14 @@ quedar disponible para las funciones que autorizan el acceso.
 #### Scenario: Sesión de una cuenta médico
 - **WHEN** inicia sesión una cuenta con rol `medico`
 - **THEN** la sesión queda identificada con rol `medico`
+
+### Requirement: Validación de origen en login y logout
+`POST /api/login` y `POST /api/logout` SHALL validar el encabezado `Origin` de
+la solicitud (con `Referer` como respaldo si `Origin` no está presente) contra
+la lista de orígenes permitidos configurada, y SHALL rechazar con 403 toda
+solicitud cuyo origen falte o no coincida.
+
+#### Scenario: Login con origen ajeno
+- **WHEN** se envía un `POST /api/login` con un encabezado `Origin` que no
+  pertenece a la lista de orígenes permitidos
+- **THEN** el sistema rechaza la solicitud con 403 sin validar las credenciales

@@ -36,8 +36,11 @@ semi-automática y no contra un padrón oficial.
   formulario de registro define en `proposal.md` no incluye ese campo; el único
   dato del lado del médico es el que declara al registrarse.
 - Verificación de la propiedad del email institucional por correo (activation
-  link). Ver Open Questions — es una decisión del usuario, no una que este diseño
-  resuelva por su cuenta.
+  link vía SMTP). **Diferido a un cambio posterior (decisión del usuario,
+  2026-09-25)**: no se implementa el envío en este cambio, pero el modelo de
+  cuenta (`CuentaMedico`, D1) SHALL dejar lugar para agregarlo después sin
+  romper el esquema — un campo `email_verificado: bool` (default `False`, sin
+  ningún flujo que lo ponga en `True` todavía) alcanza para eso.
 - Multi-tenancy, recuperación de contraseña por email, 2FA. Ninguno lo pidió la
   propuesta; agregarlos ahora sería inventar alcance.
 - Cualquier cambio al pipeline de análisis en sí (agentes, RAG, arbitraje,
@@ -104,17 +107,38 @@ o un admin forzando el cierre de sesión de una cuenta) sin mantener una
 denylist aparte. Para el tamaño de este proyecto, la sesión server-side es más
 simple de razonar y de auditar que un token autocontenido.
 
-**CSRF:** el frontend y el backend son orígenes distintos
-(`localhost:3000` / `localhost:8000` en desarrollo), con `allow_credentials=True`
-ya presente en `main.py`. La cookie `SameSite=Lax` no viaja en una solicitud
-`fetch`/`XHR` de sitio cruzado (solo en navegación de nivel superior, que esta
-API no usa), y las solicitudes de estado (`POST /api/analyze`, aprobar/rechazar)
-llevan cuerpo JSON — content type no-"simple" que obliga a un preflight CORS, así
-que un sitio malicioso no puede dispararlas a ciegas contra el backend con la
-cookie del médico. Para el alcance de este prototipo, `SameSite=Lax` + `httpOnly`
-+ CORS ya configurado es la mitigación; un token CSRF de doble envío queda
-documentado como endurecimiento pendiente si el sistema sale del contexto de
-tesis.
+**CSRF — corregido.** Una versión anterior de esta decisión asumía que
+`POST /api/analyze` viaja como JSON y que eso obliga a un preflight CORS que
+frenaría a un sitio malicioso. Es falso: `backend/api/router.py:119-122` recibe
+`file: UploadFile = File(...)` y `text: str = Form(...)`, y
+`frontend/src/lib/api.ts:25,48` arma el pedido con `FormData` —
+`multipart/form-data` es una solicitud "simple" para CORS, **no dispara
+preflight**, y un `<form>` HTML común hospedado en cualquier sitio puede
+enviarla directo contra el backend. CORS nunca protegió este endpoint.
+
+Tampoco alcanza con apoyarse en que "son orígenes distintos": `SameSite` opera
+por **sitio** (dominio registrable), no por origen — el puerto no cuenta.
+`localhost:3000` y `localhost:8000` son el mismo sitio en desarrollo, y en
+producción el frontend y el backend también lo serían si comparten dominio
+registrable (p. ej. `app.nexus.com` / `api.nexus.com`). Razonar sobre "orígenes
+distintos" fue el error de fondo; `SameSite=Lax` por sí solo no es una defensa
+suficiente para el endpoint más importante del sistema.
+
+**Elegido:** todo endpoint que cambia estado (`POST /api/analyze`,
+`POST /api/report/pdf`, `POST /api/login`, `POST /api/logout`,
+`POST /api/registro`, aprobar/rechazar de `revision-admin-matriculas`) valida el
+encabezado `Origin` de la solicitud (con `Referer` como respaldo si `Origin` no
+está presente) contra la misma lista blanca de orígenes que ya usa CORS
+(`ALLOWED_ORIGINS` en `.env`), y responde 403 si falta o no coincide — sin
+importar el tipo de contenido, así que cubre `multipart/form-data` igual que
+JSON. Es una validación barata (una comparación de string contra una lista) y no
+depende de que el navegador decida no disparar preflight. `SameSite=Lax` +
+`httpOnly` se mantienen como defensa en profundidad — siguen acotando el robo o
+reenvío pasivo de la cookie entre sitios genuinamente distintos —, y un token
+CSRF de doble envío queda documentado como endurecimiento opcional si el sistema
+sale del contexto de tesis; no es necesario para este alcance porque la
+validación de `Origin`/`Referer` ya cubre el vector real (formulario/solicitud
+disparada desde un sitio ajeno con la cookie de sesión puesta por el navegador).
 
 **Alternativas consideradas:**
 - *JWT / cookie firmada stateless (`itsdangerous`)*: evita la tabla de sesiones,
@@ -200,11 +224,14 @@ prototipo de tesis (decenas de cuentas, no miles concurrentes) el modo WAL de
 SQLite alcanza; si el proyecto escala en cantidad de escrituras simultáneas,
 migrar a Postgres es el camino y SQLModel no ata el código a SQLite.
 
-**[Riesgo] `SameSite=Lax` sin token CSRF de doble envío es una mitigación, no una
-garantía absoluta contra todos los vectores CSRF conocidos (por ejemplo, algunos
-navegadores viejos o configuraciones no estándar).** → Aceptado para el alcance
-de esta tesis; documentado como endurecimiento pendiente si el sistema sale de
-ese contexto (ver D3).
+**[Riesgo] La validación de `Origin`/`Referer` (D3) depende de que el navegador
+mande alguno de los dos encabezados; un cliente que no sea un navegador (un
+script hecho a medida) podría omitirlos.** → Por eso el rechazo es *fail-closed*:
+falta el encabezado → 403, igual que si no coincidiera. Un cliente legítimo
+(el frontend de NEXUS) siempre manda `Origin` en una solicitud de este tipo. Un
+token CSRF de doble envío queda documentado como endurecimiento opcional si el
+sistema sale del contexto de esta tesis; no es necesario para este alcance
+porque ya cubre el vector real (ver D3).
 
 **[Riesgo operativo] Next.js 16 (`frontend/package.json` fija `"next": "16.2.7"`)
 cambió cómo se maneja middleware/route protection entre versiones mayores, y
@@ -235,15 +262,3 @@ protección de `/analizar`.
 - Rollback: revertir el merge de la rama de este cambio. El archivo SQLite nuevo
   es aislado (no hay tablas existentes que haya alterado), así que no hay un paso
   de rollback de esquema más allá de descartar ese archivo.
-
-## Open Questions
-
-- **Verificación de la propiedad del email institucional (activation link por
-  correo).** Fortalecería la señal de identidad que tiene el admin (ver el
-  riesgo de seguridad central, arriba), pero agrega una dependencia de envío de
-  correo (SMTP) que hoy no existe en el proyecto, con su propio costo de
-  configuración y secretos en `.env`. Este diseño la deja **fuera de alcance** y
-  la registra como pregunta abierta en lugar de decidir por su cuenta, tal como
-  se pidió: ¿se agrega en este cambio, se defiere a uno posterior, o se
-  descarta? No bloquea el resto del diseño — sin ella, el registro sigue
-  funcionando y el admin sigue teniendo la decisión final.

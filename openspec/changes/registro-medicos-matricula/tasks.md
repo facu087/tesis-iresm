@@ -8,9 +8,12 @@
       apellido, DNI, matrícula, jurisdicción, profesión/especialidad opcional,
       email institucional, hash de contraseña, rol `medico`/`admin`, estado
       `pendiente`/`rechazado`/`verificado`, motivo de rechazo, fecha y hora de
-      consentimiento) con tipado estático y docstrings en español; verificar con
-      un test que crear una instancia y persistirla en una base SQLite temporal
-      funciona (`tests/test_cuentas_modelo.py`).
+      consentimiento, `email_verificado: bool` en `False` por defecto y sin
+      ningún flujo que lo cambie todavía — deja lugar a la verificación por
+      correo diferida a un cambio posterior, ver `design.md` Non-Goals) con
+      tipado estático y docstrings en español; verificar con un test que crear
+      una instancia y persistirla en una base SQLite temporal funciona
+      (`tests/test_cuentas_modelo.py`).
 - [ ] 1.3 Definir el modelo de auditoría (`DecisionAuditoria`: admin, cuenta
       afectada, fecha y hora, decisión, motivo o nota, fuente consultada) y el
       modelo de sesión (`Sesion`: id opaco, cuenta, expiración); verificar con
@@ -45,107 +48,128 @@
       un test que superar el límite bloquea intentos posteriores aunque las
       credenciales sean correctas.
 
-## 3. Registro de médicos
+## 3. Validación de origen (mitigación CSRF)
 
-- [ ] 3.1 Implementar `POST /api/registro`: valida campos obligatorios,
+- [ ] 3.1 Implementar una dependencia/función que valide el encabezado `Origin`
+      de la solicitud (con `Referer` como respaldo si `Origin` no está
+      presente) contra `ALLOWED_ORIGINS` (la misma lista que ya usa CORS en
+      `backend/main.py`) y rechace con 403 si falta o no coincide; aplicarla a
+      `POST /api/registro`, `POST /api/login`, `POST /api/logout`,
+      `POST /api/admin/cuentas/{id}/aprobar` y
+      `POST /api/admin/cuentas/{id}/rechazar` (ver `design.md` D3 — corregido);
+      verificar con tests que cada uno de esos endpoints rechaza con 403 un
+      origen ajeno y acepta uno permitido.
+- [ ] 3.2 Aplicar la misma validación a `POST /api/analyze` y
+      `POST /api/report/pdf`, sin importar el tipo de contenido (spec
+      `proteccion-analisis-clinico` — Requirement: Validación de origen en el
+      análisis y la exportación); verificar con un test que una solicitud
+      `multipart/form-data` a `/api/analyze` con un `Origin` ajeno y una cookie
+      de sesión válida de un médico verificado es rechazada con 403 sin
+      ejecutar el pipeline, y que con un `Origin` permitido continúa a las
+      verificaciones de sesión y estado de cuenta.
+
+## 4. Registro de médicos
+
+- [ ] 4.1 Implementar `POST /api/registro`: valida campos obligatorios,
       unicidad de DNI/email/matrícula+jurisdicción, exige el consentimiento
       explícito (Ley 25.326) y crea la cuenta en estado `pendiente`; verificar
       con tests que cubran alta exitosa, campo faltante, sin consentimiento, DNI
       duplicado y matrícula+jurisdicción duplicada (spec `registro-medicos`).
-- [ ] 3.2 Implementar `GET /api/cuenta` (requiere sesión, cualquier estado):
+- [ ] 4.2 Implementar `GET /api/cuenta` (requiere sesión, cualquier estado):
       devuelve estado actual y, si está `rechazado`, el motivo; verificar con
       tests para los tres estados.
-- [ ] 3.3 Implementar el reenvío tras rechazo (`PUT /api/registro` o
+- [ ] 4.3 Implementar el reenvío tras rechazo (`PUT /api/registro` o
       equivalente) que permite corregir los datos de una cuenta `rechazada` y la
       vuelve a `pendiente`; verificar con un test del ciclo completo
       rechazo → corrección → pendiente.
-- [ ] 3.4 Test dedicado que confirme que el almacenamiento de cuentas no admite
+- [ ] 4.4 Test dedicado que confirme que el almacenamiento de cuentas no admite
       ni expone ningún campo de texto clínico o de reporte (spec
       `registro-medicos` — Requirement: Sin datos clínicos en el registro de
       cuentas).
 
-## 4. Revisión admin y auditoría
+## 5. Revisión admin y auditoría
 
-- [ ] 4.1 Implementar la dependencia de autorización que exige rol `admin` y
+- [ ] 5.1 Implementar la dependencia de autorización que exige rol `admin` y
       aplicarla a las rutas de revisión; verificar con un test que una cuenta
       `medico` recibe 403 y una `admin` accede.
-- [ ] 4.2 Implementar `GET /api/admin/pendientes` (lista cuentas `pendiente` con
+- [ ] 5.2 Implementar `GET /api/admin/pendientes` (lista cuentas `pendiente` con
       sus datos de registro) y la configuración del enlace del buscador
       provincial (variable de entorno o config, puede quedar sin definir);
       verificar con un test que el listado no falla con el enlace provincial
       vacío.
-- [ ] 4.3 Implementar `POST /api/admin/cuentas/{id}/aprobar` (exige indicar la
+- [ ] 5.3 Implementar `POST /api/admin/cuentas/{id}/aprobar` (exige indicar la
       fuente consultada, pasa la cuenta a `verificado`) y
       `POST /api/admin/cuentas/{id}/rechazar` (exige motivo no vacío, pasa la
       cuenta a `rechazado`); verificar con tests de aprobación, rechazo con
       motivo y rechazo sin motivo (debe fallar).
-- [ ] 4.4 Registrar un `DecisionAuditoria` en cada aprobación y rechazo (quién,
+- [ ] 5.4 Registrar un `DecisionAuditoria` en cada aprobación y rechazo (quién,
       cuándo, decisión, motivo/nota, fuente); verificar con un test que ambas
       operaciones generan exactamente un registro de auditoría con esos datos.
-- [ ] 4.5 Implementar el comando CLI `python -m backend.cli crear-admin` (pide
+- [ ] 5.5 Implementar el comando CLI `python -m backend.cli crear-admin` (pide
       credenciales por parámetro o prompt, falla si ya hay una cuenta con ese
       email, no incluye ningún usuario/contraseña por defecto); verificar con un
       test que ejecutarlo crea la cuenta admin y que una instalación sin
       ejecutarlo no tiene ninguna.
 
-## 5. Protección del pipeline clínico
+## 6. Protección del pipeline clínico
 
-- [ ] 5.1 Implementar la dependencia que exige sesión de médico en estado
+- [ ] 6.1 Implementar la dependencia que exige sesión de médico en estado
       `verificado` y aplicarla a `POST /api/analyze`; verificar con tests para
       sin sesión (401), médico `pendiente`/`rechazado` (403), admin sin cuenta
       médico verificada (403) y médico `verificado` (200, spec
       `proteccion-analisis-clinico`).
-- [ ] 5.2 Aplicar la misma dependencia a `POST /api/report/pdf`; verificar con
+- [ ] 6.2 Aplicar la misma dependencia a `POST /api/report/pdf`; verificar con
       un test de acceso sin sesión (401) y con médico verificado (200).
-- [ ] 5.3 Actualizar `tests/test_api.py` (y los tests existentes que llaman a
+- [ ] 6.3 Actualizar `tests/test_api.py` (y los tests existentes que llaman a
       `/api/analyze` sin autenticación) para loguearse primero; verificar que la
       suite completa de tests del pipeline sigue pasando con el gate activo.
 
-## 6. Frontend
+## 7. Frontend
 
-- [ ] 6.1 Antes de tocar rutas o middleware: correr `npm install` en
+- [ ] 7.1 Antes de tocar rutas o middleware: correr `npm install` en
       `frontend/` si `node_modules/` no está presente y leer
       `frontend/node_modules/next/dist/docs/` sobre App Router / middleware de
       Next 16.2.7 (ver `design.md` — Riesgo operativo Next.js 16).
-- [ ] 6.2 Confirmar que el cambio `landing-explicativa` ya está mergeado a
+- [ ] 7.2 Confirmar que el cambio `landing-explicativa` ya está mergeado a
       `develop` (existe `/analizar`) antes de continuar con las tareas de
-      frontend de este grupo; si no lo está, dejar el grupo 6 pendiente y
+      frontend de este grupo; si no lo está, dejar el grupo 7 pendiente y
       avisar.
-- [ ] 6.3 Crear `/registro` (formulario con los campos obligatorios y el
+- [ ] 7.3 Crear `/registro` (formulario con los campos obligatorios y el
       checkbox de consentimiento) y `/ingresar`; verificar con
       `npm run build` sin errores y una captura de cada vista.
-- [ ] 6.4 Crear `/cuenta` (muestra `pendiente` / `rechazado` con motivo y opción
+- [ ] 7.4 Crear `/cuenta` (muestra `pendiente` / `rechazado` con motivo y opción
       de corregir y reenviar / `verificado`); verificar con `npm run build` y
       capturas de los tres estados.
-- [ ] 6.5 Crear `/admin/pendientes` (lista, enlaces a los buscadores públicos,
+- [ ] 7.5 Crear `/admin/pendientes` (lista, enlaces a los buscadores públicos,
       aprobar/rechazar con motivo obligatorio); verificar con `npm run build` y
       una captura.
-- [ ] 6.6 Proteger `/analizar` en el cliente (redirige si no hay sesión de
+- [ ] 7.6 Proteger `/analizar` en el cliente (redirige si no hay sesión de
       médico verificado) — documentado como capa de UX, no de seguridad (spec
       `proteccion-analisis-clinico` — Requirement: La aplicación no es el
       límite de seguridad); verificar manualmente que redirige sin sesión.
-- [ ] 6.7 Actualizar `frontend/src/lib/api.ts`: mandar `credentials: "include"`
+- [ ] 7.7 Actualizar `frontend/src/lib/api.ts`: mandar `credentials: "include"`
       en los `fetch` a endpoints protegidos y agregar los llamados a
       registro/login/logout/estado de cuenta/admin; verificar con
       `npm run build`.
 
-## 7. Evidencia y pruebas de extremo a extremo
+## 8. Evidencia y pruebas de extremo a extremo
 
-- [ ] 7.1 Escribir `scripts/demo_registro_medicos.py`: registro → intento de
+- [ ] 8.1 Escribir `scripts/demo_registro_medicos.py`: registro → intento de
       análisis rechazado (pendiente) → aprobación admin con auditoría →
       análisis permitido → rechazo de otra cuenta con motivo → reenvío, todo
       contra una base SQLite temporal y sin ninguna llamada a un LLM; verificar
       que corre con `python3 scripts/demo_registro_medicos.py` y deja artefactos
       en `output/`.
-- [ ] 7.2 Verificación integral: correr toda la suite de `tests/` nueva y
+- [ ] 8.2 Verificación integral: correr toda la suite de `tests/` nueva y
       existente y confirmar que pasa completa, incluida la protección de
-      `/api/analyze` y `/api/report/pdf`.
+      `/api/analyze` y `/api/report/pdf` (sesión, estado de cuenta y origen).
 
-## 8. Documentación
+## 9. Documentación
 
-- [ ] 8.1 Actualizar `.claude/CLAUDE.md` (estado del Sprint 4, nuevas
+- [ ] 9.1 Actualizar `.claude/CLAUDE.md` (estado del Sprint 4, nuevas
       variables de entorno) y `.claude/backlog.md` con el estado de esta
       tarjeta/estas tarjetas de Trello.
-- [ ] 8.2 Actualizar `.claude/stack.md` con las decisiones de esta propuesta
-      (SQLModel/SQLite, argon2-cffi, sesión server-side) siguiendo el mismo
-      formato de justificación que las decisiones existentes.
+- [ ] 9.2 Actualizar `.claude/stack.md` con las decisiones de esta propuesta
+      (SQLModel/SQLite, argon2-cffi, sesión server-side, validación de origen)
+      siguiendo el mismo formato de justificación que las decisiones
+      existentes.

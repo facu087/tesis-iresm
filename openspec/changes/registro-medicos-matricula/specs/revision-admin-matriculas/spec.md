@@ -107,3 +107,16 @@ defecto.
 - **WHEN** se inspecciona una instalación recién desplegada sin haber ejecutado el
   comando de alta de administrador
 - **THEN** no existe ninguna cuenta con rol `admin`
+
+### Requirement: Validación de origen en aprobar y rechazar
+Las operaciones de aprobar y rechazar una cuenta pendiente SHALL validar el
+encabezado `Origin` de la solicitud (con `Referer` como respaldo si `Origin` no
+está presente) contra la lista de orígenes permitidos configurada, y SHALL
+rechazar con 403 toda solicitud cuyo origen falte o no coincida, incluso con una
+sesión de administrador válida.
+
+#### Scenario: Aprobación o rechazo con origen ajeno
+- **WHEN** un administrador con sesión válida envía una aprobación o un rechazo
+  con un encabezado `Origin` que no pertenece a la lista de orígenes permitidos
+- **THEN** el sistema rechaza la operación con 403 y no cambia el estado de la
+  cuenta ni genera un registro de auditoría
