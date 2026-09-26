@@ -1,8 +1,8 @@
 ## 1. Preparación y tokens de diseño
 
-- [ ] 1.1 Instalar dependencias del frontend si falta `node_modules` (`npm install` en `frontend/`) y revisar `frontend/node_modules/next/dist/docs/` (metadata, layouts anidados con página cliente, `next/font`) antes de tocar código; si la carpeta no existe tras instalar, dejar constancia en el commit de qué notas de versión de Next 16 se usaron en su lugar (design D11); verificar con `npm install` sin errores
-- [ ] 1.2 Definir los tokens semánticos de color monocromático (fondo, texto, texto atenuado, borde, acento) como custom properties en `frontend/src/app/globals.css`, con la variante oscura bajo `@media (prefers-color-scheme: dark)` (design D5); verificar con `npm run build` y alternando el tema del sistema operativo en el navegador
-- [ ] 1.3 Crear `frontend/src/lib/pipelineSteps.ts` con los pasos del pipeline según `.claude/architecture.md` (design D4); verificar con `npm run build`
+- [x] 1.1 Instalar dependencias del frontend si falta `node_modules` (`npm install` en `frontend/`) y revisar `frontend/node_modules/next/dist/docs/` (metadata, layouts anidados con página cliente, `next/font`) antes de tocar código; si la carpeta no existe tras instalar, dejar constancia en el commit de qué notas de versión de Next 16 se usaron en su lugar (design D11); verificar con `npm install` sin errores
+- [x] 1.2 Definir los tokens semánticos de color monocromático (fondo, texto, texto atenuado, borde, acento) como custom properties en `frontend/src/app/globals.css`, con la variante oscura bajo `@media (prefers-color-scheme: dark)` (design D5); verificar con `npm run build` y alternando el tema del sistema operativo en el navegador
+- [x] 1.3 Crear `frontend/src/lib/pipelineSteps.ts` con los pasos del pipeline según `.claude/architecture.md` (design D4); verificar con `npm run build`
 
 ## 2. Ruta /analizar (reubicación del flujo de carga)
 
