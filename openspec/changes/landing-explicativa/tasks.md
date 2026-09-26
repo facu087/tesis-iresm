@@ -17,8 +17,8 @@
 
 ## 4. Landing — cómo funciona (diagrama del pipeline)
 
-- [ ] 4.1 Construir la sección "Cómo funciona" con el diagrama inline SVG/HTML del pipeline (agentes → debate rondas 1–4 → verificación/Árbitro + Ronda 5 → ensayos → reporte) usando `pipelineSteps.ts`, con `role="img"` y `aria-label` resumen; verificar con `npm run build` e inspeccionando el HTML generado
-- [ ] 4.2 Agregar la alternativa textual accesible (lista visualmente oculta con los mismos pasos, en el mismo orden que el diagrama) para lectores de pantalla; verificar inspeccionando el DOM o con un lector de pantalla
+- [x] 4.1 Construir la sección "Cómo funciona" con el diagrama inline SVG/HTML del pipeline (agentes → debate rondas 1–4 → verificación/Árbitro + Ronda 5 → ensayos → reporte) usando `pipelineSteps.ts`, con `role="img"` y `aria-label` resumen; verificar con `npm run build` e inspeccionando el HTML generado
+- [x] 4.2 Agregar la alternativa textual accesible (lista visualmente oculta con los mismos pasos, en el mismo orden que el diagrama) para lectores de pantalla; verificar inspeccionando el DOM o con un lector de pantalla
 
 ## 5. Landing — agentes y funcionalidades clave
 

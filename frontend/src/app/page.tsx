@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import ScrollReveal from "@/components/ScrollReveal";
+import { PIPELINE_STEPS, PIPELINE_SUMMARY } from "@/lib/pipelineSteps";
 
 export const metadata: Metadata = {
   title: "NEXUS — Sistema de Soporte Investigativo Clínico",
@@ -18,6 +19,9 @@ export default function LandingPage() {
       <main className="flex-1">
         <ScrollReveal>
           <HeroSection />
+        </ScrollReveal>
+        <ScrollReveal>
+          <HowItWorksSection />
         </ScrollReveal>
       </main>
     </div>
@@ -109,6 +113,72 @@ function HeroSection() {
           Genera hipótesis de investigación para que las evalúe el médico
           responsable.
         </p>
+      </div>
+    </section>
+  );
+}
+
+/* ── Cómo funciona ─────────────────────────────────────────────────────── */
+
+function HowItWorksSection() {
+  return (
+    <section
+      id="como-funciona"
+      aria-labelledby="como-funciona-heading"
+      className="border-t border-border"
+    >
+      <div className="mx-auto max-w-5xl px-6 py-16 sm:py-20">
+        <p className="text-xs font-semibold uppercase tracking-widest text-fg-muted">
+          Cómo funciona
+        </p>
+        <h2
+          id="como-funciona-heading"
+          className="mt-2 max-w-2xl text-2xl font-semibold tracking-tight sm:text-3xl"
+        >
+          Un pipeline de agentes que debaten, verifican y recién entonces
+          reportan.
+        </h2>
+
+        {/*
+          Diagrama del flujo: `role="img"` + `aria-label` lo describe como una
+          sola imagen para lectores de pantalla; el contenido visual queda
+          `aria-hidden`, y la alternativa textual completa (misma secuencia,
+          mismo orden) vive en la lista `sr-only` de abajo (design, tarea 4.2).
+        */}
+        <div
+          role="img"
+          aria-label={PIPELINE_SUMMARY}
+          className="mt-12 max-w-2xl"
+        >
+          <div aria-hidden="true">
+            {PIPELINE_STEPS.map((step, i) => (
+              <div key={step.id} className="relative flex gap-5 pb-8 last:pb-0">
+                {i < PIPELINE_STEPS.length - 1 && (
+                  <span className="absolute top-9 left-4 h-[calc(100%-1rem)] w-px bg-border" />
+                )}
+                <span className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-fg text-xs font-bold text-bg">
+                  {step.id}
+                </span>
+                <div className="pt-0.5">
+                  <p className="text-sm font-semibold">{step.label}</p>
+                  <p className="mt-1 text-sm text-fg-muted">
+                    {step.description}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Alternativa textual accesible (design, tarea 4.2): mismos pasos,
+            mismo orden que el diagrama, para lectores de pantalla. */}
+        <ol className="sr-only">
+          {PIPELINE_STEPS.map((step) => (
+            <li key={step.id}>
+              Paso {step.id}: {step.label}. {step.description}
+            </li>
+          ))}
+        </ol>
       </div>
     </section>
   );
