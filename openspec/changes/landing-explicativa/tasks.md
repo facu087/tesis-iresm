@@ -37,4 +37,4 @@
 
 ## 8. Documentación
 
-- [ ] 8.1 Actualizar `.claude/CLAUDE.md` (Sprint 4: sumar la landing y la ruta `/analizar` al árbol de carpetas del frontend, y corregir la tabla de numeración de agentes para que el 02 figure como implementado, no pendiente — ver design D8) y `.claude/backlog.md` (EP-08: nueva tarea con las decisiones D1–D11 resumidas); verificar con `openspec validate landing-explicativa --strict` y `npm run build`
+- [x] 8.1 Actualizar `.claude/CLAUDE.md` (Sprint 4: sumar la landing y la ruta `/analizar` al árbol de carpetas del frontend, y corregir la tabla de numeración de agentes para que el 02 figure como implementado, no pendiente — ver design D8) y `.claude/backlog.md` (EP-08: nueva tarea con las decisiones D1–D11 resumidas); verificar con `openspec validate landing-explicativa --strict` y `npm run build`

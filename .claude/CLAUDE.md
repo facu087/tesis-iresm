@@ -70,7 +70,9 @@ Backend mergeado a `develop` (capa de recuperación de evidencia / RAG). Autor: 
 - [x] Verificación bibliográfica de PMIDs: título real vs. citado (backend/pipeline/verification.py)
 - [x] Vista de reporte: estado de verificación de hipótesis y fuentes (frontend/src/app/report/page.tsx)
 - [x] PDF: estado de verificación en el reporte exportado (backend/pipeline/pdf_exporter.py)
-- [ ] Agente 02 (Especialista Genómica): prompt + llamada LLM + parseo JSON
+- [x] Agente 02 (Especialista Genómica): prompt + llamada LLM + parseo JSON
+      (backend/agents/agent_02_genomics.py — PR #12, 2026-09-16; cableado en
+      pipeline/orchestrator.py, pipeline/debate.py y api/router.py)
 - [x] Agente 04 (Árbitro Verificador): consenso, contradicciones y Ronda 5 de recitación
       (backend/agents/agent_04_arbiter.py + pipeline/consensus.py + pipeline/recitation.py)
 - [x] Agente 05 (Navegador de Ensayos): ClinicalTrials.gov + Orphanet
@@ -109,7 +111,7 @@ Backend mergeado a `develop` (capa de recuperación de evidencia / RAG). Autor: 
 | ID | Rol | Estado |
 |----|-----|--------|
 | 01 | Analista de Literatura | ✅ Implementado |
-| 02 | Especialista Genómica | 📋 Pendiente |
+| 02 | Especialista Genómica | ✅ Implementado |
 | 03 | Consultor Clínico | ✅ Implementado |
 | 04 | Árbitro Verificador | ✅ Implementado |
 | 05 | Navegador de Ensayos | ✅ Implementado |
@@ -263,15 +265,21 @@ tesis-iresm/
 ├── frontend/
 │   ├── src/
 │   │   ├── app/
-│   │   │   ├── page.tsx            ← vista de carga de documentos
+│   │   │   ├── page.tsx            ← landing explicativa (S4) — Server Component
+│   │   │   ├── analizar/
+│   │   │   │   ├── page.tsx        ← vista de carga de documentos (S4, movida desde `/`)
+│   │   │   │   └── layout.tsx      ← metadata propia de la ruta (S4)
 │   │   │   ├── analyzing/page.tsx  ← vista de pipeline con progreso en tiempo real
 │   │   │   └── report/page.tsx     ← vista de reporte (5 tabs)
 │   │   ├── components/
-│   │   │   └── UploadForm.tsx      ← formulario de carga PDF/texto
+│   │   │   ├── UploadForm.tsx      ← formulario de carga PDF/texto
+│   │   │   ├── ScrollReveal.tsx    ← animación de aparición al hacer scroll (S4)
+│   │   │   └── icons.tsx           ← iconos SVG inline de la landing (S4)
 │   │   └── lib/
 │   │       ├── api.ts              ← cliente HTTP al backend FastAPI
 │   │       ├── types.ts            ← tipos TypeScript del reporte
-│   │       └── inputStore.ts       ← estado compartido entre vistas
+│   │       ├── inputStore.ts       ← estado compartido entre vistas
+│   │       └── pipelineSteps.ts    ← pasos del pipeline (S4, fuente única landing + /analizar)
 │   ├── next.config.ts
 │   └── package.json
 ├── scripts/

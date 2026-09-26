@@ -97,7 +97,7 @@ Suite de tests: **82 tests, 100% passing** (`pytest tests/`)
 
 ## Sprint 4 — Árbitro y verificación (Etapa 5) 🔄 EN CURSO
 
-Épicas cubiertas: EP-04, EP-05, EP-06
+Épicas cubiertas: EP-04, EP-05, EP-06, EP-08
 
 | # | Tarea | Estado |
 |---|-------|--------|
@@ -120,6 +120,7 @@ Suite de tests: **82 tests, 100% passing** (`pytest tests/`)
 | 17 | Fix: comentarios en línea del `.env.example` se cargaban como valor de la clave | ✅ Hecho |
 | 18 | Vista de reporte: mostrar el estado de verificación de hipótesis y fuentes (EP-08) | ✅ Hecho |
 | 19 | PDF: incluir el estado de verificación en el reporte exportado (EP-07) | ✅ Hecho |
+| 20 | Landing explicativa en `/` + reubicación de la carga de casos a `/analizar` (EP-08) | ✅ Hecho (OpenSpec `landing-explicativa`) |
 
 > Nota (12) — **RESUELTA**: se integró la búsqueda semántica RAG como contexto
 > bibliográfico en `backend/pipeline/orchestrator.py` (Ronda 1), y desde la tarea 16
@@ -200,6 +201,48 @@ Suite de tests: **82 tests, 100% passing** (`pytest tests/`)
 > `agent_01` y `agent_03`), y van como tarjetas separadas en Trello:
 > tarea 9 = Agente 04 (Árbitro Verificador), tarea 13 = Agente 06 (Sintetizador).
 > La tarea 13 no existía en este backlog: se agregó junto con esta corrección.
+
+> Nota (20) — **Landing explicativa** (cambio OpenSpec `landing-explicativa`,
+> `openspec/specs/landing-explicativa/`). Decisiones D1–D11 de su `design.md`:
+>
+> - **D1** — la landing ocupa `/`; el formulario de carga se muda a `/analizar`.
+> - **D2** — `/` es un Server Component (sin `"use client"`); el CTA usa `next/link`.
+> - **D3** — `/analizar` sigue siendo cliente; su `metadata` vive en un
+>   `layout.tsx` hermano, porque un Client Component no puede exportarla.
+> - **D4** — los pasos del pipeline se leen de una única fuente compartida
+>   (`frontend/src/lib/pipelineSteps.ts`), consumida por la landing y por
+>   `/analizar`.
+> - **D5** — paleta monocromática por tokens semánticos en `globals.css`
+>   (`--color-bg/-fg/-border/-accent`), con variante oscura vía
+>   `prefers-color-scheme`; se descartó la recomendación de la herramienta de
+>   diseño (azul + naranja, Plus Jakarta Sans) por decisión del usuario
+>   ("estilo Vercel").
+> - **D6** — el movimiento (scroll reveal) es visible por defecto: sin
+>   JavaScript el contenido se ve completo; el componente cliente
+>   `ScrollReveal` lo oculta recién tras montarse, solo sin
+>   `prefers-reduced-motion`, y revela vía `IntersectionObserver` compartido.
+> - **D7** — iconos SVG inline hechos a medida (`frontend/src/components/icons.tsx`),
+>   sin librería de iconos.
+> - **D8** — precisión sobre el estado de los agentes: 01, 02, 03, 04 y 05 se
+>   describen con una capacidad real; el Agente 06 (Sintetizador) se marca
+>   pendiente/en desarrollo, sin capacidad activa descripta. Corrigió también
+>   que `CLAUDE.md` tenía al Agente 02 como pendiente, cuando está mergeado
+>   desde el PR #12 (2026-09-16) y cableado en el pipeline (ver nota de
+>   numeración arriba y la tarea 8 de esta tabla).
+> - **D9** — el header deja lugar de layout a un futuro "Ingresar", sin
+>   implementarlo.
+> - **D10** — sin corredor de tests de frontend, la evidencia de esta landing
+>   es `npm run build` + capturas responsivas manuales (375/768/1024/1440px,
+>   claro y oscuro), no un test en `tests/`.
+> - **D11** — se instalaron las dependencias del frontend (faltaba
+>   `node_modules` en el worktree) y se revisó
+>   `frontend/node_modules/next/dist/docs/` (metadata, `next/font`) antes de
+>   escribir código, por las diferencias de Next 16 con el conocimiento de
+>   entrenamiento.
+>
+> Evidencia: 16 capturas en `output/evidencia/landing/` (local, ignorada por
+> git); `npm run build` sin errores nuevos y `npm run lint` con exactamente
+> el error y el warning preexistentes (hallazgo H).
 
 Evidencia/verificación de las tareas 1–7: scripts `scripts/demo_*.py` (PubMed, Orphanet,
 PharmGKB, rate_limiter, ChromaDB, indexación, motor RAG).
