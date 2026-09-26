@@ -27,8 +27,8 @@
 
 ## 6. Landing — CTA, footer y accesibilidad de interacción
 
-- [ ] 6.1 Agregar la sección de CTA final ("Analizar un caso" → `/analizar` vía `next/link`) y el footer con el disclaimer completo y el crédito IRESM; verificar con una captura confirmando que el footer repite el texto completo del disclaimer
-- [ ] 6.2 Revisar estados de foco visibles, `cursor-pointer` en elementos clicables y transiciones hover de 150–300ms en todos los elementos interactivos nuevos (nav, CTA, tarjetas); verificar navegando con teclado (Tab) y confirmando que el foco es visible en cada elemento interactivo
+- [x] 6.1 Agregar la sección de CTA final ("Analizar un caso" → `/analizar` vía `next/link`) y el footer con el disclaimer completo y el crédito IRESM; verificar con una captura confirmando que el footer repite el texto completo del disclaimer
+- [x] 6.2 Revisar estados de foco visibles, `cursor-pointer` en elementos clicables y transiciones hover de 150–300ms en todos los elementos interactivos nuevos (nav, CTA, tarjetas); verificar navegando con teclado (Tab) y confirmando que el foco es visible en cada elemento interactivo
 
 ## 7. QA responsivo y evidencia
 

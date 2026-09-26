@@ -41,7 +41,11 @@ export default function LandingPage() {
         <ScrollReveal>
           <FeaturesSection />
         </ScrollReveal>
+        <ScrollReveal>
+          <CtaSection />
+        </ScrollReveal>
       </main>
+      <SiteFooter />
     </div>
   );
 }
@@ -285,7 +289,7 @@ function AgentsSection() {
           {AGENTS.map((agent) => (
             <div
               key={agent.id}
-              className={`rounded-2xl border p-6 ${
+              className={`rounded-2xl border p-6 transition-colors duration-200 hover:border-fg-muted ${
                 agent.pending
                   ? "border-dashed border-border text-fg-muted"
                   : "border-border"
@@ -364,7 +368,7 @@ function FeaturesSection() {
           {FEATURES.map((feature) => (
             <div
               key={feature.title}
-              className="rounded-2xl border border-border p-6"
+              className="rounded-2xl border border-border p-6 transition-colors duration-200 hover:border-fg-muted"
             >
               <feature.Icon className="h-6 w-6" />
               <p className="mt-4 text-sm font-semibold text-fg">
@@ -378,5 +382,51 @@ function FeaturesSection() {
         </div>
       </div>
     </section>
+  );
+}
+
+/* ── CTA final ─────────────────────────────────────────────────────────── */
+
+function CtaSection() {
+  return (
+    <section className="border-t border-border">
+      <div className="mx-auto max-w-5xl px-6 py-20 text-center">
+        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          ¿Tenés un caso clínico para analizar?
+        </h2>
+        <p className="mx-auto mt-3 max-w-xl text-fg-muted">
+          Subí el documento o pegá el texto: el pipeline hace el resto y
+          devuelve un reporte con hipótesis priorizadas, junto con sus
+          fuentes.
+        </p>
+        <div className="mt-8">
+          <Link
+            href="/analizar"
+            className="cursor-pointer rounded-full bg-fg px-8 py-3 text-sm font-semibold text-bg transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fg"
+          >
+            Analizar un caso →
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── Footer ────────────────────────────────────────────────────────────── */
+
+function SiteFooter() {
+  return (
+    <footer className="border-t border-border">
+      <div className="mx-auto flex max-w-5xl flex-col gap-4 px-6 py-8 sm:flex-row sm:items-center sm:justify-between">
+        <p className="max-w-xl text-xs leading-relaxed text-fg-muted">
+          <span className="font-semibold text-fg">NEXUS</span> no emite
+          diagnósticos clínicos. Las hipótesis generadas son orientativas y
+          deben ser evaluadas por el médico responsable.
+        </p>
+        <p className="shrink-0 text-xs text-fg-muted">
+          Tesis Final · Analista en Sistemas · IRESM, Villa Carlos Paz · 2026
+        </p>
+      </div>
+    </footer>
   );
 }
