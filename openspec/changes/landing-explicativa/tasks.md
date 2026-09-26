@@ -32,8 +32,8 @@
 
 ## 7. QA responsivo y evidencia
 
-- [ ] 7.1 Ejecutar `npm run build` en `frontend/` y confirmar que compila sin errores nuevos (las advertencias de lint preexistentes del hallazgo H del backlog son ajenas a este cambio y no bloquean, ya que `next build` no corre lint); verificar con la salida del comando
-- [ ] 7.2 Tomar capturas de `/` y de `/analizar` en 375px, 768px, 1024px y 1440px, en modo claro y oscuro, confirmando ausencia de scroll horizontal y contraste de texto ≥4.5:1; guardar las capturas como evidencia de la tarjeta de Trello correspondiente; verificar revisando cada captura contra los requisitos de `specs/landing-explicativa/spec.md`
+- [x] 7.1 Ejecutar `npm run build` en `frontend/` y confirmar que compila sin errores nuevos (las advertencias de lint preexistentes del hallazgo H del backlog son ajenas a este cambio y no bloquean, ya que `next build` no corre lint); verificar con la salida del comando
+- [x] 7.2 Tomar capturas de `/` y de `/analizar` en 375px, 768px, 1024px y 1440px, en modo claro y oscuro, confirmando ausencia de scroll horizontal y contraste de texto ≥4.5:1; guardar las capturas como evidencia de la tarjeta de Trello correspondiente; verificar revisando cada captura contra los requisitos de `specs/landing-explicativa/spec.md`
 
 ## 8. Documentación
 
