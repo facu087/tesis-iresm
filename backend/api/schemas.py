@@ -22,6 +22,12 @@ class ReportMetadata(BaseModel):
     nexus_version: str
     processing_time_seconds: float
     disclaimer: str = _DISCLAIMER
+    # Modo mock (S4 — D7): True cuando el análisis se produjo con respuestas
+    # grabadas, no con el proveedor real. Un reporte de modo mock MUST ser
+    # distinguible de uno real sin inspeccionar código ni logs (spec
+    # `modo-mock-pipeline`); el frontend y el PDF lo muestran con la misma
+    # visibilidad que la advertencia del consenso de IA.
+    mock: bool = False
 
 
 class CaseSummarySection(BaseModel):

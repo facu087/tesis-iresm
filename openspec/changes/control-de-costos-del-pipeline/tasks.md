@@ -128,13 +128,75 @@
 
 ## 6. Modo mock del pipeline
 
-- [ ] 6.1 Implementar el modo mock en la función compartida de 1.1, devolviendo respuestas grabadas que atraviesan el mismo parseo y las mismas validaciones que una respuesta real (D7). Verificar con `tests/test_mock_pipeline.py`.
+> **Decisión de alcance (registrada acá, no en design.md, que no la anticipó
+> explícitamente).** D7 y la tarea 6.1 describen la intercepción en el punto
+> de llamada al LLM (`call_provider()`), y esa es la implementación exacta.
+> La spec `modo-mock-pipeline` pide además "ninguna llamada... ni a las APIs
+> externas" para un análisis completo. Ampliar la intercepción a
+> `external/pubmed.py`, `external/clinical_trials.py` y `external/orphanet.py`
+> queda fuera de esta tarjeta: no está en el listado de archivos impactados
+> de proposal.md y es un cambio de superficie comparable a esta sección
+> entera. Task 6.7 cierra la brecha combinando el modo mock real (para el
+> LLM) con el mismo mockeo a nivel de test que ya usa `tests/test_api.py`
+> para esas APIs, verificado con `pytest_sin_red`. **Queda para el
+> orquestador decidir** si ampliar la intercepción de producción a esos tres
+> módulos en una tarjeta aparte.
+
+- [x] 6.1 Implementar el modo mock en la función compartida de 1.1, devolviendo respuestas grabadas que atraviesan el mismo parseo y las mismas validaciones que una respuesta real (D7). Verificar con `tests/test_mock_pipeline.py`.
+      Hecho: `call_provider()` chequea `is_mock_active()` antes de instanciar Groq y
+      devuelve `mock.responses.get_mock_response(task)`. Test:
+      `TestElModoMockEjercitaElParseoReal` (parsea con `BaseAgent.parse_hypotheses()`,
+      `_parse_critiques()`, `pico._parse_pico()`, y corre `pico.build()` /
+      `biomarker_extractor.extract()` completos con el modo activo).
 - [ ] 6.2 Generar las respuestas grabadas desde una corrida real del caso de prueba, para que se parezcan a lo que el modelo devuelve de verdad.
-- [ ] 6.3 Activación explícita por variable de entorno, **apagada por defecto** y nunca por inferencia: si falta `GROQ_API_KEY` y el modo mock no está activo, el análisis falla con un error claro. Verificar con dos tests, uno por cada caso.
-- [ ] 6.4 Marcar el reporte producido en modo mock, y mostrarlo en el frontend y en el PDF con la misma visibilidad que la advertencia del consenso de IA. Verificar con `tests/test_pdf_exporter.py` sobre el texto extraído, y con `npm run build` más una captura de la vista.
-- [ ] 6.5 Verificar el determinismo: dos análisis del mismo texto en modo mock producen el mismo resultado.
-- [ ] 6.6 Verificar que el modo mock **ejercita** el flujo: introducir un defecto en el parseo de la respuesta del modelo y comprobar que el modo mock lo manifiesta en vez de devolver un reporte correcto.
-- [ ] 6.7 Confirmar que un análisis completo en modo mock no hace ninguna llamada de red, con `scripts/pytest_sin_red.py` (el mismo instrumento de la tarjeta #75).
+      **Parcial.** `backend/mock/responses.py` tiene fixtures razonadas a mano (no
+      una grabación real: esta sesión tiene prohibido gastar cuota) que pasan el
+      parseo vigente de las 12 tareas. Documentado en el docstring del módulo.
+      Pendiente: regenerar desde una corrida real cuando haya cuota.
+- [x] 6.3 Activación explícita por variable de entorno, **apagada por defecto** y nunca por inferencia: si falta `GROQ_API_KEY` y el modo mock no está activo, el análisis falla con un error claro. Verificar con dos tests, uno por cada caso.
+      Hecho: `NEXUS_MOCK_LLM` (`backend/mock/mode.py`, `is_mock_active()`), apagada
+      por defecto. Sin ella y sin `GROQ_API_KEY`, `call_provider()` lanza
+      `RuntimeError` con mensaje explícito antes de instanciar Groq. Tests:
+      `TestActivacion::test_sin_api_key_y_sin_mock_falla_claro` y
+      `test_sin_api_key_pero_con_mock_no_falla`. `backend/main.py` informa el modo
+      mock al arrancar (test `test_lo_informa_al_arrancar`).
+- [x] 6.4 Marcar el reporte producido en modo mock, y mostrarlo en el frontend y en el PDF con la misma visibilidad que la advertencia del consenso de IA. Verificar con `tests/test_pdf_exporter.py` sobre el texto extraído, y con `npm run build` más una captura de la vista.
+      Hecho: `ReportMetadata.mock` (schemas.py) ← `build_export(mock=...)` ←
+      `router.py` (`is_mock_active()`). PDF: banner rojo antes que cualquier otro
+      aviso (`pdf_exporter.py`), tests en `TestModoMockEnPdf`
+      (`tests/test_pdf_exporter.py`). Frontend: `ReportMetadata.mock` en
+      `types.ts` + `<MockBanner/>` en `report/page.tsx`, primero en la página.
+      `npx tsc --noEmit`: sin errores. `npm run build` con Turbopack falla en este
+      worktree — `node_modules` está symlinkeado fuera de la raíz del worktree y
+      Turbopack lo rechaza ("Symlink points out of the filesystem root"), un
+      límite del entorno, no del código: `npx next build --webpack` compila y
+      genera las 4 rutas sin error. **Captura de la vista: no se hizo** (no hay
+      herramienta de automatización de navegador disponible en esta sesión);
+      queda pendiente para quien tenga esa herramienta o corra la app a mano.
+- [x] 6.5 Verificar el determinismo: dos análisis del mismo texto en modo mock producen el mismo resultado.
+      Hecho: `TestDeterminismo` (`pico.build()` y `biomarker_extractor.extract()`
+      dos veces sobre el mismo texto, mismo resultado).
+- [x] 6.6 Verificar que el modo mock **ejercita** el flujo: introducir un defecto en el parseo de la respuesta del modelo y comprobar que el modo mock lo manifiesta en vez de devolver un reporte correcto.
+      Hecho: `TestManifiestaDefectosDeParseo::test_un_parser_roto_falla_tambien_en_modo_mock`
+      rompe `pico._parse_pico` con `monkeypatch` y confirma que `pico.build()` en
+      modo mock relanza el error — prueba que el modo mock pasa por el parser real,
+      no por un atajo.
+- [x] 6.7 Confirmar que un análisis completo en modo mock no hace ninguna llamada de red, con `scripts/pytest_sin_red.py` (el mismo instrumento de la tarjeta #75).
+      Hecho: `test_hermetico_sin_red_analisis_completo_en_modo_mock` corre en
+      subproceso, con `-p pytest_sin_red`, los tests de activación, de parseo real
+      y un `POST /api/analyze` completo en modo mock (con `pico.build()`,
+      `extract_biomarkers()` y `ArbiterAgent.arbitrate()` corriendo de verdad, y
+      RAG/verificación/navegación de ensayos mockeados a nivel de test, ver nota de
+      alcance arriba). Confirma `0` intentos de conexión bloqueados.
+      Descubrimiento no relacionado con esta tarea, registrado para el
+      orquestador: correr la suite completa **sin** `pytest_sin_red` hace ~36
+      intentos reales de conexión a `api.groq.com` y ~36 a
+      `eutils.ncbi.nlm.nih.gov` desde `tests/test_api.py` (no mockea
+      `ArbiterAgent.arbitrate()` ni `verify_report_sources()`). Esta sesión usó
+      `PYTHONPATH=scripts pytest -p pytest_sin_red ...` para **toda** verificación,
+      precisamente para no arriesgar cuota real; el comando de baseline dado
+      (`pytest tests/ --ignore=tests/test_ingesta.py`, sin el plugin) no es
+      hermético en este entorno.
 
 ## 7. Evidencia y cierre
 

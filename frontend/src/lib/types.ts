@@ -186,6 +186,13 @@ export interface ReportMetadata {
   nexus_version: string;
   processing_time_seconds: number;
   disclaimer: string;
+  /**
+   * Modo mock (control de costos, S4 — D7). true = el análisis se produjo
+   * con respuestas grabadas, no con el proveedor real: la vista lo tiene que
+   * mostrar con la misma visibilidad que la advertencia del consenso de IA.
+   * Ausente = reporte anterior a este campo, se trata como false.
+   */
+  mock?: boolean;
 }
 
 /** Recuento de la verificación bibliográfica sobre todo el reporte. */

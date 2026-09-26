@@ -28,6 +28,7 @@ from ..pipeline.report_builder import build_export
 from ..pipeline.consensus import build_arbitration_input, degraded, summarize
 from ..pipeline.trial_matching import build_navigation_input
 from ..pipeline.verification import SourceVerification, verify_report_sources
+from ..mock.mode import is_mock_active
 from ..telemetry import usage as usage_telemetry
 from .schemas import StructuredReport
 
@@ -211,9 +212,10 @@ async def analyze(
             verifications=verifications,
             navigation=navigation,
             arbitration=arbitration,
+            mock=is_mock_active(),
         )
     finally:
-        usage_telemetry.close_registry(telemetry_token)
+        usage_telemetry.close_registry(telemetry_token, mock=is_mock_active())
 
 
 @router.post(

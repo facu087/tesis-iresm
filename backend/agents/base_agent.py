@@ -20,6 +20,8 @@ from abc import ABC, abstractmethod
 
 from pydantic import ValidationError
 
+from ..mock.mode import ENV_VAR, is_mock_active
+from ..mock.responses import get_mock_response
 from ..models.hypothesis import EvidenceLevel, Hypothesis, Priority, Source
 from ..models.report import AgentOutput, Critique
 from ..telemetry import usage as usage_telemetry
@@ -82,7 +84,34 @@ def call_provider(
     de los reintentos también sea visible. Sin un registro abierto (un script
     de demo, un test) esto no hace nada: la telemetría nunca es condición
     para que una llamada funcione.
+
+    En modo mock (S4 — D7, variable `NEXUS_MOCK_LLM`), devuelve una respuesta
+    grabada para `task` sin tocar la red ni instanciar el proveedor. Es la
+    intercepción, no un endpoint alternativo: la respuesta grabada atraviesa
+    después el mismo parseo que una real, porque quien llamó a `_call_llm()`
+    no se entera de la diferencia.
+
+    Sin modo mock, `GROQ_API_KEY` faltante falla con un mensaje claro antes de
+    intentar nada: un fallo de configuración tiene que fallar, no caer en
+    silencio a una respuesta grabada.
     """
+    if is_mock_active():
+        inicio = time.perf_counter()
+        contenido = get_mock_response(task)
+        usage_telemetry.record_call(
+            task=task, model=model, agent_id=agent_id, agent_name=agent_name,
+            ok=True, latency_seconds=time.perf_counter() - inicio,
+            prompt_tokens=0, completion_tokens=0, mock=True,
+        )
+        return contenido
+
+    if not os.environ.get("GROQ_API_KEY"):
+        raise RuntimeError(
+            "GROQ_API_KEY no está configurada y el modo mock está desactivado. "
+            "Configurá GROQ_API_KEY en el .env, o activá el modo mock "
+            f"({ENV_VAR}=1) para desarrollo sin cuota."
+        )
+
     from groq import Groq, RateLimitError
 
     client = Groq(api_key=os.environ["GROQ_API_KEY"])
