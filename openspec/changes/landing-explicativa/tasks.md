@@ -6,9 +6,9 @@
 
 ## 2. Ruta /analizar (reubicación del flujo de carga)
 
-- [ ] 2.1 Crear `frontend/src/app/analizar/page.tsx` moviendo la lógica cliente actual de `frontend/src/app/page.tsx` (formulario de carga, `useRouter`, `inputStore`, lista de pasos ahora leída de `pipelineSteps.ts`), sin el hero ni la grilla de agentes, re-skineada con los tokens de la tarea 1.2; verificar con `npm run build` y probando manualmente el envío del formulario hasta `/analyzing`
-- [ ] 2.2 Crear `frontend/src/app/analizar/layout.tsx` (Server Component) con `export const metadata` propio de la ruta (design D3); verificar que `npm run build` genera la ruta y que el título de la pestaña difiere entre `/` y `/analizar`
-- [ ] 2.3 Actualizar `frontend/src/app/analyzing/page.tsx` (línea del botón "Volver al inicio") y `frontend/src/app/report/page.tsx` (línea del botón "Nuevo análisis") para que sus `router.push("/")` apunten a `/analizar`; verificar navegando manualmente desde un error de análisis y desde "Nuevo análisis" en el reporte
+- [x] 2.1 Crear `frontend/src/app/analizar/page.tsx` moviendo la lógica cliente actual de `frontend/src/app/page.tsx` (formulario de carga, `useRouter`, `inputStore`, lista de pasos ahora leída de `pipelineSteps.ts`), sin el hero ni la grilla de agentes, re-skineada con los tokens de la tarea 1.2; verificar con `npm run build` y probando manualmente el envío del formulario hasta `/analyzing`
+- [x] 2.2 Crear `frontend/src/app/analizar/layout.tsx` (Server Component) con `export const metadata` propio de la ruta (design D3); verificar que `npm run build` genera la ruta y que el título de la pestaña difiere entre `/` y `/analizar`
+- [x] 2.3 Actualizar `frontend/src/app/analyzing/page.tsx` (línea del botón "Volver al inicio") y `frontend/src/app/report/page.tsx` (línea del botón "Nuevo análisis") para que sus `router.push("/")` apunten a `/analizar`; verificar navegando manualmente desde un error de análisis y desde "Nuevo análisis" en el reporte
 
 ## 3. Landing — header y hero
 

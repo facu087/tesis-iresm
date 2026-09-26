@@ -136,7 +136,7 @@ export default function AnalyzingPage() {
               {error}
             </p>
             <button
-              onClick={() => router.push("/")}
+              onClick={() => router.push("/analizar")}
               className="rounded-xl bg-slate-900 px-6 py-2 text-sm font-semibold text-white hover:bg-slate-700"
             >
               Volver al inicio
