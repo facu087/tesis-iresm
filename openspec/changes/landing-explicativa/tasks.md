@@ -12,8 +12,8 @@
 
 ## 3. Landing — header y hero
 
-- [ ] 3.1 Reescribir `frontend/src/app/page.tsx` como Server Component (sin `"use client"`) con `export const metadata` propio, header minimalista (wordmark, enlaces de ancla, CTA a `/analizar` vía `next/link`, con espacio de layout para un futuro "Ingresar" sin implementarlo — design D9) y hero con titular, bajada y el disclaimer corto visible sin scroll; verificar con `npm run build` y una captura a 1440px confirmando que el disclaimer es visible sin hacer scroll
-- [ ] 3.2 Crear el componente cliente `ScrollReveal` que aplica la animación de aparición al hacer scroll respetando `prefers-reduced-motion` y deja el contenido visible por defecto sin JavaScript (design D6); verificar deshabilitando JavaScript en el navegador y confirmando que el hero es visible, y activando "reducir movimiento" del sistema operativo y confirmando que no hay animación
+- [x] 3.1 Reescribir `frontend/src/app/page.tsx` como Server Component (sin `"use client"`) con `export const metadata` propio, header minimalista (wordmark, enlaces de ancla, CTA a `/analizar` vía `next/link`, con espacio de layout para un futuro "Ingresar" sin implementarlo — design D9) y hero con titular, bajada y el disclaimer corto visible sin scroll; verificar con `npm run build` y una captura a 1440px confirmando que el disclaimer es visible sin hacer scroll
+- [x] 3.2 Crear el componente cliente `ScrollReveal` que aplica la animación de aparición al hacer scroll respetando `prefers-reduced-motion` y deja el contenido visible por defecto sin JavaScript (design D6); verificar deshabilitando JavaScript en el navegador y confirmando que el hero es visible, y activando "reducir movimiento" del sistema operativo y confirmando que no hay animación
 
 ## 4. Landing — cómo funciona (diagrama del pipeline)
 
