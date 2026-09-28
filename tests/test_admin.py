@@ -179,3 +179,27 @@ class TestValidacionDeOrigenEnAprobarYRechazar:
                 ).first()
                 is None
             )
+
+    def test_rechazar_con_origen_ajeno_devuelve_403_y_no_cambia_nada(
+        self, client_admin, cuenta_medico_pendiente, _base_de_datos_temporal
+    ):
+        resp = client_admin.post(
+            f"/api/admin/cuentas/{cuenta_medico_pendiente.id}/rechazar",
+            json={"motivo": "Matrícula no coincide."},
+            headers={"Origin": "https://sitio-ajeno.example"},
+        )
+        assert resp.status_code == 403
+
+        from backend.models.cuenta import CuentaMedico, EstadoCuenta
+
+        with Session(_base_de_datos_temporal) as session:
+            cuenta = session.get(CuentaMedico, cuenta_medico_pendiente.id)
+            assert cuenta.estado == EstadoCuenta.PENDIENTE
+            assert (
+                session.exec(
+                    select(DecisionAuditoria).where(
+                        DecisionAuditoria.cuenta_id == cuenta_medico_pendiente.id
+                    )
+                ).first()
+                is None
+            )

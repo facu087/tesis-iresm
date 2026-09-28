@@ -121,6 +121,7 @@ Suite de tests: **82 tests, 100% passing** (`pytest tests/`)
 | 18 | Vista de reporte: mostrar el estado de verificación de hipótesis y fuentes (EP-08) | ✅ Hecho |
 | 19 | PDF: incluir el estado de verificación en el reporte exportado (EP-07) | ✅ Hecho |
 | 20 | Landing explicativa en `/` + reubicación de la carga de casos a `/analizar` (EP-08) | ✅ Hecho (OpenSpec `landing-explicativa`) |
+| 21 | Registro de médicos, matrícula, revisión admin y protección de `/api/analyze` (EP-09) | ✅ Hecho (OpenSpec `registro-medicos-matricula`) |
 
 > Nota (12) — **RESUELTA**: se integró la búsqueda semántica RAG como contexto
 > bibliográfico en `backend/pipeline/orchestrator.py` (Ronda 1), y desde la tarea 16
@@ -243,6 +244,51 @@ Suite de tests: **82 tests, 100% passing** (`pytest tests/`)
 > Evidencia: 16 capturas en `output/evidencia/landing/` (local, ignorada por
 > git); `npm run build` sin errores nuevos y `npm run lint` con exactamente
 > el error y el warning preexistentes (hallazgo H).
+
+> Nota (21) — **Registro de médicos** (cambio OpenSpec `registro-medicos-matricula`,
+> `openspec/changes/registro-medicos-matricula/`). `POST /api/analyze` no pedía
+> ninguna credencial: cualquiera que llegara al backend podía correr el pipeline con
+> datos clínicos reales. La verificación automática contra un padrón oficial
+> (SISA/REFEPS `WS020`) no es viable ahora — exige el Formulario A1 y aprobación
+> discrecional sin plazo garantizado —, así que la verificación queda
+> **semi-automática**: el médico se registra, la cuenta nace `pendiente`, y un
+> administrador la revisa a mano en `/admin/pendientes` con enlaces directos al
+> Buscador Nacional REFEPS y al buscador provincial (configurable) antes de aprobar o
+> rechazar con motivo obligatorio.
+>
+> Persistencia nueva (`CuentaMedico`, `DecisionAuditoria`, `Sesion`) vía SQLModel
+> sobre SQLite (`backend/db.py`, `NEXUS_DB_PATH`), hash Argon2id (`argon2-cffi`,
+> `backend/auth/security.py`), sesión de servidor con cookie `httpOnly`/`SameSite=Lax`
+> firmada con `SECRET_KEY` (`backend/auth/sesiones.py`) y límite de intentos de login
+> persistido en la cuenta. `POST /api/analyze` y `POST /api/report/pdf` exigen sesión
+> de médico `verificado`, controlado en el backend
+> (`backend/auth/deps.py::requerir_medico_verificado`).
+>
+> **Hallazgo de diseño corregido durante `apply`**: la primera versión de la decisión
+> de sesión (`design.md` D3) asumía que CORS protegía `POST /api/analyze` porque viaja
+> como JSON. Es falso — viaja como `multipart/form-data`, que no dispara preflight de
+> CORS — así que se agregó validación de `Origin`/`Referer` contra `ALLOWED_ORIGINS`
+> en todo endpoint que cambia estado (`backend/auth/origen.py`), aplicada también a
+> `multipart/form-data`.
+>
+> **Riesgo de seguridad documentado, no resuelto**: consultar el buscador público solo
+> prueba que "existe una matrícula con ese número, a nombre de esa persona" — no que
+> quien se registra es esa persona. El buscador expone nombre, DNI y matrícula de
+> cualquier profesional habilitado. Este cambio delega esa verificación de identidad
+> al criterio del administrador humano y dejar auditoría de qué fuente dijo haber
+> consultado (`DecisionAuditoria`); no la resuelve. Ver `design.md` — Risks/Trade-offs.
+>
+> Frontend: `/registro`, `/ingresar`, `/cuenta` (estado + reenvío tras rechazo),
+> `/admin/pendientes`. Protección de `/analizar` en el cliente es **capa de UX**, no de
+> seguridad (spec `proteccion-analisis-clinico`): el backend rechaza igual sin sesión
+> de médico verificado, se llegue por el frontend o no.
+>
+> Evidencia: `scripts/demo_registro_medicos.py` (flujo completo contra una base
+> temporal, cero llamadas a un LLM) y 24 capturas en `output/evidencia/registro/`
+> (1440/375px, claro/oscuro, local e ignorada por git). Suite completa: 826 tests
+> (baseline 739 + 87 nuevos), 0 intentos de red bloqueados en `tests/test_api.py`
+> (antes 72 — hallazgo pre-existente corregido: no mockeaba `verify_report_sources`
+> ni `ArbiterAgent.arbitrate`).
 
 Evidencia/verificación de las tareas 1–7: scripts `scripts/demo_*.py` (PubMed, Orphanet,
 PharmGKB, rate_limiter, ChromaDB, indexación, motor RAG).
