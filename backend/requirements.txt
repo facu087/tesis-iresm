@@ -33,6 +33,12 @@ aiohttp>=3.9.0
 pydantic>=2.7.0
 pydantic-settings>=2.2.0
 
+# Persistencia de cuentas — registro de médicos (Sprint 4)
+sqlmodel>=0.0.22
+
+# Hash de contraseña — Argon2id (Sprint 4)
+argon2-cffi>=23.1.0
+
 # Generación de PDF
 reportlab>=4.2.0
 # weasyprint>=62.0  # Solo Linux/macOS — requiere GTK/Cairo. En Windows usar reportlab.
