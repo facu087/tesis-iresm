@@ -22,9 +22,13 @@ Las decisiones tecnológicas se guiaron por tres criterios:
 (`openai/gpt-oss-120b`) para no depender de APIs pagas durante el desarrollo.
 La columna de producción es la arquitectura de destino.
 
-Cambiar el **modelo** de un agente = cambiar `MODEL` en su clase. Cambiar el
-**proveedor** = agregar despacho por proveedor en `BaseAgent._call_llm()`, que
-hoy instancia el cliente de Groq directamente.
+Cambiar el **modelo** de una tarea = cambiar una línea en
+`backend/agents/model_tasks.py` (`TASK_BUDGETS`, un mapa `tarea → (modelo,
+techo de tokens)`, Sprint 4). Cambiar el **proveedor** = agregar despacho por
+proveedor en `call_provider()` (`backend/agents/base_agent.py`), el único
+lugar del sistema que instancia el cliente de Groq. `BaseAgent._call_llm()`,
+`pipeline/pico.py` e `ingestion/biomarker_extractor.py` delegan ahí: ningún
+otro módulo instancia el cliente por su cuenta.
 
 ---
 
@@ -162,3 +166,17 @@ irresolubles se documentan explícitamente como información valiosa.
 | Railway.app (deploy) | ~$5-10 |
 | Otras APIs | $0 (todas gratuitas) |
 | **Total** | **~$15-30/mes** |
+
+**Telemetría de costos (Sprint 4).** Estas cifras eran estimaciones sin datos
+propios. Desde el control de costos del pipeline, cada análisis registra su
+consumo real de tokens por agente en `output/costos.jsonl`
+(`backend/telemetry/`), con una tabla de tarifas configurable
+(`backend/telemetry/pricing.py`, Groq en cero, arquitectura de destino
+comentada) que permite recalcular el costo de un registro ya guardado con
+otra tabla, sin correr nada. Los números medidos sobre una corrida real —
+tokens por caso, costo equivalente con Claude Opus/GPT-4o/Gemini Pro, cuántos
+casos entran en la cuota diaria de Groq (200.000 tokens/día)— están
+**pendientes de medición**: la sesión que instaló la telemetría tenía
+prohibido gastar cuota de Groq para no repetir el agotamiento del
+2026-09-21 (ver `.claude/backlog.md`). `scripts/demo_costos.py` deja el
+mecanismo listo para correrlo apenas haya cuota disponible.

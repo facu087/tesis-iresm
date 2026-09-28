@@ -84,7 +84,7 @@
       `_group()`/`_write_verdicts()` del Agente 04, `_plan_terms()`/`_evaluate()` del
       Agente 05, `pico.build()` y `biomarker_extractor._extract_with_llm()`. Test:
       `tests/test_model_tasks.py`.
-- [x] 4.2 Asignar el techo de cada tarea con holgura sobre su salida esperada, reemplazando el 4096 fijo. Verificar corriendo el caso de prueba y comprobando que **ninguna** respuesta quedó truncada por alcanzar su techo (`finish_reason`).
+- [ ] 4.2 Asignar el techo de cada tarea con holgura sobre su salida esperada, reemplazando el 4096 fijo. Verificar corriendo el caso de prueba y comprobando que **ninguna** respuesta quedó truncada por alcanzar su techo (`finish_reason`).
       **Parcial.** Asignación hecha con criterio explícito por tarea (ver docstring de
       `model_tasks.py`): `arbitro_agrupacion` baja a 512 (la salida son solo índices,
       sin relación con la cantidad de hipótesis) — sin evidencia de una corrida real,
@@ -160,7 +160,19 @@
       `TestActivacion::test_sin_api_key_y_sin_mock_falla_claro` y
       `test_sin_api_key_pero_con_mock_no_falla`. `backend/main.py` informa el modo
       mock al arrancar (test `test_lo_informa_al_arrancar`).
-- [x] 6.4 Marcar el reporte producido en modo mock, y mostrarlo en el frontend y en el PDF con la misma visibilidad que la advertencia del consenso de IA. Verificar con `tests/test_pdf_exporter.py` sobre el texto extraído, y con `npm run build` más una captura de la vista.
+- [ ] 6.4 Marcar el reporte producido en modo mock, y mostrarlo en el frontend y en el PDF con la misma visibilidad que la advertencia del consenso de IA. Verificar con `tests/test_pdf_exporter.py` sobre el texto extraído, y con `npm run build` más una captura de la vista.
+      **Parcial — código hecho, verificación de build/visual incompleta.** El código
+      está: `ReportMetadata.mock` (schemas.py) ← `build_export(mock=...)` ←
+      `router.py`; banner rojo primero en el PDF (`pdf_exporter.py`) y en el
+      frontend (`<MockBanner/>` en `report/page.tsx`, antes que la meta bar).
+      Observado de verdad: `tests/test_pdf_exporter.py::TestModoMockEnPdf` (2 tests,
+      verdes, texto extraído del PDF) y `npx tsc --noEmit` (sin errores). **No
+      observado tal como lo pide la tarea**: `npm run build` literal falla en este
+      worktree (Turbopack rechaza el symlink de `node_modules`, que apunta fuera de
+      la raíz del worktree — límite del entorno; `npx next build --webpack` sí
+      compila las 4 rutas, pero no es el comando pedido) y no se tomó ninguna
+      captura de la vista (sin herramienta de automatización de navegador en esta
+      sesión). Pendiente para quien tenga esa herramienta o corra la app a mano.
       Hecho: `ReportMetadata.mock` (schemas.py) ← `build_export(mock=...)` ←
       `router.py` (`is_mock_active()`). PDF: banner rojo antes que cualquier otro
       aviso (`pdf_exporter.py`), tests en `TestModoMockEnPdf`
@@ -200,9 +212,36 @@
 
 ## 7. Evidencia y cierre
 
-- [ ] 7.1 Crear `scripts/demo_costos.py` que muestre entrada → salida: el desglose de tokens por agente de un análisis, el costo estimado con Groq y el que tendría con los modelos de la arquitectura de destino. Guarda artefactos en `output/demo_costos/`.
+- [x] 7.1 Crear `scripts/demo_costos.py` que muestre entrada → salida: el desglose de tokens por agente de un análisis, el costo estimado con Groq y el que tendría con los modelos de la arquitectura de destino. Guarda artefactos en `output/demo_costos/`.
+      Hecho y **corrido** (con la red bloqueada a mano, cero conexiones): dos partes.
+      (1) `pico.build()` + `biomarker_extractor.extract()` en modo mock real, para
+      probar el mecanismo de telemetría de punta a punta sin gastar cuota —da 0
+      tokens porque el modo mock no consume nada de verdad. (2) Una muestra
+      **sintética** de 18 llamadas (conteos inventados, anotados como tales, no
+      una corrida real) que arma el desglose por agente y compara costo Groq vs.
+      arquitectura de destino con `usage.recalculate()`. Artefactos verificados en
+      `output/demo_costos/`: `mecanismo_mock.json`, `muestra_sintetica.json`,
+      `comparacion_costos.txt` (60.750 tokens de muestra, USD 0 con Groq, USD 1.67
+      con la arquitectura de destino, ~3 casos/día de cuota — todo etiquetado como
+      estimado, no medido).
 - [ ] 7.2 Correr el caso de prueba y registrar los **números medidos**: tokens por agente, total por caso y cuántos casos entran en la cuota diaria. Es el insumo del capítulo de viabilidad de la tesis.
+      **Pendiente para el orquestador** — restricción de cuota de esta sesión
+      (requiere una corrida real contra Groq). `demo_costos.py` deja el mecanismo
+      listo: correrlo con `NEXUS_MOCK_LLM` desactivado sobre una corrida real
+      reemplazaría `_MUESTRA_SINTETICA` por el registro real de `output/costos.jsonl`.
 - [ ] 7.3 Con la telemetría ya instalada, medir cuánto cambia cada agente entre la Ronda 3 y la Ronda 4 del debate, usando los `debate_rounds` de corridas reales. **No implementar el recorte**: dejar el dato en una tarjeta nueva para decidirlo con evidencia.
-- [ ] 7.4 Correr la suite completa: `pytest tests/ --ignore=tests/test_ingesta.py`.
+      **Pendiente para el orquestador** — depende de 7.2 (corridas reales) y está
+      fuera de mi alcance asignado (excluido explícitamente por la restricción de
+      cuota).
+- [x] 7.4 Correr la suite completa: `pytest tests/ --ignore=tests/test_ingesta.py`.
+      Hecho, con la red bloqueada (`-p pytest_sin_red`, ver nota de la tarea 6.7
+      sobre por qué el comando literal sin el plugin no es seguro en este entorno):
+      **819 passed**, 0 failed, 0 intentos de conexión bloqueados propios de esta
+      suite (los 136 bloqueados que reporta el plugin son de `tests/test_api.py`,
+      `tests/test_rag*.py` y `tests/test_embeddings.py`, preexistentes a este
+      cambio).
 - [ ] 7.5 Actualizar `.claude/CLAUDE.md` (sección del modelo de IA, la regla de que nadie instancia Groq por su cuenta, modo mock y variables nuevas), `.claude/stack.md` y `.claude/backlog.md` con los números medidos. Actualizar `.env.example`.
+      `.env.example` hecho (`NEXUS_MOCK_LLM`, junto con 6.3). El resto: en curso.
 - [ ] 7.6 Adjuntar la evidencia a la tarjeta de Trello y moverla a QA.
+      Fuera de mi alcance (no tengo acceso a Trello desde esta sesión) — para el
+      orquestador.

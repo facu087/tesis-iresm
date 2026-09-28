@@ -79,6 +79,12 @@ Backend mergeado a `develop` (capa de recuperación de evidencia / RAG). Autor: 
       (backend/agents/agent_05_trials.py + backend/pipeline/trial_matching.py)
 - [ ] Agente 06 (Sintetizador): reporte final — reemplaza a `pipeline/report_builder.py`
 - [x] Priorización de hipótesis por nivel de evidencia EBM (I, II, III) (backend/pipeline/evidence.py)
+- [x] Control de costos: punto único de llamada al proveedor, telemetría de
+      tokens por análisis, tarifas configurables, techo y modelo por tarea
+      (`backend/agents/model_tasks.py`), modo mock del pipeline
+      (`NEXUS_MOCK_LLM`). Ver "Modelo de IA actual" más abajo. Medición sobre
+      una corrida real: **pendiente** (restricción de cuota de la sesión que
+      implementó el cambio).
 
 > El pipeline de `POST /api/analyze` quedó **serializado**:
 > `debate → verificación → Árbitro (04) → navegación de ensayos (05)`. El RAG
@@ -187,6 +193,14 @@ Scripts disponibles:
   raras, estado de cada API y latencia); genera `navegacion.json` y `resumen.txt`.
   `--sin-red` usa respuestas grabadas y simula la caída de ClinicalTrials.gov,
   Orphanet y el LLM para mostrar cada fallback (`fallbacks.txt`)
+- `demo_costos.py` (control de costos, Sprint 4) — corre siempre en modo mock,
+  sin red ni cuota: (1) `pico.build()` + `biomarker_extractor.extract()` con
+  `NEXUS_MOCK_LLM=1` dentro de un registro de telemetría, para probar el
+  mecanismo de punta a punta; (2) una muestra sintética de 18 llamadas
+  (conteos inventados, no una corrida real) con el desglose de tokens por
+  agente y la comparación de costo Groq vs. arquitectura de destino via
+  `usage.recalculate()`. Genera `mecanismo_mock.json`, `muestra_sintetica.json`
+  y `comparacion_costos.txt`
 
 También se corrigió un bug del Sprint 2: falsos positivos en el extractor de
 biomarcadores (regex de anticuerpos y de marcadores de lab). Ver commit `e72e004`.
@@ -354,26 +368,87 @@ backfillean los Sprints 1–3. Requiere el CLI: `npm install -g @fission-ai/open
 > La arquitectura final usará Claude Opus (agentes 01, 04, 06),
 > GPT-4o (agente 02) y Gemini Pro (agente 03).
 
-Constantes disponibles en `base_agent.py`:
-- `GROQ_MAIN = "openai/gpt-oss-120b"` — modelo principal (agentes 01, 03, 06)
-- `GROQ_FAST = "openai/gpt-oss-20b"` — tareas simples/rápidas
+Constantes disponibles en `backend/agents/model_tasks.py` (re-exportadas desde
+`base_agent.py` por compatibilidad):
+- `GROQ_MAIN = "openai/gpt-oss-120b"` — razonamiento clínico
+- `GROQ_FAST = "openai/gpt-oss-20b"` — tareas de salida acotada y validada por código
 
 > ⚠ Groq dio de baja los LLaMA 3.x (`llama-3.3-70b-versatile` y
 > `llama-3.1-8b-instant`): la API devuelve 404 `model_not_found`. Se reemplazaron
 > por los `gpt-oss` en el commit `5174330`. Las constantes anteriores
 > —`GROQ_LLAMA` y `GROQ_LLAMA_FAST`— **ya no existen**.
 
-### Swap de proveedor
+### Punto único de llamada al proveedor (Sprint 4 — control de costos)
 
-`MODEL` en la definición de cada agente elige **qué modelo de Groq** usar, no el
-proveedor: `BaseAgent._call_llm()` instancia el cliente de Groq directamente
-(`backend/agents/base_agent.py`). El swap a Claude / GPT-4o / Gemini se hace en
-ese único método, agregando despacho por proveedor.
+**Ningún módulo instancia el cliente de Groq por su cuenta.** El único lugar
+del sistema que lo hace es `call_provider()` en `backend/agents/base_agent.py`
+(`grep -rn "Groq(api_key" backend/` tiene que devolver una sola línea, la de
+adentro de esa función). Todo lo demás pasa por ahí:
 
-Vale tenerlo en cuenta al escribir los agentes 02, 04 y 06: si cada uno
-asume la firma de Groq en lugar de delegar en `_call_llm()`, el swap se
-multiplica por la cantidad de agentes. El Agente 05 ya sigue esa regla:
-sus dos llamadas pasan por `self._call_llm()` (vía `asyncio.to_thread`).
+- `BaseAgent._call_llm(self, user_message, *, task)` — usado por los agentes
+  y por `critique()`/`revise()`/`recite()` del debate.
+- `pipeline/pico.py` e `ingestion/biomarker_extractor.py` — no son agentes,
+  llaman a `call_provider()` directamente.
+
+`task` es obligatorio y nombra la tarea (p. ej. `"agente01_hipotesis"`,
+`"arbitro_agrupacion"`, `"pico_sintesis"`): con eso se resuelve el **modelo y
+el techo de tokens** desde el mapa `backend/agents/model_tasks.py`
+(`TASK_BUDGETS`), no desde `self.MODEL` de la clase del agente. Revisar qué
+modelo y qué techo usa cada llamada es leer ese único mapa, sin recorrer los
+agentes. Solo tres tareas usan `GROQ_FAST` (agrupación del Árbitro,
+planificación de términos y evaluación de compatibilidad del Agente 05): su
+salida ya se valida deterministicamente por código
+(`pipeline/consensus.py`/`pipeline/trial_matching.py`). Todo lo que produce
+hipótesis, críticas, revisiones, veredictos o la síntesis PICO usa
+`GROQ_MAIN` y no se degrada.
+
+`call_provider()` también es donde vive el reintento ante 429, la telemetría
+de consumo (`backend/telemetry/usage.py`) y el modo mock (ver abajo). El swap
+de proveedor (Claude/GPT-4o/Gemini) se agrega en ese único método.
+
+Vale tenerlo en cuenta al escribir el Agente 06: si asume la firma de Groq en
+lugar de delegar en `_call_llm()`/`call_provider()`, rompe la regla y deja su
+consumo fuera de la telemetría.
+
+### Telemetría de costos
+
+Cada llamada al proveedor queda registrada (paso, modelo, tokens de entrada y
+salida, latencia, si falló) en un registro por análisis
+(`backend/telemetry/usage.py`, basado en `contextvars`: no mezcla análisis
+concurrentes). El router (`api/router.py`) abre el registro al empezar
+`POST /api/analyze` y lo cierra al terminar, escribiendo una línea JSON en
+`output/costos.jsonl` (gitignoreado, descartable) y un resumen legible por
+stderr. El identificador de análisis es aleatorio, nunca un hash del caso: no
+se puede usar para vincular dos análisis del mismo paciente. La telemetría
+nunca contiene texto clínico, prompts ni respuestas del modelo — solo
+conteos —, y un fallo al escribirla nunca rompe el análisis.
+
+`backend/telemetry/pricing.py` tiene la tabla de tarifas por modelo (Groq en
+cero; los modelos de la arquitectura de destino, comentados). Un registro ya
+guardado se puede recalcular con otra tabla vía `usage.recalculate()`, sin
+correr nada — es como se responde "¿cuánto costaría esto con Claude Opus?".
+
+`scripts/demo_costos.py` muestra el mecanismo (en modo mock, sin gastar
+cuota) y una comparación de costo Groq vs. arquitectura de destino sobre una
+muestra. Los números de una corrida real (tokens por caso, cuántos casos
+entran en la cuota diaria) están **pendientes de medición** — requieren una
+corrida contra Groq real, que no se hizo en la sesión que instaló esta
+telemetría por la misma restricción de cuota que la motivó.
+
+### Modo mock del pipeline
+
+`NEXUS_MOCK_LLM=1` (variable de entorno, **apagada por defecto**) hace que
+`call_provider()` devuelva respuestas grabadas (`backend/mock/responses.py`)
+en vez de llamar a Groq, sin tocar la red. Las respuestas grabadas atraviesan
+el mismo parseo y las mismas validaciones que una respuesta real — es la
+condición para que sirva para desarrollar sobre el pipeline. Sin
+`GROQ_API_KEY` y sin este modo activo, el análisis falla con un error claro
+(nunca cae en silencio a datos grabados). El reporte de modo mock queda
+marcado (`StructuredReport.metadata.mock`) y la marca se muestra en el PDF y
+en el frontend con la misma visibilidad que la advertencia del consenso de
+IA. Las respuestas grabadas actuales son fixtures razonadas a mano (esta
+sesión no podía gastar cuota para grabarlas de una corrida real): regenerarlas
+desde una corrida real queda pendiente.
 
 ---
 
@@ -434,6 +509,13 @@ NEXUS_EMBEDDING_MODEL=  # Sobreescribe el modelo de embeddings del RAG.
                         # Requiere sentence-transformers (arrastra torch).
                         # Sin esa dependencia el RAG cae a all-MiniLM-L6-v2
                         # y avisa por stderr — funciona, con dominio general.
+
+# Control de costos (Sprint 4, opcional)
+NEXUS_MOCK_LLM=          # Apagada por defecto. 1/true la activa: el pipeline
+                        # usa respuestas grabadas en vez de llamar a Groq, sin
+                        # tocar la red. Sin GROQ_API_KEY y sin esto activo, el
+                        # análisis falla con un error claro (nunca cae en
+                        # silencio a datos grabados).
 
 # Servidor
 ENVIRONMENT=development
