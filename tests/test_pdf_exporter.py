@@ -343,33 +343,35 @@ class TestPriorizacionEnPdf:
 # ── Tests: endpoint /api/report/pdf ───────────────────────────────────────────
 
 class TestExportPdfEndpoint:
+    """
+    Desde Sprint 4 (`proteccion-analisis-clinico`), `/api/report/pdf` exige
+    una sesión de médico `verificado`: usa la fixture `client_medico_verificado`
+    de `tests/conftest.py` en vez de `TestClient(app)` directo.
+    """
+
     def _report_json(self) -> dict:
         return _make_report().model_dump(mode="json")
 
-    def test_endpoint_devuelve_200(self):
-        with TestClient(app) as client:
-            response = client.post("/api/report/pdf", json=self._report_json())
+    def test_endpoint_devuelve_200(self, client_medico_verificado):
+        response = client_medico_verificado.post("/api/report/pdf", json=self._report_json())
         assert response.status_code == 200
 
-    def test_content_type_es_pdf(self):
-        with TestClient(app) as client:
-            response = client.post("/api/report/pdf", json=self._report_json())
+    def test_content_type_es_pdf(self, client_medico_verificado):
+        response = client_medico_verificado.post("/api/report/pdf", json=self._report_json())
         assert response.headers["content-type"] == "application/pdf"
 
-    def test_content_disposition_tiene_filename(self):
-        with TestClient(app) as client:
-            response = client.post("/api/report/pdf", json=self._report_json())
+    def test_content_disposition_tiene_filename(self, client_medico_verificado):
+        response = client_medico_verificado.post("/api/report/pdf", json=self._report_json())
         cd = response.headers.get("content-disposition", "")
         assert "attachment" in cd
         assert "nexus_reporte" in cd
         assert ".pdf" in cd
 
-    def test_body_es_pdf_valido(self):
-        with TestClient(app) as client:
-            response = client.post("/api/report/pdf", json=self._report_json())
+    def test_body_es_pdf_valido(self, client_medico_verificado):
+        response = client_medico_verificado.post("/api/report/pdf", json=self._report_json())
         assert response.content[:4] == b"%PDF"
 
-    def test_reporte_previo_a_la_priorizacion_ebm_sigue_siendo_valido(self):
+    def test_reporte_previo_a_la_priorizacion_ebm_sigue_siendo_valido(self, client_medico_verificado):
         """Contrato aditivo: un JSON sin los campos nuevos se acepta y exporta."""
         viejo = self._report_json()
         for h in viejo["hypotheses"]:
@@ -383,14 +385,12 @@ class TestExportPdfEndpoint:
         viejo["verification"].pop("hipotesis_topeadas", None)
 
         StructuredReport.model_validate(viejo)
-        with TestClient(app) as client:
-            response = client.post("/api/report/pdf", json=viejo)
+        response = client_medico_verificado.post("/api/report/pdf", json=viejo)
         assert response.status_code == 200
         assert response.content[:4] == b"%PDF"
 
-    def test_body_invalido_devuelve_422(self):
-        with TestClient(app) as client:
-            response = client.post("/api/report/pdf", json={"invalid": "data"})
+    def test_body_invalido_devuelve_422(self, client_medico_verificado):
+        response = client_medico_verificado.post("/api/report/pdf", json={"invalid": "data"})
         assert response.status_code == 422
 
 
