@@ -1,162 +1,432 @@
-"use client";
+import type { Metadata } from "next";
+import Link from "next/link";
+import ScrollReveal from "@/components/ScrollReveal";
+import { PIPELINE_STEPS, PIPELINE_SUMMARY } from "@/lib/pipelineSteps";
+import {
+  BookIcon,
+  DnaIcon,
+  PulseIcon,
+  ScaleIcon,
+  CompassIcon,
+  DocumentIcon,
+  ShieldCheckIcon,
+  LayersIcon,
+  SearchIcon,
+  DebateIcon,
+} from "@/components/icons";
 
-import { useRouter } from "next/navigation";
-import UploadForm from "@/components/UploadForm";
-import { inputStore } from "@/lib/inputStore";
-import type { AnalysisInput } from "@/lib/inputStore";
+export const metadata: Metadata = {
+  title: "NEXUS — Sistema de Soporte Investigativo Clínico",
+  description:
+    "Pipeline multi-agente que analiza documentos clínicos, debate hipótesis " +
+    "entre agentes de IA y verifica cada referencia contra PubMed. NEXUS no " +
+    "emite diagnósticos: genera hipótesis de investigación para el médico " +
+    "responsable.",
+};
 
-const AGENTS = [
-  { icon: "🔬", name: "Analista de Literatura", desc: "Evidencia PubMed" },
-  { icon: "🧬", name: "Especialista Genómica", desc: "Variantes y genes" },
-  { icon: "🏥", name: "Consultor Clínico", desc: "Razonamiento diferencial" },
-  { icon: "⚖️", name: "Árbitro Verificador", desc: "Validación cruzada" },
-  { icon: "🔭", name: "Navegador de Ensayos", desc: "ClinicalTrials.gov" },
-  { icon: "📋", name: "Sintetizador", desc: "Reporte final estructurado" },
-];
-
-const STEPS = [
-  { n: "01", label: "Ingesta", sub: "PDF o texto" },
-  { n: "02", label: "Normalización", sub: "INN · unidades" },
-  { n: "03", label: "Síntesis PICO", sub: "Contexto clínico" },
-  { n: "04", label: "Ronda 1", sub: "Análisis paralelo" },
-  { n: "05", label: "Debate", sub: "Rondas 2–4" },
-  { n: "06", label: "Reporte", sub: "Hipótesis + ensayos" },
-];
-
-export default function HomePage() {
-  const router = useRouter();
-
-  const handleReady = (input: AnalysisInput) => {
-    inputStore.set(input);
-    router.push("/analyzing");
-  };
-
+export default function LandingPage() {
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* ── Hero ──────────────────────────────────────────────────────── */}
-      <header className="bg-slate-900 text-white">
-        <div className="mx-auto max-w-5xl px-6 py-14">
-          <div className="flex items-start justify-between gap-8">
-            <div className="space-y-4 max-w-xl">
-              <div className="flex items-center gap-2">
-                <span className="rounded-full bg-blue-500/20 px-3 py-0.5 text-xs font-medium text-blue-300 ring-1 ring-blue-500/30">
-                  v0.3 · Sprint 3
-                </span>
-                <span className="rounded-full bg-emerald-500/20 px-3 py-0.5 text-xs font-medium text-emerald-300 ring-1 ring-emerald-500/30">
-                  Prototipo académico
-                </span>
-              </div>
-              <h1 className="text-5xl font-bold tracking-tight">NEXUS</h1>
-              <p className="text-lg text-slate-300 leading-relaxed">
-                Sistema de soporte investigativo clínico multi-agente.
-                Genera hipótesis de investigación respaldadas por evidencia
-                a partir de documentos clínicos.
-              </p>
-              <p className="text-sm text-slate-500">
-                Tesis Final · Analista en Sistemas · IRESM, Villa Carlos Paz
-              </p>
-            </div>
+    <div className="flex min-h-screen flex-col bg-bg text-fg">
+      <SiteHeader />
+      <main className="flex-1">
+        <ScrollReveal>
+          <HeroSection />
+        </ScrollReveal>
+        <ScrollReveal>
+          <HowItWorksSection />
+        </ScrollReveal>
+        <ScrollReveal>
+          <AgentsSection />
+        </ScrollReveal>
+        <ScrollReveal>
+          <FeaturesSection />
+        </ScrollReveal>
+        <ScrollReveal>
+          <CtaSection />
+        </ScrollReveal>
+      </main>
+      <SiteFooter />
+    </div>
+  );
+}
 
-            {/* Stats */}
-            <div className="hidden md:grid grid-cols-2 gap-3 shrink-0">
-              {[
-                { n: "6", label: "Agentes IA" },
-                { n: "4", label: "Rondas de debate" },
-                { n: "I–III", label: "Niveles evidencia" },
-                { n: "PDF", label: "Entrada soportada" },
-              ].map(({ n, label }) => (
-                <div
-                  key={label}
-                  className="rounded-xl bg-slate-800 px-5 py-4 text-center"
-                >
-                  <p className="text-2xl font-bold text-white">{n}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">{label}</p>
+/* ── Header ────────────────────────────────────────────────────────────── */
+
+function SiteHeader() {
+  return (
+    <header className="border-b border-border">
+      <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
+        <span className="text-sm font-semibold tracking-tight">NEXUS</span>
+
+        {/*
+          Fila flexible enlaces — CTA (design D9): deja lugar para insertar un
+          futuro enlace/botón "Ingresar" antes o después del CTA, sin agregarlo
+          en este cambio.
+        */}
+        <div className="flex items-center gap-6">
+          <nav className="hidden items-center gap-6 text-sm text-fg-muted sm:flex">
+            <a
+              href="#como-funciona"
+              className="cursor-pointer rounded-sm transition-colors duration-200 hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fg"
+            >
+              Cómo funciona
+            </a>
+            <a
+              href="#agentes"
+              className="cursor-pointer rounded-sm transition-colors duration-200 hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fg"
+            >
+              Agentes
+            </a>
+            <a
+              href="#funcionalidades"
+              className="cursor-pointer rounded-sm transition-colors duration-200 hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fg"
+            >
+              Funcionalidades
+            </a>
+          </nav>
+          <Link
+            href="/analizar"
+            className="cursor-pointer rounded-full bg-fg px-4 py-2 text-sm font-semibold text-bg transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fg"
+          >
+            Analizar un caso
+          </Link>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+/* ── Hero ──────────────────────────────────────────────────────────────── */
+
+function HeroSection() {
+  return (
+    <section className="mx-auto max-w-5xl px-6 pt-14 pb-16 sm:pt-20">
+      <div className="max-w-2xl space-y-6">
+        <p className="text-xs font-semibold uppercase tracking-widest text-fg-muted">
+          Tesis final · Analista en Sistemas · IRESM
+        </p>
+        <h1 className="text-4xl font-bold tracking-tight text-balance sm:text-5xl">
+          Hipótesis de investigación clínica, respaldadas por evidencia
+          verificable
+        </h1>
+        <p className="text-lg leading-relaxed text-fg-muted">
+          NEXUS analiza documentos clínicos con un pipeline de agentes de IA
+          que debaten entre sí en rondas adversariales, y verifica cada
+          referencia bibliográfica contra PubMed antes de mostrarla.
+        </p>
+        <div className="flex flex-wrap items-center gap-5 pt-1">
+          <Link
+            href="/analizar"
+            className="cursor-pointer rounded-full bg-fg px-6 py-3 text-sm font-semibold text-bg transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fg"
+          >
+            Analizar un caso →
+          </Link>
+          <a
+            href="#como-funciona"
+            className="cursor-pointer rounded-sm text-sm font-medium text-fg-muted transition-colors duration-200 hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fg"
+          >
+            Ver cómo funciona
+          </a>
+        </div>
+        <p className="rounded-xl border border-border bg-bg-subtle px-4 py-3 text-sm leading-relaxed text-fg-muted">
+          <strong className="font-semibold text-fg">
+            NEXUS no emite diagnósticos.
+          </strong>{" "}
+          Genera hipótesis de investigación para que las evalúe el médico
+          responsable.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+/* ── Cómo funciona ─────────────────────────────────────────────────────── */
+
+function HowItWorksSection() {
+  return (
+    <section
+      id="como-funciona"
+      aria-labelledby="como-funciona-heading"
+      className="border-t border-border"
+    >
+      <div className="mx-auto max-w-5xl px-6 py-16 sm:py-20">
+        <p className="text-xs font-semibold uppercase tracking-widest text-fg-muted">
+          Cómo funciona
+        </p>
+        <h2
+          id="como-funciona-heading"
+          className="mt-2 max-w-2xl text-2xl font-semibold tracking-tight sm:text-3xl"
+        >
+          Un pipeline de agentes que debaten, verifican y recién entonces
+          reportan.
+        </h2>
+
+        {/*
+          Diagrama del flujo: `role="img"` + `aria-label` lo describe como una
+          sola imagen para lectores de pantalla; el contenido visual queda
+          `aria-hidden`, y la alternativa textual completa (misma secuencia,
+          mismo orden) vive en la lista `sr-only` de abajo (design, tarea 4.2).
+        */}
+        <div
+          role="img"
+          aria-label={PIPELINE_SUMMARY}
+          className="mt-12 max-w-2xl"
+        >
+          <div aria-hidden="true">
+            {PIPELINE_STEPS.map((step, i) => (
+              <div key={step.id} className="relative flex gap-5 pb-8 last:pb-0">
+                {i < PIPELINE_STEPS.length - 1 && (
+                  <span className="absolute top-9 left-4 h-[calc(100%-1rem)] w-px bg-border" />
+                )}
+                <span className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-fg text-xs font-bold text-bg">
+                  {step.id}
+                </span>
+                <div className="pt-0.5">
+                  <p className="text-sm font-semibold">{step.label}</p>
+                  <p className="mt-1 text-sm text-fg-muted">
+                    {step.description}
+                  </p>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
         </div>
-      </header>
 
-      {/* ── Contenido principal ────────────────────────────────────────── */}
-      <main className="flex-1 bg-slate-50">
-        <div className="mx-auto max-w-5xl px-6 py-12 space-y-12">
+        {/* Alternativa textual accesible (design, tarea 4.2): mismos pasos,
+            mismo orden que el diagrama, para lectores de pantalla. */}
+        <ol className="sr-only">
+          {PIPELINE_STEPS.map((step) => (
+            <li key={step.id}>
+              Paso {step.id}: {step.label}. {step.description}
+            </li>
+          ))}
+        </ol>
+      </div>
+    </section>
+  );
+}
 
-          {/* Upload card */}
-          <section className="grid md:grid-cols-2 gap-8 items-start">
-            <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-              <h2 className="text-xl font-semibold text-slate-800 mb-1">
-                Cargar caso clínico
-              </h2>
-              <p className="text-sm text-slate-400 mb-6">
-                Subí la historia clínica en PDF o pegá el texto directamente.
-              </p>
-              <UploadForm onReady={handleReady} />
-            </div>
+/* ── Agentes ───────────────────────────────────────────────────────────── */
 
-            {/* Pipeline steps */}
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold uppercase tracking-widest text-slate-400">
-                Pipeline de análisis
-              </h3>
-              {STEPS.map((s, i) => (
-                <div
-                  key={s.n}
-                  className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white px-5 py-3"
-                >
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">
-                    {s.n}
+/**
+ * Descripciones verificadas contra el código y la documentación fuente de
+ * verdad (design D8): `backend/agents/agent_02_genomics.py`,
+ * `.claude/architecture.md` y `.claude/backlog.md` — no `.claude/CLAUDE.md`,
+ * desactualizado en el estado del Agente 02. El único agente sin capacidad
+ * activa descripta es el 06: el reporte final lo arma hoy un módulo
+ * determinista (`pipeline/report_builder.py`), no un agente propio.
+ */
+const AGENTS = [
+  {
+    id: "01",
+    name: "Analista de Literatura",
+    Icon: BookIcon,
+    description:
+      "Genera hipótesis a partir de literatura médica publicada, con búsqueda semántica sobre PubMed (RAG) como contexto.",
+    pending: false,
+  },
+  {
+    id: "02",
+    name: "Especialista Genómica",
+    Icon: DnaIcon,
+    description:
+      "Analiza el caso desde la genética y la biología molecular, con contexto farmacogenómico de PharmGKB. Una guarda anti-invención degrada cualquier hipótesis que cite un hallazgo genético que no está en el caso.",
+    pending: false,
+  },
+  {
+    id: "03",
+    name: "Consultor Clínico",
+    Icon: PulseIcon,
+    description:
+      "Razona desde la práctica clínica: diagnóstico diferencial, causas tratables a descartar primero y guías de sociedades médicas.",
+    pending: false,
+  },
+  {
+    id: "04",
+    name: "Árbitro Verificador",
+    Icon: ScaleIcon,
+    description:
+      "Verifica cada referencia citada contra PubMed, agrupa las hipótesis equivalentes en un consenso y documenta las objeciones sin resolver. Pide una recitación (Ronda 5) a las hipótesis sin respaldo.",
+    pending: false,
+  },
+  {
+    id: "05",
+    name: "Navegador de Ensayos",
+    Icon: CompassIcon,
+    description:
+      "Busca ensayos clínicos activos en ClinicalTrials.gov y enfermedades raras compatibles en Orphanet, con una compatibilidad orientativa que nunca excluye resultados.",
+    pending: false,
+  },
+  {
+    id: "06",
+    name: "Sintetizador",
+    Icon: DocumentIcon,
+    description:
+      "Va a ensamblar el reporte final asistido por un agente dedicado. Hoy ese reporte lo arma un módulo determinista, sin agente propio todavía.",
+    pending: true,
+  },
+] as const;
+
+function AgentsSection() {
+  return (
+    <section
+      id="agentes"
+      aria-labelledby="agentes-heading"
+      className="border-t border-border"
+    >
+      <div className="mx-auto max-w-5xl px-6 py-16 sm:py-20">
+        <p className="text-xs font-semibold uppercase tracking-widest text-fg-muted">
+          Agentes
+        </p>
+        <h2
+          id="agentes-heading"
+          className="mt-2 max-w-2xl text-2xl font-semibold tracking-tight sm:text-3xl"
+        >
+          Seis agentes especializados, un solo consenso.
+        </h2>
+
+        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {AGENTS.map((agent) => (
+            <div
+              key={agent.id}
+              className={`rounded-2xl border p-6 transition-colors duration-200 hover:border-fg-muted ${
+                agent.pending
+                  ? "border-dashed border-border text-fg-muted"
+                  : "border-border"
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <agent.Icon className="h-6 w-6 shrink-0" />
+                {agent.pending && (
+                  <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold tracking-wide text-fg-muted uppercase">
+                    En desarrollo
                   </span>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-slate-800">
-                      {s.label}
-                    </p>
-                    <p className="text-xs text-slate-400">{s.sub}</p>
-                  </div>
-                  {i < STEPS.length - 1 && (
-                    <span className="text-slate-300 text-xs">→</span>
-                  )}
-                </div>
-              ))}
+                )}
+              </div>
+              <p className="mt-4 text-sm font-semibold text-fg">
+                Agente {agent.id} · {agent.name}
+              </p>
+              <p className="mt-1.5 text-sm text-fg-muted">
+                {agent.description}
+              </p>
             </div>
-          </section>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
 
-          {/* Agents grid */}
-          <section>
-            <h3 className="mb-4 text-sm font-semibold uppercase tracking-widest text-slate-400">
-              Agentes especializados
-            </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {AGENTS.map((a) => (
-                <div
-                  key={a.name}
-                  className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white px-4 py-4"
-                >
-                  <span className="text-2xl">{a.icon}</span>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">
-                      {a.name}
-                    </p>
-                    <p className="text-xs text-slate-400">{a.desc}</p>
-                  </div>
-                </div>
-              ))}
+/* ── Funcionalidades clave ─────────────────────────────────────────────── */
+
+const FEATURES = [
+  {
+    Icon: ShieldCheckIcon,
+    title: "Verificación bibliográfica",
+    description:
+      "Cada referencia citada por los agentes se contrasta contra PubMed —título real contra título citado— antes de mostrarla en el reporte.",
+  },
+  {
+    Icon: LayersIcon,
+    title: "Clasificación EBM (I, II, III)",
+    description:
+      "Las hipótesis se priorizan por nivel de evidencia según el tipo de publicación verificado en PubMed, nunca por lo que el agente declara sin respaldo.",
+  },
+  {
+    Icon: SearchIcon,
+    title: "Navegación de ensayos clínicos",
+    description:
+      "Búsqueda de ensayos activos en ClinicalTrials.gov y enfermedades raras compatibles en Orphanet, con compatibilidad orientativa por caso.",
+  },
+  {
+    Icon: DebateIcon,
+    title: "Debate adversarial multi-agente",
+    description:
+      "Los agentes exponen sus hipótesis, se critican entre sí en varias rondas y ajustan su postura antes de llegar a un consenso.",
+  },
+] as const;
+
+function FeaturesSection() {
+  return (
+    <section
+      id="funcionalidades"
+      aria-labelledby="funcionalidades-heading"
+      className="border-t border-border"
+    >
+      <div className="mx-auto max-w-5xl px-6 py-16 sm:py-20">
+        <p className="text-xs font-semibold uppercase tracking-widest text-fg-muted">
+          Funcionalidades clave
+        </p>
+        <h2
+          id="funcionalidades-heading"
+          className="mt-2 max-w-2xl text-2xl font-semibold tracking-tight sm:text-3xl"
+        >
+          Evidencia verificable en cada paso, no solo en el resultado.
+        </h2>
+
+        <div className="mt-10 grid gap-4 sm:grid-cols-2">
+          {FEATURES.map((feature) => (
+            <div
+              key={feature.title}
+              className="rounded-2xl border border-border p-6 transition-colors duration-200 hover:border-fg-muted"
+            >
+              <feature.Icon className="h-6 w-6" />
+              <p className="mt-4 text-sm font-semibold text-fg">
+                {feature.title}
+              </p>
+              <p className="mt-1.5 text-sm text-fg-muted">
+                {feature.description}
+              </p>
             </div>
-          </section>
+          ))}
         </div>
-      </main>
+      </div>
+    </section>
+  );
+}
 
-      {/* ── Footer ────────────────────────────────────────────────────── */}
-      <footer className="border-t border-slate-200 bg-white">
-        <div className="mx-auto max-w-5xl px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-400">
-          <p>
-            <span className="font-medium text-slate-600">NEXUS</span> no emite
-            diagnósticos clínicos. Las hipótesis generadas son orientativas y
-            deben ser evaluadas por el médico responsable.
-          </p>
-          <p className="shrink-0">IRESM · 2026</p>
+/* ── CTA final ─────────────────────────────────────────────────────────── */
+
+function CtaSection() {
+  return (
+    <section className="border-t border-border">
+      <div className="mx-auto max-w-5xl px-6 py-20 text-center">
+        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          ¿Tenés un caso clínico para analizar?
+        </h2>
+        <p className="mx-auto mt-3 max-w-xl text-fg-muted">
+          Subí el documento o pegá el texto: el pipeline hace el resto y
+          devuelve un reporte con hipótesis priorizadas, junto con sus
+          fuentes.
+        </p>
+        <div className="mt-8">
+          <Link
+            href="/analizar"
+            className="cursor-pointer rounded-full bg-fg px-8 py-3 text-sm font-semibold text-bg transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fg"
+          >
+            Analizar un caso →
+          </Link>
         </div>
-      </footer>
-    </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── Footer ────────────────────────────────────────────────────────────── */
+
+function SiteFooter() {
+  return (
+    <footer className="border-t border-border">
+      <div className="mx-auto flex max-w-5xl flex-col gap-4 px-6 py-8 sm:flex-row sm:items-center sm:justify-between">
+        <p className="max-w-xl text-xs leading-relaxed text-fg-muted">
+          <span className="font-semibold text-fg">NEXUS</span> no emite
+          diagnósticos clínicos. Las hipótesis generadas son orientativas y
+          deben ser evaluadas por el médico responsable.
+        </p>
+        <p className="shrink-0 text-xs text-fg-muted">
+          Tesis Final · Analista en Sistemas · IRESM, Villa Carlos Paz · 2026
+        </p>
+      </div>
+    </footer>
   );
 }

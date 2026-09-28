@@ -76,7 +76,7 @@ export default function ReportPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => router.push("/")}
+            onClick={() => router.push("/analizar")}
             className="rounded-lg border border-slate-700 px-4 py-1.5 text-sm text-slate-300 hover:border-slate-500 hover:text-white transition-colors"
           >
             Nuevo análisis

@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import type { AnalysisInput } from "@/lib/inputStore";
+import { CheckIcon, DocumentIcon } from "@/components/icons";
 
 interface Props {
   onReady: (input: AnalysisInput) => void;
@@ -57,16 +58,16 @@ export default function UploadForm({ onReady }: Props) {
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       {/* Tabs */}
-      <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-1">
+      <div className="flex rounded-lg border border-border bg-bg-subtle p-1">
         {(["file", "text"] as InputMode[]).map((m) => (
           <button
             key={m}
             type="button"
             onClick={() => { setMode(m); setError(null); }}
-            className={`flex-1 rounded-md py-2 text-sm font-medium transition-colors ${
+            className={`flex-1 cursor-pointer rounded-md py-2 text-sm font-medium transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fg ${
               mode === m
-                ? "bg-white shadow text-slate-900"
-                : "text-slate-500 hover:text-slate-700"
+                ? "bg-bg text-fg shadow-sm ring-1 ring-border"
+                : "text-fg-muted hover:text-fg"
             }`}
           >
             {m === "file" ? "Subir PDF" : "Ingresar texto"}
@@ -83,10 +84,10 @@ export default function UploadForm({ onReady }: Props) {
           onClick={() => fileInputRef.current?.click()}
           className={`cursor-pointer select-none rounded-xl border-2 border-dashed p-10 text-center transition-colors ${
             isDragging
-              ? "border-blue-400 bg-blue-50"
+              ? "border-fg bg-bg-subtle"
               : file
-              ? "border-emerald-400 bg-emerald-50"
-              : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+              ? "border-fg bg-bg"
+              : "border-border hover:border-fg-muted hover:bg-bg-subtle"
           }`}
         >
           <input
@@ -98,21 +99,21 @@ export default function UploadForm({ onReady }: Props) {
           />
           {file ? (
             <div className="space-y-1">
-              <p className="text-2xl">✓</p>
-              <p className="font-medium text-emerald-700">{file.name}</p>
-              <p className="text-sm text-slate-400">{(file.size / 1024).toFixed(1)} KB</p>
+              <CheckIcon className="mx-auto h-8 w-8 text-fg" />
+              <p className="font-medium text-fg">{file.name}</p>
+              <p className="text-sm text-fg-muted">{(file.size / 1024).toFixed(1)} KB</p>
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setFile(null); }}
-                className="mt-2 text-xs text-slate-400 underline hover:text-slate-600"
+                className="mt-2 cursor-pointer text-xs text-fg-muted underline hover:text-fg"
               >
                 Cambiar archivo
               </button>
             </div>
           ) : (
-            <div className="space-y-2 text-slate-400">
-              <p className="text-4xl">📄</p>
-              <p className="font-medium text-slate-600">Arrastrá un PDF aquí</p>
+            <div className="space-y-2 text-fg-muted">
+              <DocumentIcon className="mx-auto h-10 w-10" />
+              <p className="font-medium text-fg">Arrastrá un PDF aquí</p>
               <p className="text-sm">o hacé clic para seleccionar</p>
             </div>
           )}
@@ -126,13 +127,13 @@ export default function UploadForm({ onReady }: Props) {
           onChange={(e) => setText(e.target.value)}
           placeholder="Pegá el texto del caso clínico aquí..."
           rows={10}
-          className="w-full resize-none rounded-xl border border-slate-200 px-4 py-3 text-sm leading-relaxed placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300"
+          className="w-full resize-none rounded-xl border border-border bg-bg px-4 py-3 text-sm leading-relaxed text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-fg-muted"
         />
       )}
 
       {/* Error */}
       {error && (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">
+        <p className="rounded-lg border border-red-600/30 bg-red-600/10 px-4 py-2 text-sm text-red-700 dark:text-red-400">
           {error}
         </p>
       )}
@@ -141,7 +142,7 @@ export default function UploadForm({ onReady }: Props) {
       <button
         type="submit"
         disabled={!canSubmit}
-        className="w-full rounded-xl bg-slate-900 py-3 font-semibold text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+        className="w-full cursor-pointer rounded-xl bg-fg py-3 font-semibold text-bg transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fg disabled:cursor-not-allowed disabled:bg-bg-subtle disabled:text-fg-muted disabled:ring-1 disabled:ring-border disabled:hover:opacity-100"
       >
         Analizar caso clínico →
       </button>
