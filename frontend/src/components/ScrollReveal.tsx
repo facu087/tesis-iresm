@@ -8,7 +8,8 @@ import { useEffect, useRef } from "react";
  * El HTML servido por el servidor ya trae las clases de "visible"
  * (`opacity-100 translate-y-0`): sin JavaScript el contenido se ve completo.
  * Recién después de montarse — y solo si el usuario no pidió
- * `prefers-reduced-motion` — el efecto oculta el nodo (8–16px, opacity 0)
+ * `prefers-reduced-motion` y el nodo todavía está por debajo del viewport —
+ * el efecto oculta el nodo (8–16px, opacity 0)
  * manipulando `classList` directamente (sin pasar por estado de React, para
  * no disparar un re-render en cascada) hasta que un `IntersectionObserver`
  * compartido lo revela (300ms) al entrar en el viewport. Deja de observar
@@ -62,6 +63,10 @@ export default function ScrollReveal({
       "(prefers-reduced-motion: reduce)",
     ).matches;
     if (prefersReducedMotion) return; // queda visible, sin animar
+
+    // Lo que ya está en pantalla al montar (el hero, con el aviso de alcance)
+    // queda visible: ocultarlo acá lo haría aparecer, desaparecer y volver.
+    if (node.getBoundingClientRect().top < window.innerHeight) return;
 
     const observer = getSharedObserver();
     if (!observer) return;
