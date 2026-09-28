@@ -84,6 +84,16 @@ export function DocumentIcon({ className }: IconProps) {
   );
 }
 
+/** Formulario de carga — archivo seleccionado: check dentro de un círculo. */
+export function CheckIcon({ className }: IconProps) {
+  return (
+    <svg {...BASE_PROPS} className={className}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="m8.5 12.2 2.3 2.3 4.7-4.9" />
+    </svg>
+  );
+}
+
 /** Funcionalidad — verificación bibliográfica: escudo con check. */
 export function ShieldCheckIcon({ className }: IconProps) {
   return (
