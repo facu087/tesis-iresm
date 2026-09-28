@@ -6,6 +6,8 @@ Arrancar con:
 """
 
 import os
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
@@ -13,7 +15,18 @@ from fastapi import FastAPI
 load_dotenv()
 from fastapi.middleware.cors import CORSMiddleware
 
+from .api.admin_router import router as admin_router
+from .api.cuentas_router import router as cuentas_router
 from .api.router import router
+from .db import create_db_and_tables
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Crea el esquema de la base de cuentas si no existe (design.md — D1)."""
+    create_db_and_tables()
+    yield
+
 
 app = FastAPI(
     title="NEXUS — Sistema de Soporte Investigativo Clínico",
@@ -25,6 +38,7 @@ app = FastAPI(
     version="0.3.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 _ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
@@ -37,6 +51,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(cuentas_router)
+app.include_router(admin_router)
 app.include_router(router)
 
 

@@ -34,7 +34,31 @@ def test_create_db_and_tables_crea_el_archivo_y_las_tablas(tmp_path):
     assert {"cuenta_medico", "decision_auditoria", "sesion"} <= tablas
 
 
-# El test que confirma que el `lifespan` de `backend.main` dispara
-# `create_db_and_tables()` al levantar la app vive en este mismo archivo,
-# agregado en el commit que cablea ese `lifespan` (sección 2 de tasks.md) —
-# acá arriba solo lo que no depende de `backend.main`.
+def test_levantar_la_app_crea_el_esquema_en_el_engine_activo(tmp_path):
+    """
+    El `lifespan` de la app llama a `create_db_and_tables()` sin argumentos:
+    usa el engine activo del módulo. `tests/conftest.py` ya lo reemplaza por
+    uno en memoria antes de cada test (fixture autouse) — acá solo se
+    confirma que, dado un engine en blanco, levantar la app crea el esquema.
+
+    Se usa un archivo real (no `:memory:`): `TestClient` corre el lifespan en
+    otro hilo, y una base `:memory:` sin `StaticPool` es privada por hilo —
+    un archivo en disco no tiene ese problema.
+    """
+    from backend import db as db_module
+
+    db_path = tmp_path / "arranque" / "nexus_test.db"
+    engine_en_blanco = build_engine(str(db_path))
+    original = db_module.engine
+    db_module.set_engine(engine_en_blanco)
+    try:
+        from fastapi.testclient import TestClient
+
+        from backend.main import app
+
+        with TestClient(app):
+            pass
+
+        assert "cuenta_medico" in inspect(engine_en_blanco).get_table_names()
+    finally:
+        db_module.set_engine(original)
