@@ -221,7 +221,7 @@ class BaseAgent(ABC):
         )
 
     @staticmethod
-    def _build_source(declared: dict) -> Source:
+    def _build_source(declared: object) -> Source | None:
         """
         Construye una Source con los campos que al agente le corresponde declarar.
 
@@ -233,17 +233,53 @@ class BaseAgent(ABC):
         `evidence.py` y `report_builder._annotate_source()` los ignoraban aguas
         abajo. Acá se descartan en el origen.
 
-        No falla ante campos de más: emitirlos no invalida la hipótesis, y la regla
-        del proyecto es no descartar hipótesis. Una fuente sin `title` sí sigue
-        siendo un error de validación, como antes.
+        Tampoco falla ante un campo con el tipo equivocado: el PMID escrito como
+        número se convierte a texto, y un año, una revista o una URL inválidos
+        quedan vacíos. Devuelve `None` cuando la fuente no trae un título
+        utilizable, que es lo único sin lo cual no se puede contrastar contra
+        PubMed. En la corrida real del 2026-10-04 una sola fuente con
+        `title: null` levantó un error de validación y dejó al Agente 03 fuera
+        de la Ronda 1 completa: una cita inservible no puede costar un agente.
         """
+        if not isinstance(declared, dict):
+            return None
+
+        title = declared.get("title")
+        if not isinstance(title, str) or not title.strip():
+            return None
+
         return Source(
-            pmid=declared.get("pmid"),
-            title=declared.get("title"),  # type: ignore[arg-type]
-            journal=declared.get("journal"),
-            year=declared.get("year"),
-            url=declared.get("url"),
+            pmid=BaseAgent._as_pmid(declared.get("pmid")),
+            title=title,
+            journal=BaseAgent._as_text(declared.get("journal")),
+            year=BaseAgent._as_year(declared.get("year")),
+            url=BaseAgent._as_text(declared.get("url")),
         )
+
+    @staticmethod
+    def _as_text(value: object) -> str | None:
+        """Devuelve el valor si es texto no vacío; cualquier otra cosa es `None`."""
+        return value if isinstance(value, str) and value.strip() else None
+
+    @staticmethod
+    def _as_pmid(value: object) -> str | None:
+        """Acepta el PMID como texto o como entero, que es como suele escribirlo el modelo."""
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, int):
+            return str(value)
+        return BaseAgent._as_text(value)
+
+    @staticmethod
+    def _as_year(value: object) -> int | None:
+        """Acepta el año como entero o como texto numérico; cualquier otra cosa es `None`."""
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, int):
+            return value
+        if isinstance(value, str) and value.strip().isdigit():
+            return int(value.strip())
+        return None
 
     @staticmethod
     def parse_hypotheses(raw: str) -> list[Hypothesis]:
@@ -254,8 +290,15 @@ class BaseAgent(ABC):
         data = BaseAgent.extract_json(raw)
         hypotheses = []
 
+        discarded_sources = 0
+
         for h in data.get("hypotheses", []):
-            sources = [BaseAgent._build_source(s) for s in h.get("sources", [])]
+            declared_sources = h.get("sources", [])
+            if not isinstance(declared_sources, list):
+                declared_sources = []
+            built = [BaseAgent._build_source(s) for s in declared_sources]
+            sources = [s for s in built if s is not None]
+            discarded_sources += len(built) - len(sources)
             try:
                 hypothesis = Hypothesis(
                     text=h["text"],
@@ -270,6 +313,14 @@ class BaseAgent(ABC):
 
         if not hypotheses:
             raise ValueError("El modelo no devolvió ninguna hipótesis.")
+
+        if discarded_sources:
+            # Solo la cantidad: el contenido de una cita no se registra.
+            print(
+                f"[NEXUS] {discarded_sources} fuente(s) descartada(s) por no traer "
+                "un título utilizable; sus hipótesis se conservan.",
+                file=sys.stderr,
+            )
 
         return hypotheses
 
