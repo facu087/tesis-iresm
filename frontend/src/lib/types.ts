@@ -232,3 +232,50 @@ export interface StructuredReport {
 export interface ApiError {
   detail: string | { msg: string; type: string }[];
 }
+
+/* ── Cuentas de médico (Sprint 4 — registro-medicos-matricula) ──────────── */
+
+export type RolCuenta = "medico" | "admin";
+export type EstadoCuenta = "pendiente" | "rechazado" | "verificado";
+
+/** Respuesta de GET /api/cuenta, POST /api/login, POST/PUT /api/registro. */
+export interface CuentaEstado {
+  rol: RolCuenta;
+  estado: EstadoCuenta;
+  motivo_rechazo?: string | null;
+  nombre?: string | null;
+  apellido?: string | null;
+  dni?: string | null;
+  matricula?: string | null;
+  jurisdiccion?: string | null;
+  profesion?: string | null;
+  email: string;
+}
+
+/** Cuerpo de POST /api/registro y PUT /api/registro (reenvío tras rechazo). */
+export interface RegistroMedicoPayload {
+  nombre: string;
+  apellido: string;
+  dni: string;
+  matricula: string;
+  jurisdiccion: string;
+  profesion?: string;
+  email: string;
+  password: string;
+  acepta_tratamiento_datos: boolean;
+}
+
+/** Una fila de GET /api/admin/pendientes. */
+export interface CuentaPendiente {
+  id: number;
+  nombre?: string | null;
+  apellido?: string | null;
+  dni?: string | null;
+  matricula?: string | null;
+  jurisdiccion?: string | null;
+  profesion?: string | null;
+  email: string;
+  creada_en: string;
+  enlace_refeps: string;
+  enlace_provincial?: string | null;
+}

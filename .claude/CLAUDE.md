@@ -85,6 +85,11 @@ Backend mergeado a `develop` (capa de recuperación de evidencia / RAG). Autor: 
       (`NEXUS_MOCK_LLM`). Ver "Modelo de IA actual" más abajo. Medición sobre
       una corrida real: **pendiente** (restricción de cuota de la sesión que
       implementó el cambio).
+- [x] Registro de médicos con matrícula, revisión admin y protección de `POST
+      /api/analyze`/`POST /api/report/pdf` (backend/models/{cuenta,auditoria,sesion}.py,
+      backend/db.py, backend/auth/, backend/api/{cuentas_router,admin_router}.py,
+      backend/cli.py, frontend/src/app/{registro,ingresar,cuenta,admin/pendientes}/) —
+      OpenSpec `registro-medicos-matricula`, ver nota (22) en `.claude/backlog.md`
 
 > El pipeline de `POST /api/analyze` quedó **serializado**:
 > `debate → verificación → Árbitro (04) → navegación de ensayos (05)`. El RAG
@@ -156,6 +161,30 @@ levanta `EmbeddingModelMismatch` si la colección en disco fue construida con
 otro modelo, porque los vectores no son comparables. La salida es
 `reset_collection()`. `chroma_db/` es descartable (gitignoreada).
 
+### Setup de cuentas y alta del primer admin (Sprint 4)
+
+`SQLModel.metadata.create_all()` crea el esquema (`cuenta_medico`,
+`decision_auditoria`, `sesion`) al levantar el backend — no hace falta correr
+nada a mano. El archivo SQLite (`NEXUS_DB_PATH`, default `./data/nexus.db`)
+es descartable y gitignoreado, igual que `chroma_db/`.
+
+Ninguna instalación trae una cuenta admin por defecto
+(`revision-admin-matriculas` — Requirement: Alta del primer administrador).
+Darla de alta:
+
+```bash
+python -m backend.cli crear-admin --email admin@tu-dominio.example
+# Pide la contraseña de forma interactiva (sin eco). También acepta
+# --password para scripts, pero no la dejes en el historial de la shell.
+```
+
+Falla si ya existe una cuenta con ese email — se puede correr más de una vez
+para dar de alta más de un admin. `SECRET_KEY` (firma la cookie de sesión) y
+`ALLOWED_ORIGINS` (valida `Origin`/`Referer` en todo endpoint que cambia
+estado) tienen que estar en `.env` antes de levantar el backend: sin
+`SECRET_KEY`, `backend/auth/sesiones.py` levanta `SecretKeyNoConfigurada` en
+el primer login.
+
 ### Verificación / evidencia (scripts de demo)
 Para documentar cada tarea (capturas para Trello) hay scripts en `scripts/demo_*.py`
 que muestran entrada → salida de cada módulo. Cada uno guarda artefactos en `output/`.
@@ -201,6 +230,12 @@ Scripts disponibles:
   agente y la comparación de costo Groq vs. arquitectura de destino via
   `usage.recalculate()`. Genera `mecanismo_mock.json`, `muestra_sintetica.json`
   y `comparacion_costos.txt`
+- `demo_registro_medicos.py` — registro de médicos, revisión admin y pipeline
+  protegido: dos altas → intento de análisis rechazado (pendiente, 403) → alta
+  del primer admin por CLI → aprobación con auditoría → análisis permitido
+  (pipeline mockeado) → rechazo con motivo → reenvío corregido. Contra una base
+  SQLite temporal en memoria, cero llamadas a un LLM. Genera `flujo.json` y
+  `resumen.txt` en `output/demo_registro/`
 
 También se corrigió un bug del Sprint 2: falsos positivos en el extractor de
 biomarcadores (regex de anticuerpos y de marcadores de lab). Ver commit `e72e004`.
@@ -233,6 +268,14 @@ tesis-iresm/
 │   │   ├── agent_04_arbiter.py     ← Árbitro Verificador (S4) — arbitrate(), no debate
 │   │   ├── agent_05_trials.py      ← Navegador de Ensayos (S4) — navigate(), no debate
 │   │   └── __init__.py
+│   ├── auth/                       ← autenticación, sesión y autorización (S4)
+│   │   ├── security.py             ← hash/verify de contraseña (Argon2id)
+│   │   ├── sesiones.py             ← crear/resolver/invalidar sesión + cookie
+│   │   ├── login.py                ← autenticar() + límite de intentos fallidos
+│   │   ├── deps.py                 ← Depends() de FastAPI: sesión, rol, estado
+│   │   ├── origen.py               ← validación Origin/Referer (mitigación CSRF)
+│   │   └── verificacion.py         ← LicenseVerificationProvider — punto de
+│   │                                   extensión sin implementar (design.md D6)
 │   ├── ingestion/
 │   │   ├── extractor.py            ← PDF nativo (pdfplumber) + OCR (Tesseract)
 │   │   ├── normalizer.py           ← normalización INN y unidades de medida
@@ -245,7 +288,12 @@ tesis-iresm/
 │   │   ├── biomarkers.py       ← BiomarkerProfile
 │   │   ├── arbitration.py      ← consenso, contradicciones y resumen del Agente 04 (S4)
 │   │   ├── trial.py            ← ClinicalTrial + contrato del Agente 05 (S4)
+│   │   ├── cuenta.py           ← CuentaMedico, RolCuenta, EstadoCuenta (S4)
+│   │   ├── auditoria.py        ← DecisionAuditoria, DecisionTipo (S4)
+│   │   ├── sesion.py           ← Sesion — fila server-side de la cookie (S4)
 │   │   └── __init__.py
+│   ├── db.py                   ← engine SQLite + create_db_and_tables() (S4)
+│   ├── cli.py                  ← `python -m backend.cli crear-admin` (S4)
 │   ├── pipeline/
 │   │   ├── pico.py             ← build() síntesis PICO + format_for_agents()
 │   │   ├── orchestrator.py     ← distribución paralela asyncio (Ronda 1)
@@ -272,32 +320,42 @@ tesis-iresm/
 │   │   ├── retriever.py        ← motor RAG: búsqueda semántica
 │   │   └── __init__.py
 │   ├── api/
-│   │   ├── router.py           ← POST /api/analyze, POST /api/report/pdf
-│   │   └── schemas.py          ← schemas Pydantic para request/response
-│   ├── main.py                 ← FastAPI app + rutas + CORS
+│   │   ├── router.py            ← POST /api/analyze, POST /api/report/pdf (protegidos, S4)
+│   │   ├── schemas.py           ← schemas Pydantic del reporte
+│   │   ├── cuentas_router.py    ← POST/PUT /api/registro, /login, /logout, GET /cuenta (S4)
+│   │   ├── admin_router.py      ← GET /api/admin/pendientes, aprobar/rechazar (S4)
+│   │   ├── schemas_cuentas.py   ← Pydantic: registro, login, estado de cuenta (S4)
+│   │   └── schemas_admin.py     ← Pydantic: pendiente, aprobar, rechazar (S4)
+│   ├── main.py                  ← FastAPI app + rutas + CORS + lifespan (create_db_and_tables, S4)
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/
 │   │   ├── app/
 │   │   │   ├── page.tsx            ← landing explicativa (S4) — Server Component
 │   │   │   ├── analizar/
-│   │   │   │   ├── page.tsx        ← vista de carga de documentos (S4, movida desde `/`)
+│   │   │   │   ├── page.tsx        ← vista de carga (S4, movida desde `/`; guard de
+│   │   │   │   │                      sesión — capa de UX, no de seguridad)
 │   │   │   │   └── layout.tsx      ← metadata propia de la ruta (S4)
 │   │   │   ├── analyzing/page.tsx  ← vista de pipeline con progreso en tiempo real
-│   │   │   └── report/page.tsx     ← vista de reporte (5 tabs)
+│   │   │   ├── report/page.tsx     ← vista de reporte (5 tabs)
+│   │   │   ├── registro/page.tsx   ← alta de médico + consentimiento Ley 25.326 (S4)
+│   │   │   ├── ingresar/page.tsx   ← login (S4)
+│   │   │   ├── cuenta/page.tsx     ← estado de cuenta + reenvío tras rechazo (S4)
+│   │   │   └── admin/pendientes/page.tsx ← revisión admin de cuentas pendientes (S4)
 │   │   ├── components/
 │   │   │   ├── UploadForm.tsx      ← formulario de carga PDF/texto
 │   │   │   ├── ScrollReveal.tsx    ← animación de aparición al hacer scroll (S4)
-│   │   │   └── icons.tsx           ← iconos SVG inline de la landing (S4)
+│   │   │   └── icons.tsx           ← iconos SVG inline (landing + cuentas, S4)
 │   │   └── lib/
-│   │       ├── api.ts              ← cliente HTTP al backend FastAPI
-│   │       ├── types.ts            ← tipos TypeScript del reporte
+│   │       ├── api.ts              ← cliente HTTP al backend FastAPI (credentials: "include", S4)
+│   │       ├── types.ts            ← tipos TypeScript del reporte y de cuentas (S4)
 │   │       ├── inputStore.ts       ← estado compartido entre vistas
 │   │       └── pipelineSteps.ts    ← pasos del pipeline (S4, fuente única landing + /analizar)
 │   ├── next.config.ts
 │   └── package.json
 ├── scripts/
 │   ├── poc_test.py             ← script de prueba end-to-end Sprint 1
+│   ├── demo_registro_medicos.py ← flujo completo de registro/revisión admin (S4)
 │   └── demo_*.py               ← scripts de verificación por tarea (evidencia Trello):
 │       │                          extraccion, ocr, normalizacion, biomarcadores, pico,
 │       │                          base_agent, agente01, agente03, orquestador,
@@ -306,7 +364,12 @@ tesis-iresm/
 │   ├── test_ingesta.py
 │   ├── test_normalizer.py
 │   ├── test_pico.py
-│   └── test_biomarkers.py
+│   ├── test_biomarkers.py
+│   ├── conftest.py             ← fixtures de cuentas: base SQLite en memoria
+│   │                              autouse (aísla toda la suite de ./data/nexus.db),
+│   │                              client/client_medico_verificado/client_admin (S4)
+│   └── test_{cuentas_modelo,auditoria_y_sesion_modelo,db,security,origen,
+│       sesiones,deps,login,registro,admin,proteccion_analisis}.py ← Sprint 4
 ├── output/                     ← JSONs generados (ignorado por git)
 ├── .env.example
 ├── .gitignore
@@ -520,7 +583,24 @@ NEXUS_MOCK_LLM=          # Apagada por defecto. 1/true la activa: el pipeline
 # Servidor
 ENVIRONMENT=development
 MAX_FILE_SIZE_MB=50
-SESSION_TTL_MINUTES=60
+SESSION_TTL_MINUTES=60  # TTL de la sesión de cuenta — en uso desde Sprint 4
+
+# Seguridad (Sprint 4 — registro de médicos)
+SECRET_KEY=              # Firma la cookie de sesión (HMAC). Obligatoria: sin
+                         # ella, backend/auth/sesiones.py levanta
+                         # SecretKeyNoConfigurada en el primer login.
+ALLOWED_ORIGINS=http://localhost:3000  # Lista blanca para CORS y para la
+                         # validación de Origin/Referer (mitigación CSRF) en
+                         # todo endpoint que cambia estado.
+
+# Persistencia de cuentas (Sprint 4)
+NEXUS_DB_PATH=./data/nexus.db  # Cuentas, sesiones y auditoría (SQLite).
+                         # Gitignoreado, se regenera con create_all().
+PROVINCIAL_LICENSE_SEARCH_URL=  # Enlace al buscador de matrícula de la
+                         # jurisdicción provincial, mostrado al admin en
+                         # /admin/pendientes. Puede quedar sin definir (el de
+                         # Córdoba está roto al momento de este cambio). El
+                         # Buscador Nacional REFEPS no es configurable.
 ```
 
 ---

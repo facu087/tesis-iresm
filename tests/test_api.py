@@ -1,6 +1,13 @@
 """
 Tests del endpoint POST /api/analyze y GET /health.
 Todos los tests mockean el pipeline — no realizan llamadas reales a LLMs ni APIs externas.
+
+Desde Sprint 4 (`proteccion-analisis-clinico`), `/api/analyze` y
+`/api/report/pdf` exigen una sesión de médico `verificado` y un `Origin`
+permitido: los tests de este archivo usan la fixture `client_medico_verificado`
+de `tests/conftest.py` (ya logueada, con el `Origin` permitido por default) en
+vez de instanciar `TestClient(app)` directamente. La cobertura específica de
+401/403 por sesión/estado/origen vive en `tests/test_proteccion_analisis.py`.
 """
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -147,10 +154,27 @@ def _pipeline_patches():
             new_callable=AsyncMock,
             return_value=_make_navigation(),
         ),
+        # Sprint 4 — hermeticidad: sin estos dos, el pipeline llama de verdad
+        # a PubMed (verify_report_sources) y a Groq (ArbiterAgent.arbitrate).
+        # El router ya absorbe una falla del Árbitro con el consenso
+        # degradado (_arbitrate_safe), así que forzar la excepción alcanza
+        # para no depender de la red sin tener que armar un ArbitrationResult
+        # completo a mano.
+        "verify_sources": patch(
+            "backend.api.router.verify_report_sources",
+            new_callable=AsyncMock,
+            return_value={},
+        ),
+        "arbitrate": patch(
+            "backend.api.router.ArbiterAgent.arbitrate",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("mock: sin llamada real a Groq"),
+        ),
     }
 
 
 # ── Tests: /health ─────────────────────────────────────────────────────────────
+# /health no requiere sesión: sigue usando TestClient(app) directo.
 
 class TestHealth:
     def test_health_devuelve_ok(self):
@@ -169,8 +193,8 @@ class TestHealth:
 # ── Tests: POST /api/analyze ───────────────────────────────────────────────────
 
 class TestAnalyzeEndpoint:
-    def _run(self, **request_kwargs):
-        """Lanza la request con todos los mocks activos."""
+    def _run(self, client, **request_kwargs):
+        """Lanza la request con todos los mocks activos, sobre un cliente ya logueado."""
         patches = _pipeline_patches()
         with (
             patches["normalize"],
@@ -179,16 +203,19 @@ class TestAnalyzeEndpoint:
             patches["run_round_1"],
             patches["run_debate"],
             patches["navigate"],
-            TestClient(app) as client,
+            patches["verify_sources"],
+            patches["arbitrate"],
         ):
             return client.post("/api/analyze", **request_kwargs)
 
-    def test_texto_plano_devuelve_200(self):
-        response = self._run(data={"text": "Paciente masculino 42 años con neuropatía."})
+    def test_texto_plano_devuelve_200(self, client_medico_verificado):
+        response = self._run(
+            client_medico_verificado, data={"text": "Paciente masculino 42 años con neuropatía."}
+        )
         assert response.status_code == 200
 
-    def test_respuesta_incluye_secciones_del_reporte(self):
-        response = self._run(data={"text": "caso clínico de prueba"})
+    def test_respuesta_incluye_secciones_del_reporte(self, client_medico_verificado):
+        response = self._run(client_medico_verificado, data={"text": "caso clínico de prueba"})
         body = response.json()
         assert "metadata" in body
         assert "case_summary" in body
@@ -197,62 +224,60 @@ class TestAnalyzeEndpoint:
         assert "clinical_trials" in body
         assert "bibliography" in body
 
-    def test_report_tiene_hipotesis(self):
-        response = self._run(data={"text": "caso clínico de prueba"})
+    def test_report_tiene_hipotesis(self, client_medico_verificado):
+        response = self._run(client_medico_verificado, data={"text": "caso clínico de prueba"})
         hypotheses = response.json()["hypotheses"]
         assert len(hypotheses) > 0
         assert "text" in hypotheses[0]
         assert "evidence_level" in hypotheses[0]
         assert "rank" in hypotheses[0]
 
-    def test_trials_son_lista(self):
-        response = self._run(data={"text": "caso clínico de prueba"})
+    def test_trials_son_lista(self, client_medico_verificado):
+        response = self._run(client_medico_verificado, data={"text": "caso clínico de prueba"})
         trials = response.json()["clinical_trials"]
         assert isinstance(trials, list)
         assert trials[0]["nct_id"] == "NCT04000001"
 
-    def test_processing_time_es_numero(self):
-        response = self._run(data={"text": "caso clínico de prueba"})
+    def test_processing_time_es_numero(self, client_medico_verificado):
+        response = self._run(client_medico_verificado, data={"text": "caso clínico de prueba"})
         assert isinstance(response.json()["metadata"]["processing_time_seconds"], float)
 
-    def test_sin_parametros_devuelve_422(self):
-        with TestClient(app) as client:
-            response = client.post("/api/analyze")
+    def test_sin_parametros_devuelve_422(self, client_medico_verificado):
+        response = client_medico_verificado.post("/api/analyze")
         assert response.status_code == 422
 
-    def test_texto_vacio_devuelve_422(self):
-        response = self._run(data={"text": "   "})
+    def test_texto_vacio_devuelve_422(self, client_medico_verificado):
+        response = self._run(client_medico_verificado, data={"text": "   "})
         assert response.status_code == 422
 
-    def test_archivo_pdf_es_procesado(self):
+    def test_archivo_pdf_es_procesado(self, client_medico_verificado):
         pdf_bytes = b"%PDF-1.4 fake pdf content for testing"
         with patch("backend.api.router.extract", return_value="texto extraído del PDF"):
             response = self._run(
+                client_medico_verificado,
                 files={"file": ("informe.pdf", pdf_bytes, "application/pdf")},
             )
         assert response.status_code == 200
 
-    def test_archivo_vacio_devuelve_422(self):
-        with TestClient(app) as client:
-            response = client.post(
-                "/api/analyze",
-                files={"file": ("vacio.pdf", b"", "application/pdf")},
-            )
+    def test_archivo_vacio_devuelve_422(self, client_medico_verificado):
+        response = client_medico_verificado.post(
+            "/api/analyze",
+            files={"file": ("vacio.pdf", b"", "application/pdf")},
+        )
         assert response.status_code == 422
 
-    def test_formato_no_soportado_devuelve_415(self):
+    def test_formato_no_soportado_devuelve_415(self, client_medico_verificado):
         with patch(
             "backend.api.router.extract",
             side_effect=ValueError("Formato no soportado: .docx. Formatos válidos: pdf, txt."),
         ):
-            with TestClient(app) as client:
-                response = client.post(
-                    "/api/analyze",
-                    files={"file": ("doc.docx", b"contenido", "application/octet-stream")},
-                )
+            response = client_medico_verificado.post(
+                "/api/analyze",
+                files={"file": ("doc.docx", b"contenido", "application/octet-stream")},
+            )
         assert response.status_code == 415
 
-    def test_error_inesperado_dentro_del_agente_no_rompe_el_pipeline(self):
+    def test_error_inesperado_dentro_del_agente_no_rompe_el_pipeline(self, client_medico_verificado):
         """El router tiene su propia red de seguridad sobre el Agente 05."""
         patches = _pipeline_patches()
         patches["navigate"] = patch(
@@ -267,23 +292,24 @@ class TestAnalyzeEndpoint:
             patches["run_round_1"],
             patches["run_debate"],
             patches["navigate"],
-            TestClient(app) as client,
+            patches["verify_sources"],
+            patches["arbitrate"],
         ):
-            response = client.post("/api/analyze", data={"text": "caso clínico"})
+            response = client_medico_verificado.post("/api/analyze", data={"text": "caso clínico"})
         body = response.json()
         assert response.status_code == 200
         assert body["clinical_trials"] == []
         assert body["trial_search"]["estado_clinicaltrials"] == "no_disponible"
 
-    def test_respuesta_incluye_compatibilidad_y_estado_de_la_busqueda(self):
-        response = self._run(data={"text": "caso clínico de prueba"})
+    def test_respuesta_incluye_compatibilidad_y_estado_de_la_busqueda(self, client_medico_verificado):
+        response = self._run(client_medico_verificado, data={"text": "caso clínico de prueba"})
         body = response.json()
         assert body["clinical_trials"][0]["compatibility"] == "alta"
         assert body["clinical_trials"][0]["criteria_to_verify"]
         assert body["trial_search"]["estado_orphanet"] == "ok"
         assert body["rare_diseases"][0]["orpha_code"] == "271861"
 
-    def test_el_agente_recibe_las_hipotesis_del_debate(self):
+    def test_el_agente_recibe_las_hipotesis_del_debate(self, client_medico_verificado):
         patches = _pipeline_patches()
         with (
             patches["normalize"],
@@ -292,9 +318,10 @@ class TestAnalyzeEndpoint:
             patches["run_round_1"],
             patches["run_debate"],
             patches["navigate"] as mock_navigate,
-            TestClient(app) as client,
+            patches["verify_sources"],
+            patches["arbitrate"],
         ):
-            client.post("/api/analyze", data={"text": "texto clínico"})
+            client_medico_verificado.post("/api/analyze", data={"text": "texto clínico"})
         entrada = mock_navigate.await_args.args[0]
         assert [c.text for c in entrada.candidates] == [
             "Neuropatía axonal por deficiencia de vitamina B12."
@@ -302,7 +329,7 @@ class TestAnalyzeEndpoint:
         # El motivo de consulta en español no se usa como condición de reemplazo.
         assert entrada.condition_en == ""
 
-    def test_llama_a_run_round_1_con_case(self):
+    def test_llama_a_run_round_1_con_case(self, client_medico_verificado):
         patches = _pipeline_patches()
         with (
             patches["normalize"],
@@ -311,12 +338,13 @@ class TestAnalyzeEndpoint:
             patches["run_round_1"] as mock_round_1,
             patches["run_debate"],
             patches["navigate"],
-            TestClient(app) as client,
+            patches["verify_sources"],
+            patches["arbitrate"],
         ):
-            client.post("/api/analyze", data={"text": "texto clínico"})
+            client_medico_verificado.post("/api/analyze", data={"text": "texto clínico"})
         mock_round_1.assert_awaited_once()
 
-    def test_llama_a_run_debate_con_report_de_ronda_1(self):
+    def test_llama_a_run_debate_con_report_de_ronda_1(self, client_medico_verificado):
         patches = _pipeline_patches()
         with (
             patches["normalize"],
@@ -325,12 +353,13 @@ class TestAnalyzeEndpoint:
             patches["run_round_1"],
             patches["run_debate"] as mock_debate,
             patches["navigate"],
-            TestClient(app) as client,
+            patches["verify_sources"],
+            patches["arbitrate"],
         ):
-            client.post("/api/analyze", data={"text": "texto clínico"})
+            client_medico_verificado.post("/api/analyze", data={"text": "texto clínico"})
         mock_debate.assert_awaited_once()
 
-    def test_biomarkers_vacios_no_rompen_busqueda(self):
+    def test_biomarkers_vacios_no_rompen_busqueda(self, client_medico_verificado):
         patches = _pipeline_patches()
         patches["extract_biomarkers"] = patch(
             "backend.api.router.extract_biomarkers",
@@ -343,9 +372,10 @@ class TestAnalyzeEndpoint:
             patches["run_round_1"],
             patches["run_debate"],
             patches["navigate"],
-            TestClient(app) as client,
+            patches["verify_sources"],
+            patches["arbitrate"],
         ):
-            response = client.post("/api/analyze", data={"text": "texto clínico"})
+            response = client_medico_verificado.post("/api/analyze", data={"text": "texto clínico"})
         assert response.status_code == 200
 
 
@@ -389,9 +419,8 @@ def _reporte_previo() -> dict:
 
 
 class TestExportPdfEndpoint:
-    def test_reporte_previo_sin_campos_nuevos_devuelve_200(self):
-        with TestClient(app) as client:
-            response = client.post("/api/report/pdf", json=_reporte_previo())
+    def test_reporte_previo_sin_campos_nuevos_devuelve_200(self, client_medico_verificado):
+        response = client_medico_verificado.post("/api/report/pdf", json=_reporte_previo())
         assert response.status_code == 200
         assert response.headers["content-type"] == "application/pdf"
 

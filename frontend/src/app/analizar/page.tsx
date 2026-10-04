@@ -1,19 +1,55 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import UploadForm from "@/components/UploadForm";
 import { inputStore } from "@/lib/inputStore";
 import type { AnalysisInput } from "@/lib/inputStore";
 import { PIPELINE_STEPS } from "@/lib/pipelineSteps";
+import { obtenerCuenta } from "@/lib/api";
 
 export default function AnalizarPage() {
   const router = useRouter();
+  const [autorizado, setAutorizado] = useState(false);
+
+  // Protección de UX, no de seguridad (proteccion-analisis-clinico —
+  // Requirement: La aplicación no es el límite de seguridad): el backend ya
+  // rechaza con 401/403 igual, sin sesión de médico verificado. Esto solo
+  // evita que alguien sin cuenta cargue un caso para nada.
+  useEffect(() => {
+    let cancelado = false;
+    obtenerCuenta()
+      .then((cuenta) => {
+        if (cancelado) return;
+        if (cuenta === null) {
+          router.push("/ingresar");
+        } else if (cuenta.rol !== "medico" || cuenta.estado !== "verificado") {
+          router.push("/cuenta");
+        } else {
+          setAutorizado(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelado) router.push("/ingresar");
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [router]);
 
   const handleReady = (input: AnalysisInput) => {
     inputStore.set(input);
     router.push("/analyzing");
   };
+
+  if (!autorizado) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-bg text-sm text-fg-muted">
+        Verificando sesión...
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-bg text-fg">

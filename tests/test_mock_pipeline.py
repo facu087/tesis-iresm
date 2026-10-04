@@ -238,13 +238,10 @@ class TestAnalisisCompletoEnModoMock:
     criterio que `tests/test_api.py`.
     """
 
-    def _correr(self, monkeypatch):
+    def _correr(self, monkeypatch, client):
         from unittest.mock import AsyncMock
 
         from backend.models.trial import TrialNavigationResult, TrialSearchSummary
-        from fastapi.testclient import TestClient
-
-        from backend.main import app
 
         monkeypatch.setenv(ENV_VAR, "1")
         with (
@@ -260,12 +257,13 @@ class TestAnalisisCompletoEnModoMock:
                   return_value=TrialNavigationResult(summary=TrialSearchSummary(
                       estado_clinicaltrials="sin_consulta", estado_orphanet="sin_consulta",
                   ))),
-            TestClient(app, raise_server_exceptions=False) as client,
         ):
             return client.post("/api/analyze", data={"text": CASO_CLINICO})
 
-    def test_devuelve_200_y_marca_el_reporte_como_mock(self, monkeypatch):
-        response = self._correr(monkeypatch)
+    def test_devuelve_200_y_marca_el_reporte_como_mock(
+        self, monkeypatch, client_medico_verificado_sin_relanzar
+    ):
+        response = self._correr(monkeypatch, client_medico_verificado_sin_relanzar)
         assert response.status_code == 200
         assert response.json()["metadata"]["mock"] is True
 

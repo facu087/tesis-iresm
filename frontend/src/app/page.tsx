@@ -58,11 +58,6 @@ function SiteHeader() {
       <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
         <span className="text-sm font-semibold tracking-tight">NEXUS</span>
 
-        {/*
-          Fila flexible enlaces — CTA (design D9): deja lugar para insertar un
-          futuro enlace/botón "Ingresar" antes o después del CTA, sin agregarlo
-          en este cambio.
-        */}
         <div className="flex items-center gap-6">
           <nav className="hidden items-center gap-6 text-sm text-fg-muted sm:flex">
             <a
@@ -83,6 +78,12 @@ function SiteHeader() {
             >
               Funcionalidades
             </a>
+            <Link
+              href="/ingresar"
+              className="cursor-pointer rounded-sm transition-colors duration-200 hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fg"
+            >
+              Ingresar
+            </Link>
           </nav>
           <Link
             href="/analizar"

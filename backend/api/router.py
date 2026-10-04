@@ -6,10 +6,13 @@ import asyncio
 import sys
 import time
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 
 from ..agents.agent_01_literature import LiteratureAnalystAgent
+from ..auth.deps import requerir_medico_verificado
+from ..auth.origen import validar_origen
+from ..models.cuenta import CuentaMedico
 from ..agents.agent_02_genomics import GenomicsSpecialistAgent
 from ..agents.agent_03_clinical import ClinicalConsultantAgent
 from ..agents.agent_04_arbiter import ArbiterAgent
@@ -118,10 +121,16 @@ def _debate_agents(report: Report, case: ClinicalCase) -> dict[str, BaseAgent]:
     return agentes
 
 
-@router.post("/analyze", response_model=StructuredReport, summary="Analizar caso clínico")
+@router.post(
+    "/analyze",
+    response_model=StructuredReport,
+    summary="Analizar caso clínico",
+    dependencies=[Depends(validar_origen)],
+)
 async def analyze(
     file: UploadFile | None = File(default=None),
     text: str | None = Form(default=None),
+    _medico: CuentaMedico = Depends(requerir_medico_verificado),
 ) -> StructuredReport:
     """
     Recibe un documento clínico (PDF o texto plano) y ejecuta el pipeline completo:
@@ -131,6 +140,10 @@ async def analyze(
     Devuelve un Report con hipótesis priorizadas por nivel de evidencia (I, II, III).
 
     NEXUS no emite diagnósticos. Genera hipótesis de investigación para el médico responsable.
+
+    `proteccion-analisis-clinico`: exige sesión de médico `verificado`
+    (`requerir_medico_verificado`) y `Origin`/`Referer` permitido
+    (`validar_origen`), sin importar el tipo de contenido de la solicitud.
     """
     if file is None and not text:
         raise HTTPException(
@@ -223,13 +236,21 @@ async def analyze(
     summary="Exportar reporte a PDF",
     response_class=Response,
     responses={200: {"content": {"application/pdf": {}}}},
+    dependencies=[Depends(validar_origen)],
 )
-async def export_pdf(report: StructuredReport) -> Response:
+async def export_pdf(
+    report: StructuredReport,
+    _medico: CuentaMedico = Depends(requerir_medico_verificado),
+) -> Response:
     """
     Recibe un StructuredReport (resultado de POST /api/analyze) y devuelve el PDF.
 
     El frontend llama primero a /api/analyze para obtener el JSON,
     lo muestra al usuario y, si quiere descargarlo, llama a este endpoint.
+
+    `proteccion-analisis-clinico` — Requirement: Misma exigencia sobre la
+    exportación a PDF: exige la misma sesión de médico `verificado` que
+    `/api/analyze` (design.md — D5).
     """
     pdf_bytes = await asyncio.to_thread(generate_pdf, report)
     filename = (

@@ -7,6 +7,8 @@ Arrancar con:
 
 import os
 import sys
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
@@ -14,9 +16,20 @@ from fastapi import FastAPI
 load_dotenv()
 from fastapi.middleware.cors import CORSMiddleware
 
+from .api.admin_router import router as admin_router
+from .api.cuentas_router import router as cuentas_router
 from .api.router import router
+from .db import create_db_and_tables
 from .mock.mode import ENV_VAR as _MOCK_ENV_VAR
 from .mock.mode import is_mock_active
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Crea el esquema de la base de cuentas si no existe (design.md — D1)."""
+    create_db_and_tables()
+    yield
+
 
 if is_mock_active():
     # Spec `modo-mock-pipeline`, "Activación deliberada": el modo mock se
@@ -38,6 +51,7 @@ app = FastAPI(
     version="0.3.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 _ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
@@ -50,6 +64,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(cuentas_router)
+app.include_router(admin_router)
 app.include_router(router)
 
 

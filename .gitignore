@@ -34,6 +34,9 @@ reports/
 # Base vectorial local del RAG (se regenera indexando PubMed)
 chroma_db/
 
+# Base de cuentas de médicos (se regenera con create_all() al arrancar)
+data/
+
 # Frontend
 frontend/.next/
 frontend/node_modules/

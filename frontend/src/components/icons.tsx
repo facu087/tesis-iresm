@@ -72,6 +72,58 @@ export function CompassIcon({ className }: IconProps) {
   );
 }
 
+/** Cuenta — candado: /ingresar, sesión protegida. */
+export function LockIcon({ className }: IconProps) {
+  return (
+    <svg {...BASE_PROPS} className={className}>
+      <rect x="5" y="11" width="14" height="9.5" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </svg>
+  );
+}
+
+/** Cuenta — persona con más: /registro. */
+export function UserPlusIcon({ className }: IconProps) {
+  return (
+    <svg {...BASE_PROPS} className={className}>
+      <circle cx="10" cy="8" r="3.5" />
+      <path d="M3.5 20c.7-3.8 3.6-6 6.5-6s5.8 2.2 6.5 6" />
+      <path d="M18 8.5h4M20 6.5v4" />
+    </svg>
+  );
+}
+
+/** Cuenta — reloj: estado `pendiente`. */
+export function ClockIcon({ className }: IconProps) {
+  return (
+    <svg {...BASE_PROPS} className={className}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5V12l3 2" />
+    </svg>
+  );
+}
+
+/** Cuenta — alerta: estado `rechazado`. */
+export function AlertIcon({ className }: IconProps) {
+  return (
+    <svg {...BASE_PROPS} className={className}>
+      <path d="M12 3.5 21 19H3L12 3.5Z" />
+      <path d="M12 10v4" />
+      <path d="M12 16.7v.1" strokeWidth={2} />
+    </svg>
+  );
+}
+
+/** Cuenta — check en círculo grande: estado `verificado`. */
+export function VerifiedIcon({ className }: IconProps) {
+  return (
+    <svg {...BASE_PROPS} className={className}>
+      <path d="M12 3.5 5 6v6c0 4.5 3 7.5 7 8.5 4-1 7-4 7-8.5V6l-7-2.5Z" />
+      <path d="m8.5 12.2 2.3 2.3 4.7-4.9" />
+    </svg>
+  );
+}
+
 /** Agente 06 — Sintetizador (pendiente): documento en blanco. */
 export function DocumentIcon({ className }: IconProps) {
   return (

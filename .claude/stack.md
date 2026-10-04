@@ -118,6 +118,49 @@ RAG encuentra similitud de significado, no solo de palabras exactas.
 
 ---
 
+## Cuentas y autenticación (Sprint 4 — registro de médicos)
+
+| Componente | Tecnología | Versión | Decisión |
+|-----------|-----------|---------|---------|
+| Persistencia de cuentas | SQLModel sobre SQLite | sqlmodel 0.0.22+ | Pydantic + SQLAlchemy en una sola clase; `create_all()` sin Alembic todavía |
+| Hash de contraseña | argon2-cffi | 23.1+ | Argon2id, recomendación vigente de OWASP |
+| Sesión | Fila en SQLite + cookie httpOnly firmada con `SECRET_KEY` (HMAC-SHA256) | — | Revocación inmediata sin denylist aparte |
+| Mitigación CSRF | Validación de `Origin`/`Referer` contra `ALLOWED_ORIGINS` | — | `multipart/form-data` no dispara preflight de CORS |
+
+**Por qué SQLite vía SQLModel y no SQLAlchemy 2.0 ORM puro.** SQLAlchemy ORM
+puro es más maduro, pero duplica cada entidad (modelo ORM + schema Pydantic
+para la API), lo que va contra la convención Pydantic-first del proyecto
+(`.claude/CLAUDE.md`: "Pydantic para todos los modelos de datos"). SQLModel
+define ambos en una sola clase. Se descartó también un archivo JSON/TinyDB:
+sin garantías transaccionales, con el riesgo concreto de que una aprobación
+admin y un registro nuevo lleguen al mismo tiempo y se pisen.
+
+**Por qué argon2-cffi directo y no passlib.** `argon2-cffi` es el binding de
+referencia, mantenido, sin capas intermedias. `passlib` está efectivamente
+discontinuado; sumar una dependencia sin mantenimiento activo para el hash de
+contraseñas no se justifica cuando `PasswordHasher().hash()`/`.verify()` ya
+cubre lo que este cambio necesita.
+
+**Por qué sesión server-side y no JWT.** Un JWT autocontenido evita la tabla
+de sesiones, pero revocar una sesión (logout, o que un admin corte el acceso
+de una cuenta) exige una denylist igual — es la misma complejidad con un paso
+extra. Con SQLite ya elegido para las cuentas, una tabla de sesiones es
+gratis y da revocación inmediata sin trabajo adicional.
+
+**Por qué validar `Origin`/`Referer` y no confiar solo en CORS + `SameSite`.**
+`backend/api/router.py` recibe `POST /api/analyze` como
+`multipart/form-data` (`UploadFile`/`Form`), que es una solicitud "simple"
+para CORS — **no dispara preflight** — así que CORS nunca protegió ese
+endpoint. Tampoco alcanza "son orígenes distintos": `SameSite` opera por
+*sitio* (dominio registrable), no por origen, y `localhost:3000`/
+`localhost:8000` son el mismo sitio en desarrollo. La validación de
+`Origin`/`Referer` contra `ALLOWED_ORIGINS` cubre el vector real sin
+depender de que el navegador decida no disparar preflight; ver
+`openspec/changes/registro-medicos-matricula/design.md` — D3 para el detalle
+completo, incluida la corrección sobre una versión anterior de esta decisión.
+
+---
+
 ## Frontend
 
 | Fase | Tecnología | Decisión |
