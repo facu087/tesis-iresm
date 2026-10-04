@@ -33,10 +33,17 @@ class TestMapaDeTareas:
         assert model_tasks.get_budget("pico_sintesis").max_tokens == 2048
         assert model_tasks.get_budget("biomarcadores_extraccion").max_tokens == 1024
 
-    def test_arbitro_agrupacion_tiene_techo_acotado(self):
-        """Devuelve solo índices: no necesita el techo de un razonamiento completo."""
-        presupuesto = model_tasks.get_budget("arbitro_agrupacion")
-        assert presupuesto.max_tokens < 2048
+    @pytest.mark.parametrize(
+        "tarea", ["arbitro_agrupacion", "agente05_planificacion_terminos"],
+    )
+    def test_las_tareas_de_salida_breve_conservan_el_techo_historico(self, tarea):
+        """
+        Medición del 2026-10-04 (tasks.md 4.2): con 512 y 1024 las dos tareas
+        se cortaron por techo, porque los `gpt-oss` cuentan los tokens de
+        razonamiento dentro de la salida. Una respuesta de pocos índices
+        consume igual varios cientos de tokens antes de escribirse.
+        """
+        assert model_tasks.get_budget(tarea).max_tokens == 4096
 
 
 class TestTareasDeRazonamiento:

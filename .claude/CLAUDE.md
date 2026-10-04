@@ -82,9 +82,11 @@ Backend mergeado a `develop` (capa de recuperación de evidencia / RAG). Autor: 
 - [x] Control de costos: punto único de llamada al proveedor, telemetría de
       tokens por análisis, tarifas configurables, techo y modelo por tarea
       (`backend/agents/model_tasks.py`), modo mock del pipeline
-      (`NEXUS_MOCK_LLM`). Ver "Modelo de IA actual" más abajo. Medición sobre
-      una corrida real: **pendiente** (restricción de cuota de la sesión que
-      implementó el cambio).
+      (`NEXUS_MOCK_LLM`). Ver "Modelo de IA actual" más abajo. Medido sobre
+      una corrida real el 2026-10-04 (`scripts/medir_costos.py`): 77.516 tokens
+      por caso, 2 casos por día de cuota. Los techos de agrupación y
+      planificación de términos volvieron a 4096: con 512 y 1024 se cortaban,
+      porque los `gpt-oss` cuentan el razonamiento dentro de la salida.
 - [x] Registro de médicos con matrícula, revisión admin y protección de `POST
       /api/analyze`/`POST /api/report/pdf` (backend/models/{cuenta,auditoria,sesion}.py,
       backend/db.py, backend/auth/, backend/api/{cuentas_router,admin_router}.py,
