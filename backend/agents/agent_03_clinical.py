@@ -74,7 +74,8 @@ urgencia pero alta probabilidad."""
             "Analizá el siguiente caso clínico desde la perspectiva del razonamiento clínico "
             "y el diagnóstico diferencial. Generá hipótesis de investigación priorizando "
             "causas tratables y aplicando criterios de guías clínicas vigentes:\n\n"
-            f"{clinical_context}"
+            f"{clinical_context}",
+            task="agente03_hipotesis",
         )
         hypotheses = self.parse_hypotheses(raw)
         return self._build_output(hypotheses, raw)

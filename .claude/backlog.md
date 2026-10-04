@@ -121,6 +121,7 @@ Suite de tests: **82 tests, 100% passing** (`pytest tests/`)
 | 18 | Vista de reporte: mostrar el estado de verificación de hipótesis y fuentes (EP-08) | ✅ Hecho |
 | 19 | PDF: incluir el estado de verificación en el reporte exportado (EP-07) | ✅ Hecho |
 | 20 | Landing explicativa en `/` + reubicación de la carga de casos a `/analizar` (EP-08) | ✅ Hecho (OpenSpec `landing-explicativa`) |
+| 21 | Control de costos del pipeline: punto único de llamada al proveedor, telemetría de tokens, tarifas configurables, techo/modelo por tarea, modo mock | 🔄 Casi listo — ver nota (21) |
 
 > Nota (12) — **RESUELTA**: se integró la búsqueda semántica RAG como contexto
 > bibliográfico en `backend/pipeline/orchestrator.py` (Ronda 1), y desde la tarea 16
@@ -243,6 +244,68 @@ Suite de tests: **82 tests, 100% passing** (`pytest tests/`)
 > Evidencia: 16 capturas en `output/evidencia/landing/` (local, ignorada por
 > git); `npm run build` sin errores nuevos y `npm run lint` con exactamente
 > el error y el warning preexistentes (hallazgo H).
+
+> Nota (21) — **implementación hecha, medición pendiente.** Cambio OpenSpec
+> `control-de-costos-del-pipeline` (rama `feature/s4-control-de-costos`). Motivo:
+> el 2026-09-21 tres corridas del caso de prueba agotaron los 200.000 tokens
+> diarios del tier gratuito de Groq (197.800/200.000) sin que nadie lo viera
+> venir — no había forma de verlo venir. Implementado en 6 commits:
+>
+> 1. **Punto único de llamada al proveedor** (`call_provider()` en
+>    `base_agent.py`): `pico.py` e `ingestion/biomarker_extractor.py` dejan de
+>    instanciar Groq por su cuenta. `grep -rn "Groq(api_key" backend/` da una
+>    sola línea.
+> 2. **Telemetría de tokens por análisis** (`backend/telemetry/usage.py`):
+>    registro por `contextvars` (no mezcla análisis concurrentes), id aleatorio
+>    (nunca un hash del caso), JSONL en `output/costos.jsonl`, resumen por
+>    stderr, nunca contiene texto clínico, un fallo de escritura no rompe el
+>    análisis.
+> 3. **Tarifas configurables** (`backend/telemetry/pricing.py`): Groq en cero,
+>    arquitectura de destino comentada, recalculable sobre un registro ya
+>    guardado.
+> 4. **Techo de tokens por tarea** (`backend/agents/model_tasks.py`): reemplaza
+>    el `max_tokens=4096` fijo. Solo se *achicó* el techo donde el análisis de
+>    la salida esperada lo sostiene (agrupación del Árbitro, planificación de
+>    términos del Agente 05); el resto conserva el histórico porque no hay
+>    corrida real que confirme que aguanta menos.
+> 5. **Modelo por tarea**: agrupación del Árbitro, planificación de términos y
+>    evaluación de compatibilidad del Agente 05 bajan a `GROQ_FAST` — las tres
+>    tienen salida validada deterministicamente por código
+>    (`pipeline/consensus.py`/`pipeline/trial_matching.py`). Todo lo que
+>    produce hipótesis, críticas, revisiones, veredictos o la síntesis PICO se
+>    queda en `GROQ_MAIN`.
+> 6. **Modo mock del pipeline** (`NEXUS_MOCK_LLM`): respuestas grabadas que
+>    atraviesan el mismo parseo que una respuesta real, apagado por defecto,
+>    nunca por inferencia. Reporte marcado (`metadata.mock`) y visible en PDF
+>    y frontend.
+>
+> **Pendiente, todo por la misma restricción de cuota que motivó el cambio**
+> (la sesión que lo implementó no podía gastar cuota de Groq sin repetir el
+> incidente que originó la tarjeta): medir tokens/costo reales de una corrida
+> (tarea 7.2 del `tasks.md` del cambio), comparar Ronda 3 vs. Ronda 4 del
+> debate con datos reales (7.3), confirmar que ningún techo nuevo trunca una
+> respuesta real (4.2), medir si el modelo rápido degrada alguna de las tres
+> tareas movidas (5.4), y regenerar las respuestas grabadas del modo mock
+> desde una corrida real (6.2, hoy son fixtures razonadas a mano). También
+> falta la captura de pantalla del banner de modo mock en el frontend (6.4) —
+> el código está y pasa `tests/test_pdf_exporter.py` y `npx tsc --noEmit`, pero
+> `npm run build` con Turbopack falla en el worktree de esta sesión por un
+> límite del entorno (symlink de `node_modules` fuera de la raíz del
+> worktree), no del código; compila con `npx next build --webpack`.
+>
+> **Suite completa: 819 tests, verde**, corrida con `scripts/pytest_sin_red.py`
+> (bloquea la red) por seguridad — no se puede usar `pytest
+> tests/ --ignore=tests/test_ingesta.py` a secas en este entorno: `test_api.py`
+> no mockea `ArbiterAgent.arbitrate()` ni `verify_report_sources()`, así que
+> hace ~36 intentos reales de conexión a `api.groq.com` y ~36 a
+> `eutils.ncbi.nlm.nih.gov` por corrida. Es preexistente a este cambio; queda
+> como hallazgo para decidir si se mockean esos dos también.
+>
+> `scripts/demo_costos.py` corre siempre en modo mock (nunca toca la red) y
+> muestra el mecanismo con una muestra sintética de 18 llamadas — **no** son
+> números medidos: 60.750 tokens de muestra, USD 0 con Groq, USD ~1,67 con la
+> arquitectura de destino, ~3 casos/día de cuota estimados. Artefactos en
+> `output/demo_costos/` (gitignoreado).
 
 Evidencia/verificación de las tareas 1–7: scripts `scripts/demo_*.py` (PubMed, Orphanet,
 PharmGKB, rate_limiter, ChromaDB, indexación, motor RAG).

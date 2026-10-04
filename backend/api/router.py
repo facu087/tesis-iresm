@@ -28,6 +28,8 @@ from ..pipeline.report_builder import build_export
 from ..pipeline.consensus import build_arbitration_input, degraded, summarize
 from ..pipeline.trial_matching import build_navigation_input
 from ..pipeline.verification import SourceVerification, verify_report_sources
+from ..mock.mode import is_mock_active
+from ..telemetry import usage as usage_telemetry
 from .schemas import StructuredReport
 
 router = APIRouter(prefix="/api", tags=["análisis"])
@@ -138,72 +140,82 @@ async def analyze(
 
     start = time.perf_counter()
 
-    # ── 1. Extracción de texto ─────────────────────────────────────────────────
-    if file is not None:
-        content = await file.read()
-        if not content:
-            raise HTTPException(status_code=422, detail="El archivo enviado está vacío.")
-        try:
-            clinical_text = await asyncio.to_thread(
-                extract, file.filename or "document.pdf", content
-            )
-        except ValueError as e:
-            raise HTTPException(status_code=415, detail=str(e)) from e
-    else:
-        clinical_text = text  # type: ignore[assignment]
+    # Registro de consumo del análisis (control de costos, S4 — D2). Se abre
+    # acá porque el router es el único lugar que conoce el ciclo de vida
+    # completo de un análisis, y se cierra en el `finally` para que un fallo a
+    # mitad de pipeline no deje el contexto de telemetría activo.
+    telemetry_token = usage_telemetry.open_registry()
+    try:
+        # ── 1. Extracción de texto ─────────────────────────────────────────
+        if file is not None:
+            content = await file.read()
+            if not content:
+                raise HTTPException(status_code=422, detail="El archivo enviado está vacío.")
+            try:
+                clinical_text = await asyncio.to_thread(
+                    extract, file.filename or "document.pdf", content
+                )
+            except ValueError as e:
+                raise HTTPException(status_code=415, detail=str(e)) from e
+        else:
+            clinical_text = text  # type: ignore[assignment]
 
-    if not clinical_text or not clinical_text.strip():
-        raise HTTPException(status_code=422, detail="No se pudo extraer texto del documento.")
+        if not clinical_text or not clinical_text.strip():
+            raise HTTPException(status_code=422, detail="No se pudo extraer texto del documento.")
 
-    # Truncar si supera el límite para proteger las APIs downstream
-    if len(clinical_text.encode()) > _MAX_TEXT_BYTES:
-        clinical_text = clinical_text[:_MAX_TEXT_BYTES]
+        # Truncar si supera el límite para proteger las APIs downstream
+        if len(clinical_text.encode()) > _MAX_TEXT_BYTES:
+            clinical_text = clinical_text[:_MAX_TEXT_BYTES]
 
-    # ── 2. Normalización ───────────────────────────────────────────────────────
-    normalized = await asyncio.to_thread(normalize, clinical_text)
-    case = ClinicalCase(raw_text=normalized)
+        # ── 2. Normalización ────────────────────────────────────────────────
+        normalized = await asyncio.to_thread(normalize, clinical_text)
+        case = ClinicalCase(raw_text=normalized)
 
-    # ── 3. Síntesis PICO y extracción de biomarcadores (paralelo) ──────────────
-    case_with_pico, biomarkers = await asyncio.gather(
-        asyncio.to_thread(pico.build, case),
-        asyncio.to_thread(extract_biomarkers, normalized),
-    )
-    case_with_pico.biomarkers = biomarkers
+        # ── 3. Síntesis PICO y extracción de biomarcadores (paralelo) ───────
+        case_with_pico, biomarkers = await asyncio.gather(
+            asyncio.to_thread(pico.build, case),
+            asyncio.to_thread(extract_biomarkers, normalized),
+        )
+        case_with_pico.biomarkers = biomarkers
 
-    # ── 4. Ronda 1: análisis paralelo de agentes ───────────────────────────────
-    round_1_report = await orchestrator.run_round_1(case_with_pico)
+        # ── 4. Ronda 1: análisis paralelo de agentes ────────────────────────
+        round_1_report = await orchestrator.run_round_1(case_with_pico)
 
-    # ── 5. Debate adversarial: Rondas 2–4 ─────────────────────────────────────
-    final_report = await debate.run_debate(case_with_pico, round_1_report)
+        # ── 5. Debate adversarial: Rondas 2–4 ───────────────────────────────
+        final_report = await debate.run_debate(case_with_pico, round_1_report)
 
-    # ── 6. Verificación bibliográfica de los PMIDs citados (Agente 04) ────────
-    verifications = await verify_report_sources(final_report)
+        # ── 6. Verificación bibliográfica de los PMIDs citados (Agente 04) ──
+        verifications = await verify_report_sources(final_report)
 
-    # ── 7. Arbitraje: consenso, contradicciones y Ronda 5 (Agente 04) ────────
-    # Va después de la verificación porque el Árbitro necesita saber qué citas
-    # resistieron para decidir qué hipótesis se recitan.
-    arbitration = await _arbitrate_safe(final_report, verifications, case_with_pico)
+        # ── 7. Arbitraje: consenso, contradicciones y Ronda 5 (Agente 04) ───
+        # Va después de la verificación porque el Árbitro necesita saber qué
+        # citas resistieron para decidir qué hipótesis se recitan.
+        arbitration = await _arbitrate_safe(final_report, verifications, case_with_pico)
 
-    # ── 8. Navegación de ensayos (Agente 05) ─────────────────────────────────
-    # Ahora busca sobre el consenso y no sobre la concatenación del debate: son
-    # menos hipótesis y sin duplicados, así que la búsqueda trae menos ruido.
-    # `build_navigation_input()` ya estaba preparado para esto y no cambia.
-    consensus_hypotheses = [c.hypothesis for c in arbitration.consensus]
-    nav_input = build_navigation_input(
-        case_with_pico,
-        consensus_hypotheses or final_report.hypotheses,
-    )
-    navigation = await _navigate_trials_safe(nav_input)
+        # ── 8. Navegación de ensayos (Agente 05) ────────────────────────────
+        # Ahora busca sobre el consenso y no sobre la concatenación del
+        # debate: son menos hipótesis y sin duplicados, así que la búsqueda
+        # trae menos ruido. `build_navigation_input()` ya estaba preparado
+        # para esto y no cambia.
+        consensus_hypotheses = [c.hypothesis for c in arbitration.consensus]
+        nav_input = build_navigation_input(
+            case_with_pico,
+            consensus_hypotheses or final_report.hypotheses,
+        )
+        navigation = await _navigate_trials_safe(nav_input)
 
-    return build_export(
-        case=case_with_pico,
-        report=final_report,
-        trials=navigation.trials,
-        processing_time=time.perf_counter() - start,
-        verifications=verifications,
-        navigation=navigation,
-        arbitration=arbitration,
-    )
+        return build_export(
+            case=case_with_pico,
+            report=final_report,
+            trials=navigation.trials,
+            processing_time=time.perf_counter() - start,
+            verifications=verifications,
+            navigation=navigation,
+            arbitration=arbitration,
+            mock=is_mock_active(),
+        )
+    finally:
+        usage_telemetry.close_registry(telemetry_token, mock=is_mock_active())
 
 
 @router.post(

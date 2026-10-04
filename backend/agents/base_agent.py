@@ -14,19 +14,160 @@ está implementada aquí y es heredada por todos los agentes.
 import json
 import os
 import re
+import sys
 import time
 from abc import ABC, abstractmethod
 
 from pydantic import ValidationError
 
+from ..mock.mode import ENV_VAR, is_mock_active
+from ..mock.responses import get_mock_response
 from ..models.hypothesis import EvidenceLevel, Hypothesis, Priority, Source
 from ..models.report import AgentOutput, Critique
+from ..telemetry import usage as usage_telemetry
+from . import model_tasks
+# GROQ_MAIN/GROQ_FAST viven en model_tasks.py junto con el mapa tarea → (modelo,
+# techo) que las usa; se re-exportan acá porque `agents/__init__.py` y varios
+# agentes ya las importan desde `base_agent`.
+from .model_tasks import GROQ_FAST, GROQ_MAIN
 
-# Modelos disponibles
-# Groq dio de baja los LLaMA 3.x (llama-3.3-70b-versatile / llama-3.1-8b-instant):
-# la API devuelve 404 model_not_found. Reemplazados por los gpt-oss disponibles.
-GROQ_MAIN = "openai/gpt-oss-120b"  # Agentes 01, 03, 06
-GROQ_FAST = "openai/gpt-oss-20b"   # Agente rápido para tareas simples
+
+def call_provider(
+    *,
+    system_prompt: str,
+    user_message: str,
+    model: str,
+    max_tokens: int,
+    task: str,
+    agent_id: str | None = None,
+    agent_name: str | None = None,
+    temperature: float = 0.3,
+) -> str:
+    """
+    Punto único de llamada al proveedor del modelo de lenguaje (control de
+    costos, Sprint 4 — D1).
+
+    Antes de este cambio, tres lugares instanciaban el cliente de Groq por su
+    cuenta: `BaseAgent._call_llm()`, `pipeline/pico.py` y
+    `ingestion/biomarker_extractor.py`. Cada uno repetía su propio reintento y
+    su propio manejo de errores, y el swap de proveedor había que hacerlo tres
+    veces. Ahora los tres delegan acá: es el único lugar del sistema que
+    instancia el cliente del proveedor, así que es también el único lugar que
+    hay que tocar para contar el consumo de una llamada o para cambiar de
+    proveedor.
+
+    Args:
+        system_prompt: Prompt de sistema del agente o del módulo que llama.
+        user_message:  Mensaje de usuario ya armado para esta tarea.
+        model:         Modelo del proveedor a usar (p. ej. GROQ_MAIN o
+                       GROQ_FAST).
+        max_tokens:    Techo de tokens de la respuesta, propio de la tarea que
+                       llama: no hay un valor único para todo el sistema.
+        task:          Etiqueta de la tarea que originó la llamada (p. ej.
+                       "agente01_hipotesis", "pico_sintesis"). Identifica el
+                       paso de origen para quien lea los logs.
+        agent_id:      ID del agente que llama, si corresponde. `None` para
+                       llamadas que no vienen de un agente (PICO,
+                       biomarcadores).
+        agent_name:    Nombre legible del agente que llama, si corresponde.
+        temperature:   Temperatura de muestreo del modelo.
+
+    Returns:
+        Texto crudo de la respuesta del modelo.
+
+    Reintenta hasta 3 veces con backoff incremental ante errores 429 (rate
+    limit del tier gratuito de Groq). Agota los reintentos y relanza la
+    última excepción si el proveedor sigue devolviendo 429.
+
+    Cada intento —falle o no— queda contabilizado en el registro de
+    telemetría activo (control de costos, Sprint 4 — D2), para que el costo
+    de los reintentos también sea visible. Sin un registro abierto (un script
+    de demo, un test) esto no hace nada: la telemetría nunca es condición
+    para que una llamada funcione.
+
+    En modo mock (S4 — D7, variable `NEXUS_MOCK_LLM`), devuelve una respuesta
+    grabada para `task` sin tocar la red ni instanciar el proveedor. Es la
+    intercepción, no un endpoint alternativo: la respuesta grabada atraviesa
+    después el mismo parseo que una real, porque quien llamó a `_call_llm()`
+    no se entera de la diferencia.
+
+    Sin modo mock, `GROQ_API_KEY` faltante falla con un mensaje claro antes de
+    intentar nada: un fallo de configuración tiene que fallar, no caer en
+    silencio a una respuesta grabada.
+    """
+    if is_mock_active():
+        inicio = time.perf_counter()
+        contenido = get_mock_response(task)
+        usage_telemetry.record_call(
+            task=task, model=model, agent_id=agent_id, agent_name=agent_name,
+            ok=True, latency_seconds=time.perf_counter() - inicio,
+            prompt_tokens=0, completion_tokens=0, mock=True,
+        )
+        return contenido
+
+    if not os.environ.get("GROQ_API_KEY"):
+        raise RuntimeError(
+            "GROQ_API_KEY no está configurada y el modo mock está desactivado. "
+            "Configurá GROQ_API_KEY en el .env, o activá el modo mock "
+            f"({ENV_VAR}=1) para desarrollo sin cuota."
+        )
+
+    from groq import Groq, RateLimitError
+
+    client = Groq(api_key=os.environ["GROQ_API_KEY"])
+    delays = [8, 20, 40]  # segundos de espera entre reintentos
+    last_exc: Exception | None = None
+
+    for attempt, delay in enumerate(delays + [None], start=1):
+        inicio = time.perf_counter()
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_message},
+                ],
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
+        except RateLimitError as exc:
+            usage_telemetry.record_call(
+                task=task, model=model, agent_id=agent_id, agent_name=agent_name,
+                ok=False, latency_seconds=time.perf_counter() - inicio,
+            )
+            last_exc = exc
+            if delay is None:
+                break
+            print(
+                f"[NEXUS] {task}: rate limit (intento {attempt}/3). "
+                f"Reintentando en {delay}s…",
+                file=sys.stderr,
+            )
+            time.sleep(delay)
+            continue
+        except Exception:
+            # Cualquier otra falla (auth, red, error del proveedor) también
+            # queda contabilizada, aunque acá no se reintenta: solo el 429
+            # tiene backoff propio.
+            usage_telemetry.record_call(
+                task=task, model=model, agent_id=agent_id, agent_name=agent_name,
+                ok=False, latency_seconds=time.perf_counter() - inicio,
+            )
+            raise
+
+        latencia = time.perf_counter() - inicio
+        choice = response.choices[0]
+        consumo = getattr(response, "usage", None)
+        usage_telemetry.record_call(
+            task=task, model=model, agent_id=agent_id, agent_name=agent_name,
+            ok=True, latency_seconds=latencia,
+            prompt_tokens=getattr(consumo, "prompt_tokens", None) if consumo else None,
+            completion_tokens=getattr(consumo, "completion_tokens", None) if consumo else None,
+            truncated=getattr(choice, "finish_reason", None) == "length",
+        )
+        return choice.message.content
+
+    raise last_exc  # type: ignore[misc]
 
 
 class BaseAgent(ABC):
@@ -134,43 +275,28 @@ class BaseAgent(ABC):
 
     # ── Llamada al LLM ────────────────────────────────────────────
 
-    def _call_llm(self, user_message: str) -> str:
+    def _call_llm(self, user_message: str, *, task: str) -> str:
         """
-        Llama al modelo configurado en self.MODEL vía Groq.
-        Devuelve el texto crudo de la respuesta.
-        Reintenta hasta 3 veces con backoff incremental ante errores 429
-        (rate limit del tier gratuito de Groq: 12k TPM).
+        Llama al proveedor vía `call_provider()`, con el modelo y el techo de
+        tokens de `task` (control de costos, S4 — D6). Devuelve el texto
+        crudo de la respuesta.
+
+        `task` reemplaza a `self.MODEL` para decidir el modelo real de la
+        llamada: `self.MODEL` sigue siendo un atributo obligatorio de cada
+        agente (documentación de qué modelo usa "por defecto"), pero la
+        política vigente vive en `model_tasks.TASK_BUDGETS`, consultable sin
+        recorrer los agentes.
         """
-        from groq import Groq, RateLimitError
-
-        client = Groq(api_key=os.environ["GROQ_API_KEY"])
-        delays = [8, 20, 40]  # segundos de espera entre reintentos
-        last_exc: Exception | None = None
-
-        for attempt, delay in enumerate(delays + [None], start=1):
-            try:
-                response = client.chat.completions.create(
-                    model=self.MODEL,
-                    messages=[
-                        {"role": "system", "content": self.SYSTEM_PROMPT},
-                        {"role": "user", "content": user_message},
-                    ],
-                    max_tokens=4096,
-                    temperature=0.3,
-                )
-                return response.choices[0].message.content
-            except RateLimitError as exc:
-                last_exc = exc
-                if delay is None:
-                    break
-                print(
-                    f"[NEXUS] Agente {self.AGENT_NAME}: rate limit (intento {attempt}/3). "
-                    f"Reintentando en {delay}s…",
-                    file=__import__("sys").stderr,
-                )
-                time.sleep(delay)
-
-        raise last_exc  # type: ignore[misc]
+        budget = model_tasks.get_budget(task)
+        return call_provider(
+            system_prompt=self.SYSTEM_PROMPT,
+            user_message=user_message,
+            model=budget.model,
+            max_tokens=budget.max_tokens,
+            task=task,
+            agent_id=self.AGENT_ID,
+            agent_name=self.AGENT_NAME,
+        )
 
     # ── Interfaz pública ──────────────────────────────────────────
 
@@ -226,7 +352,7 @@ class BaseAgent(ABC):
             '      "alternative": "alternativa sugerida o null"\n'
             "    }\n  ]\n}"
         )
-        raw = self._call_llm(prompt)
+        raw = self._call_llm(prompt, task="debate_critica")
         return self._parse_critiques(raw)
 
     def revise(
@@ -253,7 +379,7 @@ class BaseAgent(ABC):
             "Respondé ÚNICAMENTE con JSON en el formato estándar de hipótesis:\n"
             '{\n  "hypotheses": [...]\n}'
         )
-        raw = self._call_llm(prompt)
+        raw = self._call_llm(prompt, task="debate_revision")
         hypotheses = self.parse_hypotheses(raw)
         return self._build_output(hypotheses, raw)
 
@@ -287,7 +413,7 @@ class BaseAgent(ABC):
             ofrecido es `pipeline/recitation.validate_recited()`.
         """
         prompt = self._build_recitation_prompt(hypotheses_with_reasons, articles)
-        raw = self._call_llm(prompt)
+        raw = self._call_llm(prompt, task="debate_recitacion")
         return self._parse_recitation(raw, total=len(hypotheses_with_reasons))
 
     def _build_recitation_prompt(

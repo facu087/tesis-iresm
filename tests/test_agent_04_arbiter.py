@@ -58,7 +58,7 @@ class _LlmFalso:
         self.prompts: list[str] = []
 
     def instalar(self, monkeypatch) -> "_LlmFalso":
-        def fake(self_agent, prompt):  # noqa: ANN001
+        def fake(self_agent, prompt, **kwargs):  # noqa: ANN001
             self.prompts.append(prompt)
             if not self.respuestas:
                 raise AssertionError("El agente llamó al LLM más veces de las previstas")

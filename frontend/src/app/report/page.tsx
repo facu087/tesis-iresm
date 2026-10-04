@@ -91,6 +91,9 @@ export default function ReportPage() {
         </div>
       </header>
 
+      {/* ── Modo mock ───────────────────────────────────────────────────── */}
+      {report.metadata.mock && <MockBanner />}
+
       {/* ── Meta bar ────────────────────────────────────────────────────── */}
       <div className="bg-white border-b border-slate-200">
         <div className="mx-auto max-w-5xl px-6 py-4 flex flex-wrap items-center gap-6 text-sm">
@@ -257,6 +260,29 @@ const SOURCE_VERDICT: Record<string, { label: string; color: string; tachado: bo
   sin_pmid:       { label: "sin PMID",         color: "text-slate-400",   tachado: false },
   no_verificable: { label: "no verificable",   color: "text-slate-400",   tachado: false },
 };
+
+/**
+ * Aviso de modo mock (control de costos, S4 — D7).
+ *
+ * Un reporte de modo mock MUST ser distinguible de uno real sin inspeccionar
+ * código ni logs (spec `modo-mock-pipeline`): va primero, antes que
+ * cualquier otro aviso, porque si el reporte es de modo mock ninguna otra
+ * afirmación de la vista es real tampoco.
+ */
+function MockBanner() {
+  return (
+    <div className="bg-red-600 text-white">
+      <div className="mx-auto max-w-5xl px-6 py-2.5 text-xs font-semibold flex items-center gap-2">
+        <span>⛔</span>
+        <span>
+          Reporte de modo mock: las hipótesis, el consenso y los ensayos NO provienen de un
+          análisis real. Son respuestas grabadas para desarrollo — no corresponden a ningún
+          paciente ni deben usarse para ninguna decisión clínica.
+        </span>
+      </div>
+    </div>
+  );
+}
 
 /**
  * Aviso de cabecera con el resultado de la verificación.

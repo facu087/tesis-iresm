@@ -259,6 +259,21 @@ def _cover(report: StructuredReport, s: dict) -> list:
     elems.append(t)
     elems.append(Spacer(1, 0.8 * cm))
 
+    # Modo mock (S4 — D7): antes que cualquier otro aviso. Si el reporte es de
+    # modo mock, ninguna otra afirmación de la portada es real tampoco, así
+    # que el lector tiene que enterarse primero de esto, no al final de la
+    # lista de advertencias.
+    if report.metadata.mock:
+        elems.append(_par(
+            f"<font color='{_hex(_RED)}'><b>Reporte de modo mock:</b> "
+            "las hipótesis, el consenso y los ensayos de este documento NO "
+            "provienen de un análisis real: son respuestas grabadas, "
+            "usadas para desarrollo. No corresponden a ningún paciente ni "
+            "deben usarse para ninguna decisión clínica.</font>",
+            s["disclaimer"],
+        ))
+        elems.append(Spacer(1, 0.5 * cm))
+
     # Aviso de verificación: si las referencias no resisten el contraste contra
     # PubMed, el lector tiene que enterarse en la portada, no en la bibliografía.
     if v and v.total_fuentes:
