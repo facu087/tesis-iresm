@@ -130,11 +130,65 @@ class TestSaneamientoDeFuentes:
         assert len(hypotheses) == 1
         assert hypotheses[0].sources[0].pmid == "22439958"
 
-    def test_fuente_sin_titulo_sigue_siendo_error(self):
-        """Comportamiento previo al fix: una fuente sin título no valida."""
-        raw = _respuesta([{"pmid": "22439958"}])
-        with pytest.raises(Exception):
-            BaseAgent.parse_hypotheses(raw)
+    @pytest.mark.parametrize("titulo", [None, "", "   ", 42])
+    def test_fuente_sin_titulo_se_descarta_sin_tirar_la_hipotesis(self, titulo):
+        """
+        Corrida real del 2026-10-04: el Agente 03 devolvió una fuente con
+        `title: null` y perdió la Ronda 1 completa. Una fuente inservible se
+        descarta; la hipótesis y el resto de sus fuentes se conservan.
+        """
+        raw = _respuesta([
+            {"pmid": "22439958", "title": titulo},
+            {"pmid": "30000001", "title": "Axonal neuropathy in adults"},
+        ])
+        hypotheses = BaseAgent.parse_hypotheses(raw)
+        assert len(hypotheses) == 1
+        assert [s.pmid for s in hypotheses[0].sources] == ["30000001"]
+
+    def test_hipotesis_cuya_unica_fuente_es_inservible_queda_sin_fuentes(self):
+        """No se descarta la hipótesis: la clasificación EBM la tratará como sin respaldo."""
+        hypotheses = BaseAgent.parse_hypotheses(_respuesta([{"pmid": "22439958"}]))
+        assert len(hypotheses) == 1
+        assert hypotheses[0].sources == []
+
+    def test_pmid_numerico_se_convierte_a_texto(self):
+        """Los modelos suelen escribir el PMID como número, no como cadena."""
+        raw = _respuesta([{"pmid": 22439958, "title": "Metformin and B12"}])
+        assert BaseAgent.parse_hypotheses(raw)[0].sources[0].pmid == "22439958"
+
+    @pytest.mark.parametrize("anio", ["s.f.", None, [2012], True])
+    def test_anio_invalido_no_invalida_la_fuente(self, anio):
+        raw = _respuesta([{"pmid": "22439958", "title": "Metformin and B12", "year": anio}])
+        source = BaseAgent.parse_hypotheses(raw)[0].sources[0]
+        assert source.title == "Metformin and B12"
+        assert source.year is None
+
+    def test_anio_como_texto_numerico_se_conserva(self):
+        raw = _respuesta([{"pmid": "22439958", "title": "Metformin and B12", "year": "2012"}])
+        assert BaseAgent.parse_hypotheses(raw)[0].sources[0].year == 2012
+
+    def test_revista_o_url_con_tipo_invalido_quedan_vacias(self):
+        raw = _respuesta([{
+            "pmid": "22439958", "title": "Metformin and B12",
+            "journal": ["Diabetes Care"], "url": 123,
+        }])
+        source = BaseAgent.parse_hypotheses(raw)[0].sources[0]
+        assert (source.journal, source.url) == (None, None)
+
+    def test_elemento_de_sources_que_no_es_objeto_se_ignora(self):
+        raw = _respuesta(["PMID 22439958", {"pmid": "30000001", "title": "Axonal neuropathy"}])
+        assert [s.pmid for s in BaseAgent.parse_hypotheses(raw)[0].sources] == ["30000001"]
+
+    def test_el_descarte_se_avisa_sin_volcar_el_contenido(self, capsys):
+        raw = _respuesta([
+            {"pmid": "22439958", "title": None},
+            {"pmid": "30000001", "title": "Axonal neuropathy in adults"},
+        ])
+        BaseAgent.parse_hypotheses(raw)
+        aviso = capsys.readouterr().err
+        assert "1 fuente" in aviso
+        assert "22439958" not in aviso
+        assert "Axonal" not in aviso
 
 
 # ── Extracción de JSON ────────────────────────────────────────────────────────
