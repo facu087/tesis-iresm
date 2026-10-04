@@ -25,9 +25,16 @@ mida cuánto necesitan de verdad (queda pendiente, ver tasks.md 4.2), y
 reducirlas a ciegas arriesga truncar una respuesta válida, que la spec trata
 como un defecto, no un ahorro.
 
-`arbitro_agrupacion` es la excepción con evidencia clara: su salida son solo
-índices (`{"groups": [[1,3],[2]]}`), así que un techo bajo tiene holgura de
-sobra sin importar cuántas hipótesis se agrupen.
+`arbitro_agrupacion` y `agente05_planificacion_terminos` habían bajado a 512 y
+1024 con el argumento de que su salida es breve. La medición del 2026-10-04
+(tasks.md 4.2) mostró que el argumento no vale para los `gpt-oss`: son modelos
+de razonamiento y los tokens de razonamiento cuentan dentro de la salida. Con
+nueve hipótesis, la agrupación agotó los 512 con los dos modelos sin llegar a
+escribir la respuesta, y la planificación agotó los 1024 en una de tres
+llamadas. Cada corte termina en el fallback determinista, es decir, en un
+análisis sin agrupamiento. Las dos vuelven al 4096 histórico: el techo es un
+límite, no un consumo, así que subirlo no encarece las llamadas que no lo
+alcanzan.
 """
 
 from __future__ import annotations
@@ -80,8 +87,10 @@ TASK_BUDGETS: dict[str, TaskBudget] = {
     # GROQ_FAST. Una respuesta peor del modelo chico cae en una validación
     # existente (consensus.normalize_partition() / pipeline.trial_matching),
     # nunca en un resultado incorrecto que nadie detecte. ───────────────────
-    "arbitro_agrupacion": TaskBudget(GROQ_FAST, 512),
-    "agente05_planificacion_terminos": TaskBudget(GROQ_FAST, 1024),
+    # Techo histórico: con 512 y 1024 se cortaban por los tokens de
+    # razonamiento (ver docstring del módulo).
+    "arbitro_agrupacion": TaskBudget(GROQ_FAST, 4096),
+    "agente05_planificacion_terminos": TaskBudget(GROQ_FAST, 4096),
     # Hasta MAX_TRIALS=10 ensayos, cada uno con fundamento (hasta 600 chars)
     # y hasta 5 criterios a verificar: el techo histórico no tiene holgura de
     # sobra en el peor caso, así que se conserva sin cambios; solo baja el

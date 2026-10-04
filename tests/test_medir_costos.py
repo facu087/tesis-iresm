@@ -169,10 +169,14 @@ class TestTerminos:
 
 class TestResumenPorTarea:
     def test_maximo_techo_holgura_y_truncados(self):
+        # El techo se lee del mapa, para que el test no dependa de su valor.
+        techo_agrupacion = model_tasks.get_budget("arbitro_agrupacion").max_tokens
         llamadas = [
             _llamada("agente01_hipotesis", salida=1200),
             _llamada("agente01_hipotesis", salida=3000),
-            _llamada("arbitro_agrupacion", salida=512, truncada=True, agente="04"),
+            _llamada(
+                "arbitro_agrupacion", salida=techo_agrupacion, truncada=True, agente="04",
+            ),
         ]
         filas = {f["task"]: f for f in medicion.summarize_tasks(llamadas, model_tasks.TASK_BUDGETS)}
 
