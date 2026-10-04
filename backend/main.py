@@ -6,6 +6,7 @@ Arrancar con:
 """
 
 import os
+import sys
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -19,6 +20,8 @@ from .api.admin_router import router as admin_router
 from .api.cuentas_router import router as cuentas_router
 from .api.router import router
 from .db import create_db_and_tables
+from .mock.mode import ENV_VAR as _MOCK_ENV_VAR
+from .mock.mode import is_mock_active
 
 
 @asynccontextmanager
@@ -27,6 +30,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     create_db_and_tables()
     yield
 
+
+if is_mock_active():
+    # Spec `modo-mock-pipeline`, "Activación deliberada": el modo mock se
+    # informa al arrancar, para que nadie lo active sin darse cuenta y
+    # confunda un reporte grabado con uno producido de verdad.
+    print(
+        f"[NEXUS] Modo mock activo ({_MOCK_ENV_VAR}): el pipeline va a usar "
+        "respuestas grabadas, sin llamar al proveedor del modelo.",
+        file=sys.stderr,
+    )
 
 app = FastAPI(
     title="NEXUS — Sistema de Soporte Investigativo Clínico",

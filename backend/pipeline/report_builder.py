@@ -295,6 +295,7 @@ def build_export(
     verifications: dict[str, SourceVerification] | None = None,
     navigation: TrialNavigationResult | None = None,
     arbitration: ArbitrationResult | None = None,
+    mock: bool = False,
 ) -> StructuredReport:
     """
     Ensambla el StructuredReport de exportación a partir de los outputs del pipeline.
@@ -314,6 +315,10 @@ def build_export(
                           omite, las hipótesis son las del debate sin consolidar
                           y `arbitration` queda nulo, igual que en un reporte
                           anterior al Árbitro.
+        mock:             True si el análisis se produjo en modo mock (S4 —
+                          D7): el reporte lo declara en `metadata.mock` para
+                          que el frontend y el PDF lo muestren, y nadie lo
+                          confunda con un análisis real.
 
     Returns:
         StructuredReport listo para serializar a JSON o exportar a PDF.
@@ -326,6 +331,7 @@ def build_export(
             generated_at=datetime.now(timezone.utc),
             nexus_version=_VERSION,
             processing_time_seconds=round(processing_time, 2),
+            mock=mock,
         ),
         case_summary=_build_case_summary(case, report),
         hypotheses=hypotheses,

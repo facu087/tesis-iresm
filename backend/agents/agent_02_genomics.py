@@ -86,7 +86,8 @@ class GenomicsSpecialistAgent(BaseAgent):
         enriched = self._build_context(clinical_context)
         raw = self._call_llm(
             f"Analizá el siguiente caso clínico desde la perspectiva genómica "
-            f"y generá hipótesis de investigación:\n\n{enriched}"
+            f"y generá hipótesis de investigación:\n\n{enriched}",
+            task="agente02_hipotesis",
         )
         hypotheses = self.parse_hypotheses(raw)
         hypotheses = hypotheses[:4]

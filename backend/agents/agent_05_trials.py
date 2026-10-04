@@ -222,7 +222,9 @@ REGLAS CRÍTICAS:
 
         prompt = _build_planning_prompt(entrada)
         try:
-            raw = await asyncio.to_thread(self._call_llm, prompt)
+            raw = await asyncio.to_thread(
+                self._call_llm, prompt, task="agente05_planificacion_terminos"
+            )
             datos = self.extract_json(raw)
         except Exception as exc:
             self._log_fallback("planificación de términos", exc)
@@ -453,7 +455,9 @@ REGLAS CRÍTICAS:
 
         prompt = _build_evaluation_prompt(entrada, trials)
         try:
-            raw = await asyncio.to_thread(self._call_llm, prompt)
+            raw = await asyncio.to_thread(
+                self._call_llm, prompt, task="agente05_evaluacion_compatibilidad"
+            )
             datos = self.extract_json(raw)
         except Exception as exc:
             self._log_fallback("evaluación de compatibilidad", exc)

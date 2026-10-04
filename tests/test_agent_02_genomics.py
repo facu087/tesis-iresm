@@ -103,7 +103,7 @@ class TestRun:
     def test_run_caso_base_prompt_dice_no_hay_variantes(self):
         agente = GenomicsSpecialistAgent(_ctx_sin_hallazgos())
         prompts_capturados: list[str] = []
-        def capturar(prompt: str) -> str:
+        def capturar(prompt: str, **kwargs) -> str:
             prompts_capturados.append(prompt)
             return _json_valido()
         with patch.object(agente, "_call_llm", side_effect=capturar):
@@ -114,7 +114,7 @@ class TestRun:
     def test_run_caso_ttr_prompt_contiene_variante(self):
         agente = GenomicsSpecialistAgent(_ctx_con_ttr())
         prompts_capturados: list[str] = []
-        def capturar(prompt: str) -> str:
+        def capturar(prompt: str, **kwargs) -> str:
             prompts_capturados.append(prompt)
             return _json_valido()
         with patch.object(agente, "_call_llm", side_effect=capturar):
@@ -165,7 +165,7 @@ class TestDebateMethods:
         ctx = _ctx_con_ttr()
         agente = GenomicsSpecialistAgent(ctx)
         prompts_capturados: list[str] = []
-        def capturar(prompt: str) -> str:
+        def capturar(prompt: str, **kwargs) -> str:
             prompts_capturados.append(prompt)
             return '{"critiques": []}'
         own = AgentOutput(agent_id="02", agent_name="Especialista Genómica", hypotheses=[], raw_response="{}")

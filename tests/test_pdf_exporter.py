@@ -211,6 +211,31 @@ class TestLimpiezaDeCaracteres:
         assert generate_pdf(report)[:4] == b"%PDF"
 
 
+# ── Tests: modo mock en el PDF (control de costos, S4 — task 6.4) ────────────
+
+class TestModoMockEnPdf:
+    """
+    Un reporte de modo mock MUST ser distinguible sin inspeccionar código ni
+    logs (spec `modo-mock-pipeline`): la advertencia tiene que estar en el
+    texto extraído del PDF, con la misma visibilidad que la del consenso de
+    IA o la de verificación bibliográfica.
+    """
+
+    def _reporte_mock(self) -> StructuredReport:
+        report = _make_report()
+        return report.model_copy(
+            update={"metadata": report.metadata.model_copy(update={"mock": True})}
+        )
+
+    def test_el_pdf_declara_el_modo_mock(self):
+        texto = _texto_del_pdf(generate_pdf(self._reporte_mock()))
+        assert "mock" in texto.lower()
+
+    def test_un_reporte_real_no_menciona_el_modo_mock(self):
+        texto = _texto_del_pdf(generate_pdf(_make_report()))
+        assert "modo mock" not in texto.lower()
+
+
 # ── Tests: verificación bibliográfica en el PDF ───────────────────────────────
 
 class TestVerificacionEnPdf:

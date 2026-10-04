@@ -7,15 +7,15 @@ que reciben todos los agentes de análisis.
 """
 
 import json
-import os
 import re
-import time
 
-from groq import Groq, RateLimitError
 from pydantic import ValidationError
 
-from ..agents.base_agent import GROQ_MAIN
+from ..agents import model_tasks
+from ..agents.base_agent import call_provider
 from ..models.case import ClinicalCase, PICOSynthesis
+
+_TASK = "pico_sintesis"
 
 SYSTEM_PROMPT = """Eres un médico especialista en metodología de investigación clínica.
 Tu tarea es analizar un caso clínico y construir una síntesis estructurada en formato PICO.
@@ -89,40 +89,28 @@ def build(case: ClinicalCase) -> ClinicalCase:
     Construye la síntesis PICO para un caso clínico.
     Recibe un ClinicalCase con raw_text, devuelve el mismo objeto
     con el campo pico completado.
+
+    La llamada al proveedor pasa por `call_provider()` (control de costos,
+    S4 — D1): antes este módulo instanciaba el cliente de Groq por su cuenta,
+    lo que dejaba su consumo fuera de cualquier contabilidad futura y
+    triplicaba el punto de swap de proveedor. El modelo y el techo de tokens
+    salen de `model_tasks.TASK_BUDGETS` (D6), no de una constante local: es
+    el mismo mapa que consultan los agentes.
     """
-    client = Groq(api_key=os.environ["GROQ_API_KEY"])
-    delays = [8, 20, 40]
-    last_exc: Exception | None = None
-
-    for attempt, delay in enumerate(delays + [None], start=1):
-        try:
-            response = client.chat.completions.create(
-                model=GROQ_MAIN,
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {
-                        "role": "user",
-                        "content": (
-                            "Construí la síntesis PICO para el siguiente caso clínico:\n\n"
-                            f"{case.raw_text}"
-                        ),
-                    },
-                ],
-                max_tokens=2048,
-                temperature=0.1,
-            )
-            raw = response.choices[0].message.content
-            case.pico = _parse_pico(raw)
-            return case
-        except RateLimitError as exc:
-            last_exc = exc
-            if delay is None:
-                break
-            import sys
-            print(f"[NEXUS] PICO: rate limit (intento {attempt}/3). Reintentando en {delay}s…", file=sys.stderr)
-            time.sleep(delay)
-
-    raise last_exc  # type: ignore[misc]
+    budget = model_tasks.get_budget(_TASK)
+    raw = call_provider(
+        system_prompt=SYSTEM_PROMPT,
+        user_message=(
+            "Construí la síntesis PICO para el siguiente caso clínico:\n\n"
+            f"{case.raw_text}"
+        ),
+        model=budget.model,
+        max_tokens=budget.max_tokens,
+        task=_TASK,
+        temperature=0.1,
+    )
+    case.pico = _parse_pico(raw)
+    return case
 
 
 def format_for_agents(pico: PICOSynthesis) -> str:

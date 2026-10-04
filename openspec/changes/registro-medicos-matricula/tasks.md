@@ -263,7 +263,7 @@
       variables de entorno) y `.claude/backlog.md` con el estado de esta
       tarjeta/estas tarjetas de Trello.
       — Hecho: nuevas variables de entorno, estructura de carpetas, alta del
-      primer admin y scripts de demo documentados en `CLAUDE.md`; nota (21)
+      primer admin y scripts de demo documentados en `CLAUDE.md`; nota (22)
       con el resumen completo en `backlog.md`.
 - [x] 9.2 Actualizar `.claude/stack.md` con las decisiones de esta propuesta
       (SQLModel/SQLite, argon2-cffi, sesión server-side, validación de origen)

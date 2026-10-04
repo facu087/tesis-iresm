@@ -13,13 +13,13 @@ Usa dos estrategias combinadas:
 """
 
 import json
-import os
 import re
 
-from groq import Groq
-
-from ..agents.base_agent import GROQ_MAIN
+from ..agents import model_tasks
+from ..agents.base_agent import call_provider
 from ..models.biomarkers import BiomarkerProfile
+
+_TASK = "biomarcadores_extraccion"
 
 # ── Patrones de reconocimiento rápido ────────────────────────────────────────
 
@@ -152,20 +152,23 @@ def _extract_with_regex(text: str) -> dict:
 
 
 def _extract_with_llm(text: str) -> dict:
-    """Extracción semántica con LLM para capturar entidades no previstas."""
-    client = Groq(api_key=os.environ["GROQ_API_KEY"])
+    """
+    Extracción semántica con LLM para capturar entidades no previstas.
 
-    response = client.chat.completions.create(
-        model=GROQ_MAIN,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT_LLM},
-            {"role": "user", "content": f"Extraé las entidades biomédicas del siguiente texto clínico:\n\n{text}"},
-        ],
-        max_tokens=1024,
+    La llamada pasa por `call_provider()` (control de costos, S4 — D1): antes
+    este módulo instanciaba el cliente de Groq por su cuenta, sin reintento
+    ante rate limit y con su consumo fuera de cualquier contabilidad futura.
+    El modelo y el techo salen de `model_tasks.TASK_BUDGETS` (D6).
+    """
+    budget = model_tasks.get_budget(_TASK)
+    raw = call_provider(
+        system_prompt=SYSTEM_PROMPT_LLM,
+        user_message=f"Extraé las entidades biomédicas del siguiente texto clínico:\n\n{text}",
+        model=budget.model,
+        max_tokens=budget.max_tokens,
+        task=_TASK,
         temperature=0.1,
-    )
-
-    raw = response.choices[0].message.content.strip()
+    ).strip()
 
     # Limpiar markdown fences si los hay
     if raw.startswith("```"):
