@@ -91,6 +91,26 @@ def client_medico_verificado(client, cuenta_medico_verificada):
 
 
 @pytest.fixture()
+def client_medico_verificado_sin_relanzar(cuenta_medico_verificada):
+    """
+    Igual que `client_medico_verificado`, pero un error no controlado del
+    servidor llega como respuesta 500 en vez de relanzarse en el test. Para
+    los tests que ejercitan una falla del pipeline detrás del endpoint protegido.
+    """
+    from backend.main import app
+
+    with TestClient(
+        app, headers={"Origin": _ORIGEN_PERMITIDO}, raise_server_exceptions=False
+    ) as c:
+        resp = c.post(
+            "/api/login",
+            json={"email": cuenta_medico_verificada.email, "password": "ContraseñaSegura123"},
+        )
+        assert resp.status_code == 200, resp.text
+        yield c
+
+
+@pytest.fixture()
 def cuenta_medico_pendiente(_base_de_datos_temporal):
     """Cuenta de médico recién registrada, en estado `pendiente`."""
     with Session(_base_de_datos_temporal) as session:

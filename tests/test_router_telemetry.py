@@ -90,7 +90,7 @@ def _patches():
     }
 
 
-def _run_analisis(**kwargs):
+def _run_analisis(client, **kwargs):
     patches = _patches()
     with (
         patches["normalize"], patches["pico_build"], patches["extract_biomarkers"],
@@ -101,7 +101,6 @@ def _run_analisis(**kwargs):
             new_callable=AsyncMock,
             return_value=_arbitration_result_vacio(),
         ),
-        TestClient(app, raise_server_exceptions=False) as client,
     ):
         return client.post("/api/analyze", data=kwargs.get("data", {"text": CASO_CLINICO}))
 
@@ -115,21 +114,23 @@ def _arbitration_result_vacio():
 # ── El router abre y cierra un registro por análisis (D2) ────────────────────────
 
 class TestAperturaYCierreDelRegistro:
-    def test_abre_y_cierra_un_registro(self):
+    def test_abre_y_cierra_un_registro(self, client_medico_verificado_sin_relanzar):
         with patch(
             "backend.api.router.usage_telemetry.open_registry",
             return_value="token-de-prueba",
         ) as abrir, patch(
             "backend.api.router.usage_telemetry.close_registry",
         ) as cerrar:
-            response = _run_analisis()
+            response = _run_analisis(client_medico_verificado_sin_relanzar)
 
         assert response.status_code == 200
         abrir.assert_called_once()
         cerrar.assert_called_once()
         assert cerrar.call_args.args[0] == "token-de-prueba"
 
-    def test_cierra_el_registro_aunque_el_pipeline_falle(self):
+    def test_cierra_el_registro_aunque_el_pipeline_falle(
+        self, client_medico_verificado_sin_relanzar
+    ):
         patches = _patches()
         patches["run_round_1"] = patch(
             "backend.api.router.orchestrator.run_round_1",
@@ -143,19 +144,19 @@ class TestAperturaYCierreDelRegistro:
                 return_value="token-de-prueba",
             ) as abrir,
             patch("backend.api.router.usage_telemetry.close_registry") as cerrar,
-            TestClient(app, raise_server_exceptions=False) as client,
         ):
-            client.post("/api/analyze", data={"text": CASO_CLINICO})
+            client_medico_verificado_sin_relanzar.post(
+                "/api/analyze", data={"text": CASO_CLINICO}
+            )
 
         abrir.assert_called_once()
         cerrar.assert_called_once()
         assert cerrar.call_args.args[0] == "token-de-prueba"
 
-    def test_no_abre_registro_si_falta_el_texto_y_el_archivo(self):
+    def test_no_abre_registro_si_falta_el_texto_y_el_archivo(self, client_medico_verificado):
         """El 422 de entrada inválida es previo a cualquier análisis."""
         with patch("backend.api.router.usage_telemetry.open_registry") as abrir:
-            with TestClient(app) as client:
-                response = client.post("/api/analyze")
+            response = client_medico_verificado.post("/api/analyze")
         assert response.status_code == 422
         abrir.assert_not_called()
 
@@ -163,7 +164,9 @@ class TestAperturaYCierreDelRegistro:
 # ── Privacidad: el registro de un análisis real no contiene texto clínico ───────
 
 class TestPrivacidadDelRegistroEnUnAnalisisReal:
-    def test_el_registro_no_contiene_el_texto_clinico(self, tmp_path, monkeypatch):
+    def test_el_registro_no_contiene_el_texto_clinico(
+        self, tmp_path, monkeypatch, client_medico_verificado_sin_relanzar
+    ):
         """
         Task 2.7. Corre un análisis (con el LLM y las APIs externas
         mockeadas, como el resto de esta suite) y verifica que el resumen de
@@ -172,7 +175,7 @@ class TestPrivacidadDelRegistroEnUnAnalisisReal:
         destino = tmp_path / "costos.jsonl"
         monkeypatch.setattr(usage, "_DEFAULT_OUTPUT_PATH", destino)
 
-        response = _run_analisis()
+        response = _run_analisis(client_medico_verificado_sin_relanzar)
         assert response.status_code == 200
 
         if destino.exists():
