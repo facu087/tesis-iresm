@@ -84,7 +84,16 @@
       `_group()`/`_write_verdicts()` del Agente 04, `_plan_terms()`/`_evaluate()` del
       Agente 05, `pico.build()` y `biomarker_extractor._extract_with_llm()`. Test:
       `tests/test_model_tasks.py`.
-- [ ] 4.2 Asignar el techo de cada tarea con holgura sobre su salida esperada, reemplazando el 4096 fijo. Verificar corriendo el caso de prueba y comprobando que **ninguna** respuesta quedó truncada por alcanzar su techo (`finish_reason`).
+- [x] 4.2 Asignar el techo de cada tarea con holgura sobre su salida esperada, reemplazando el 4096 fijo. Verificar corriendo el caso de prueba y comprobando que **ninguna** respuesta quedó truncada por alcanzar su techo (`finish_reason`).
+      **Medido el 2026-10-04** con `scripts/medir_costos.py` (dos corridas reales).
+      Primera corrida: `arbitro_agrupacion` (techo 512) y
+      `agente05_planificacion_terminos` (techo 1024) se cortaron por techo y cayeron
+      en el fallback determinista. Causa: los `gpt-oss` cuentan los tokens de
+      razonamiento dentro de la salida. Los dos techos volvieron a 4096 (commit
+      `3774e19`). Segunda corrida, ya corregida: **0 respuestas cortadas** en 27
+      llamadas. La agrupación usó 1.062 tokens de salida, el doble del techo anterior.
+      Menor holgura observada: `debate_revision` (3.315 de 4.096, 19 %) y
+      `biomarcadores_extraccion` (749 de 1.024, 27 %).
       **Parcial.** Asignación hecha con criterio explícito por tarea (ver docstring de
       `model_tasks.py`): `arbitro_agrupacion` baja a 512 (la salida son solo índices,
       sin relación con la cantidad de hipótesis) — sin evidencia de una corrida real,
@@ -114,7 +123,16 @@
 - [x] 5.3 Mover el **etiquetado de compatibilidad del Agente 05** a `GROQ_FAST`. Verificar con `tests/test_agent_05_trials.py`.
       Hecho: `TASK_BUDGETS["agente05_evaluacion_compatibilidad"].model = GROQ_FAST`
       (techo sin cambios, ver 4.2). `tests/test_agent_05_trials.py` verde.
-- [ ] 5.4 **Medir antes de dar por buena la decisión** (D6, y el riesgo del design): correr el caso de prueba con las tres tareas en `GROQ_MAIN` y después en `GROQ_FAST`, y comparar el agrupamiento resultante, los términos planificados y las etiquetas de compatibilidad. Registrar cuántas veces la salida del modelo rápido cayó en una validación. Si el agrupamiento empeora, esa tarea vuelve a `GROQ_MAIN` y se deja constancia.
+- [x] 5.4 **Medir antes de dar por buena la decisión** (D6, y el riesgo del design): correr el caso de prueba con las tres tareas en `GROQ_MAIN` y después en `GROQ_FAST`, y comparar el agrupamiento resultante, los términos planificados y las etiquetas de compatibilidad. Registrar cuántas veces la salida del modelo rápido cayó en una validación. Si el agrupamiento empeora, esa tarea vuelve a `GROQ_MAIN` y se deja constancia.
+      **Medido el 2026-10-04**, con los dos modelos sobre las mismas entradas de una
+      sola pasada del debate. Agrupación del Árbitro (14 hipótesis): los dos modelos
+      devolvieron una salida aceptada sin reparación y la **misma partición**.
+      Evaluación de compatibilidad: 10 de 10 ensayos con la misma etiqueta, ninguna
+      evaluación descartada por validación. Planificación de términos: las 3
+      candidatas en común, 1 de 3 con el mismo término principal y ninguna lista
+      idéntica. Ninguna salida de `GROQ_FAST` cayó en una validación. **Decisión: las
+      tres tareas se quedan en `GROQ_FAST`.** Es una sola corrida por modelo, no una
+      muestra: alcanza para no revertir, no para afirmar equivalencia.
       **Pendiente para el orquestador** — restricción de cuota de esta sesión
       (requiere correr el caso de prueba dos veces contra Groq real). El mecanismo
       para hacerlo está listo: cambiar el `model` de las tres entradas en
@@ -224,12 +242,26 @@
       `comparacion_costos.txt` (60.750 tokens de muestra, USD 0 con Groq, USD 1.67
       con la arquitectura de destino, ~3 casos/día de cuota — todo etiquetado como
       estimado, no medido).
-- [ ] 7.2 Correr el caso de prueba y registrar los **números medidos**: tokens por agente, total por caso y cuántos casos entran en la cuota diaria. Es el insumo del capítulo de viabilidad de la tesis.
+- [x] 7.2 Correr el caso de prueba y registrar los **números medidos**: tokens por agente, total por caso y cuántos casos entran en la cuota diaria. Es el insumo del capítulo de viabilidad de la tesis.
+      **Medido el 2026-10-04** (segunda corrida, tres agentes completos): 27 llamadas,
+      **77.516 tokens por caso** (41.392 de entrada y 36.124 de salida), 467 s. Por
+      agente: 01 → 20.605; 02 → 20.396; 03 → 21.279; 04 → 4.861; 05 → 7.179; PICO y
+      biomarcadores → 3.196. **Entran 2 casos por día** en la cuota de 200.000
+      tokens. Hubo 6 reintentos por límite de velocidad, todos recuperados. La primera
+      corrida dio 50.599 tokens, pero con el Agente 03 caído en la Ronda 1 y el
+      Árbitro sin agrupar: no es representativa. Artefactos en
+      `output/medicion_costos/` (ignorado por git).
       **Pendiente para el orquestador** — restricción de cuota de esta sesión
       (requiere una corrida real contra Groq). `demo_costos.py` deja el mecanismo
       listo: correrlo con `NEXUS_MOCK_LLM` desactivado sobre una corrida real
       reemplazaría `_MUESTRA_SINTETICA` por el registro real de `output/costos.jsonl`.
-- [ ] 7.3 Con la telemetría ya instalada, medir cuánto cambia cada agente entre la Ronda 3 y la Ronda 4 del debate, usando los `debate_rounds` de corridas reales. **No implementar el recorte**: dejar el dato en una tarjeta nueva para decidirlo con evidencia.
+- [x] 7.3 Con la telemetría ya instalada, medir cuánto cambia cada agente entre la Ronda 3 y la Ronda 4 del debate, usando los `debate_rounds` de corridas reales. **No implementar el recorte**: dejar el dato en una tarjeta nueva para decidirlo con evidencia.
+      **Medido el 2026-10-04**: entre la Ronda 3 y la Ronda 4, 11 hipótesis cambiaron
+      de enunciado y **ninguna cambió de nivel de evidencia ni de prioridad** (agente
+      01: 1 de 5; agente 02: 4 de 4, y pasó de 4 a 3 hipótesis; agente 03: 6 de 6).
+      La Ronda 4 reescribe, no reclasifica. `debate_revision` es además el paso más
+      caro: 10 llamadas y 26.788 tokens, un tercio del caso. Es una sola corrida; el
+      recorte queda para decidirlo en una tarjeta aparte.
       **Pendiente para el orquestador** — depende de 7.2 (corridas reales) y está
       fuera de mi alcance asignado (excluido explícitamente por la restricción de
       cuota).

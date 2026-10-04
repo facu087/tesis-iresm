@@ -307,6 +307,18 @@ Suite de tests: **82 tests, 100% passing** (`pytest tests/`)
 > números medidos: 60.750 tokens de muestra, USD 0 con Groq, USD ~1,67 con la
 > arquitectura de destino, ~3 casos/día de cuota estimados. Artefactos en
 > `output/demo_costos/` (gitignoreado).
+>
+> **Medición del 2026-10-04** (tarjeta #84, `scripts/medir_costos.py`, dos corridas
+> reales). Un caso completo consume **77.516 tokens** en 27 llamadas: entran 2 casos
+> por día. La primera corrida encontró un defecto del propio cambio: los techos de
+> `arbitro_agrupacion` (512) y `agente05_planificacion_terminos` (1024) cortaban la
+> respuesta y el Árbitro no agrupaba, porque los `gpt-oss` cuentan el razonamiento
+> dentro de la salida. Volvieron a 4096 y la segunda corrida no tuvo cortes. Las
+> tres tareas en `GROQ_FAST` dieron el mismo resultado que en `GROQ_MAIN` sobre las
+> mismas entradas (misma partición, 10 de 10 etiquetas de compatibilidad).
+> Pendiente: regenerar las respuestas grabadas del modo mock (tasks.md 6.2) y el
+> Agente 03, que en la primera corrida se cayó en la Ronda 1 por un campo de
+> `Source` con tipo inválido (hallazgo G).
 
 > Nota (22) — **Registro de médicos** (cambio OpenSpec `registro-medicos-matricula`,
 > `openspec/changes/registro-medicos-matricula/`). `POST /api/analyze` no pedía
