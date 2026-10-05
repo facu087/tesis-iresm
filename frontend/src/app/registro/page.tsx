@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import ThemeToggle from "@/components/ThemeToggle";
 import { useRouter } from "next/navigation";
 import { registrarMedico } from "@/lib/api";
 import { UserPlusIcon } from "@/components/icons";
@@ -63,12 +64,15 @@ export default function RegistroPage() {
           >
             NEXUS
           </Link>
-          <Link
-            href="/ingresar"
-            className="cursor-pointer rounded-sm text-sm text-fg-muted transition-colors duration-200 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
-          >
-            Ya tengo cuenta — Ingresar
-          </Link>
+          <div className="flex items-center gap-2 sm:gap-4">
+            <ThemeToggle />
+            <Link
+              href="/ingresar"
+              className="cursor-pointer rounded-sm text-sm text-fg-muted transition-colors duration-200 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+            >
+              Ya tengo cuenta — Ingresar
+            </Link>
+          </div>
         </div>
       </header>
 

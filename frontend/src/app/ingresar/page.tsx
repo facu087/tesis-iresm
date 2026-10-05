@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from "react";
 import Link from "next/link";
+import ThemeToggle from "@/components/ThemeToggle";
 import { useRouter, useSearchParams } from "next/navigation";
 import { login } from "@/lib/api";
 import { LockIcon } from "@/components/icons";
@@ -104,13 +105,14 @@ export default function IngresarPage() {
   return (
     <div className="flex min-h-screen flex-col bg-bg text-fg">
       <header className="border-b border-border">
-        <div className="mx-auto flex max-w-md items-center px-6 py-5">
+        <div className="mx-auto flex max-w-md items-center justify-between px-6 py-5">
           <Link
             href="/"
             className="cursor-pointer rounded-sm font-serif text-lg font-semibold tracking-tight text-accent transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
           >
             NEXUS
           </Link>
+          <ThemeToggle />
         </div>
       </header>
       <main className="flex-1">

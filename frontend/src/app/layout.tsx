@@ -1,6 +1,15 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Newsreader } from "next/font/google";
 import "./globals.css";
+import ThemeScope from "@/components/ThemeScope";
+
+/**
+ * Fija el tema elegido antes del primer pintado, para que quien eligió oscuro
+ * no vea un destello claro. Por defecto el tema es claro, sin mirar el sistema.
+ * La clave debe coincidir con `THEME_STORAGE_KEY` de `ThemeToggle`.
+ */
+const THEME_INIT_SCRIPT =
+  "try{if(localStorage.getItem('nexus-theme')==='dark')document.documentElement.dataset.theme='dark'}catch(e){}";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,9 +39,14 @@ export default function RootLayout({
   return (
     <html
       lang="es"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} ${newsreader.variable} h-full antialiased`}
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body className="min-h-full flex flex-col bg-gray-50 text-gray-900">
+        <ThemeScope />
         {children}
       </body>
     </html>

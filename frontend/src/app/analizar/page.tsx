@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import ThemeToggle from "@/components/ThemeToggle";
 import { useRouter } from "next/navigation";
 import UploadForm from "@/components/UploadForm";
 import { inputStore } from "@/lib/inputStore";
@@ -62,12 +63,15 @@ export default function AnalizarPage() {
           >
             NEXUS
           </Link>
-          <Link
-            href="/"
-            className="cursor-pointer rounded-sm text-sm text-fg-muted transition-colors duration-200 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
-          >
-            ← Volver al inicio
-          </Link>
+          <div className="flex items-center gap-2 sm:gap-4">
+            <ThemeToggle />
+            <Link
+              href="/"
+              className="cursor-pointer rounded-sm text-sm text-fg-muted transition-colors duration-200 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+            >
+              ← Volver al inicio
+            </Link>
+          </div>
         </div>
       </header>
 

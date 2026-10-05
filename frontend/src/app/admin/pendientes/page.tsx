@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import ThemeToggle from "@/components/ThemeToggle";
 import { useRouter } from "next/navigation";
 import { aprobarCuenta, listarPendientes, logout, obtenerCuenta, rechazarCuenta } from "@/lib/api";
 import type { CuentaPendiente } from "@/lib/types";
@@ -174,13 +175,16 @@ export default function AdminPendientesPage() {
           >
             NEXUS
           </Link>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="cursor-pointer rounded-sm text-sm text-fg-muted transition-colors duration-200 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
-          >
-            Cerrar sesión
-          </button>
+          <div className="flex items-center gap-2 sm:gap-4">
+            <ThemeToggle />
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="cursor-pointer rounded-sm text-sm text-fg-muted transition-colors duration-200 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+            >
+              Cerrar sesión
+            </button>
+          </div>
         </div>
       </header>
 

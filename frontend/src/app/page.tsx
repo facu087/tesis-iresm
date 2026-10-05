@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import ScrollReveal from "@/components/ScrollReveal";
+import ThemeToggle from "@/components/ThemeToggle";
 import ReportPreview from "@/components/ReportPreview";
 import DebateDiagram from "@/components/DebateDiagram";
 import { PIPELINE_STEPS, PIPELINE_SUMMARY } from "@/lib/pipelineSteps";
@@ -60,7 +61,7 @@ function SiteHeader() {
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <span className="font-serif text-lg font-semibold tracking-tight text-accent">NEXUS</span>
 
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-3 sm:gap-6">
           <nav className="hidden items-center gap-6 text-sm text-fg-muted sm:flex">
             <a
               href="#como-funciona"
@@ -87,6 +88,7 @@ function SiteHeader() {
               Ingresar
             </Link>
           </nav>
+          <ThemeToggle />
           <Link
             href="/analizar"
             className="cursor-pointer rounded-full bg-accent px-4 py-2 text-sm font-semibold text-accent-fg transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
