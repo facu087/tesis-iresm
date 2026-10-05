@@ -8,7 +8,7 @@ import { registrarMedico } from "@/lib/api";
 import { UserPlusIcon } from "@/components/icons";
 
 const inputClass =
-  "w-full rounded-lg border border-border bg-bg px-3.5 py-2.5 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-accent";
+  "w-full rounded-lg border border-fg-muted bg-bg px-3.5 py-2.5 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-accent";
 const labelClass = "mb-1.5 block text-sm font-medium text-fg";
 
 export default function RegistroPage() {
@@ -55,7 +55,7 @@ export default function RegistroPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-bg text-fg">
+    <div className="flex min-h-screen font-body flex-col bg-bg text-fg">
       <header className="border-b border-border">
         <div className="mx-auto flex max-w-2xl items-center justify-between px-6 py-5">
           <Link
@@ -149,7 +149,7 @@ export default function RegistroPage() {
                 type="checkbox"
                 checked={aceptaTratamientoDatos}
                 onChange={(e) => setAceptaTratamientoDatos(e.target.checked)}
-                className="mt-0.5 h-4 w-4 shrink-0 rounded border-border focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-fg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               />
               <span>
                 Acepto el tratamiento de mis datos personales (nombre, DNI, matrícula, email y

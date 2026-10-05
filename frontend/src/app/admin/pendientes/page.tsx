@@ -8,7 +8,7 @@ import { aprobarCuenta, listarPendientes, logout, obtenerCuenta, rechazarCuenta 
 import type { CuentaPendiente } from "@/lib/types";
 
 const inputClass =
-  "w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-accent";
+  "w-full rounded-lg border border-fg-muted bg-bg px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-accent";
 
 function FilaPendiente({
   cuenta,
@@ -166,7 +166,7 @@ export default function AdminPendientesPage() {
   const quitarDeLaLista = (id: number) => setPendientes((p) => (p ? p.filter((c) => c.id !== id) : p));
 
   return (
-    <div className="flex min-h-screen flex-col bg-bg text-fg">
+    <div className="flex min-h-screen font-body flex-col bg-bg text-fg">
       <header className="border-b border-border">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-5">
           <Link

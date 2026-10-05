@@ -127,7 +127,7 @@ export default function UploadForm({ onReady }: Props) {
           onChange={(e) => setText(e.target.value)}
           placeholder="Pegá el texto del caso clínico aquí..."
           rows={10}
-          className="w-full resize-none rounded-xl border border-border bg-bg px-4 py-3 text-sm leading-relaxed text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-accent"
+          className="w-full resize-none rounded-xl border border-fg-muted bg-bg px-4 py-3 text-sm leading-relaxed text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-accent"
         />
       )}
 

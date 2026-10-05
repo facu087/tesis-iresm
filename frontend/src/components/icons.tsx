@@ -146,46 +146,9 @@ export function CheckIcon({ className }: IconProps) {
   );
 }
 
-/** Funcionalidad — verificación bibliográfica: escudo con check. */
-export function ShieldCheckIcon({ className }: IconProps) {
-  return (
-    <svg {...BASE_PROPS} className={className}>
-      <path d="M12 3.5 5 6v6c0 4.5 3 7.5 7 8.5 4-1 7-4 7-8.5V6l-7-2.5Z" />
-      <path d="m9 12 2 2 4-4.5" />
-    </svg>
-  );
-}
 
-/** Funcionalidad — clasificación EBM: capas/niveles. */
-export function LayersIcon({ className }: IconProps) {
-  return (
-    <svg {...BASE_PROPS} className={className}>
-      <path d="m12 3.5 8 4.5-8 4.5-8-4.5 8-4.5Z" />
-      <path d="m4 12 8 4.5 8-4.5" />
-      <path d="m4 15.5 8 4.5 8-4.5" />
-    </svg>
-  );
-}
 
-/** Funcionalidad — navegación de ensayos: lupa. */
-export function SearchIcon({ className }: IconProps) {
-  return (
-    <svg {...BASE_PROPS} className={className}>
-      <circle cx="10.5" cy="10.5" r="6.5" />
-      <path d="m20 20-4.3-4.3" />
-    </svg>
-  );
-}
 
-/** Funcionalidad — debate adversarial multi-agente: dos burbujas de diálogo. */
-export function DebateIcon({ className }: IconProps) {
-  return (
-    <svg {...BASE_PROPS} className={className}>
-      <rect x="2.5" y="4.5" width="13" height="8" rx="3" />
-      <rect x="8.5" y="12.5" width="13" height="7" rx="3" />
-    </svg>
-  );
-}
 
 /** Selector de tema — sol: acción "cambiar a tema claro". */
 export function SunIcon({ className }: IconProps) {

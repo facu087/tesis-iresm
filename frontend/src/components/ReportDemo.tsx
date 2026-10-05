@@ -1,7 +1,7 @@
 import { AlertIcon, CheckIcon, ClockIcon, VerifiedIcon } from "@/components/icons";
 
 /**
- * Vista del reporte de NEXUS a todo el ancho (variante /v2).
+ * Vista del reporte de NEXUS a todo el ancho.
  *
  * Muestra lo que tiene el reporte real: hipótesis de consenso con nivel de
  * evidencia y estado (respaldada, pendiente, especulativa), los agentes que
@@ -37,11 +37,11 @@ export default function ReportDemo() {
     >
       {/* Barra del reporte */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-bg-subtle px-5 py-3 sm:px-7">
-        <div className="flex items-center gap-3">
-          <span className="font-serif text-lg font-semibold text-accent">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <span className="font-serif text-lg font-semibold whitespace-nowrap text-accent">
             Reporte de análisis
           </span>
-          <span className="rounded-full border border-ochre px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-widest text-ochre">
+          <span className="rounded-full border border-ochre px-2.5 py-0.5 text-[11px] whitespace-nowrap font-bold uppercase tracking-widest text-ochre">
             Ejemplo ilustrativo
           </span>
         </div>

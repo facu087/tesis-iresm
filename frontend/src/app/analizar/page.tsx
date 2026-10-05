@@ -46,14 +46,14 @@ export default function AnalizarPage() {
 
   if (!autorizado) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-bg text-sm text-fg-muted">
+      <div className="flex min-h-screen font-body items-center justify-center bg-bg text-sm text-fg-muted">
         Verificando sesión...
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-bg text-fg">
+    <div className="flex min-h-screen font-body flex-col bg-bg text-fg">
       {/* ── Header ────────────────────────────────────────────────────── */}
       <header className="border-b border-border">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">

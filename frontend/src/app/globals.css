@@ -9,70 +9,12 @@
   --foreground: #0f172a;
 
   /*
-   * Tokens semánticos — identidad "revista científica": fondo color papel,
-   * tinta casi negra con matiz verdoso y un único color de marca (verde
-   * petróleo). Todos los pares texto/fondo cumplen WCAG AA (>= 4.5:1).
+   * Tokens semánticos — identidad "institucional editorial": fondo gris
+   * azulado muy claro, tinta azul noche, azul marino como color de marca y un
+   * ocre escaso como acento. El ocre de texto está oscurecido (#8a5206):
+   * #a16207 daba 4,22:1 sobre la superficie sutil. Todos los pares
+   * texto/fondo cumplen WCAG AA (>= 4,5:1).
    */
-  --color-bg: #faf7f0;
-  --color-bg-subtle: #f3eee3;
-  --color-fg: #1c2321;
-  --color-fg-muted: #5c655f;
-  --color-border: #e2dccd;
-  --color-accent: #0f5c55;
-  --color-accent-fg: #faf7f0;
-
-  /*
-   * Región de marca (landing): el verde petróleo como fondo completo de una
-   * sección. Se compone aparte en oscuro: un verde profundo, no el menta del
-   * acento, que encandilaría sobre un fondo casi negro. El botón es del
-   * color del papel (claro) o del acento (oscuro) para no ser verde sobre verde.
-   */
-  --color-brand: #0f5c55;
-  --color-brand-fg: #faf7f0;
-  --color-brand-fg-muted: #c3d9d3;
-  --color-brand-line: #7fb0a9;
-  --color-brand-btn: #faf7f0;
-  --color-brand-btn-fg: #0f5c55;
-}
-
-/*
- * Solo los tokens semánticos cambian en modo oscuro. `--background` y
- * `--foreground` alimentan el `body` de todas las rutas, y /analyzing y
- * /report todavía usan clases claras fijas: si cambiaran acá, esas vistas
- * heredarían texto claro sobre sus tarjetas blancas. Las páginas que sí
- * adoptan la paleta fijan su propio fondo con `bg-bg text-fg`.
- */
-:root[data-theme="dark"] {
-  --color-bg: #0e1715;
-  --color-bg-subtle: #152320;
-  --color-fg: #ece7da;
-  --color-fg-muted: #a3aca5;
-  --color-border: #26332f;
-  --color-accent: #5fc4b6;
-  --color-accent-fg: #0e1715;
-  --color-brand: #17504a;
-  --color-brand-fg: #ece7da;
-  --color-brand-fg-muted: #b4cdc6;
-  --color-brand-line: #67a89d;
-  --color-brand-btn: #5fc4b6;
-  --color-brand-btn-fg: #0e1715;
-  color-scheme: dark;
-}
-
-/* Las rutas de colores fijos nunca adoptan el esquema oscuro nativo. */
-:root[data-fixed-light] {
-  color-scheme: light;
-}
-
-/*
- * Variante /v2 (ruta de comparación temporal): azul marino institucional con
- * acento ocre. Solo se sobrescriben las variables dentro del contenedor
- * `data-variant="v2"`; el resto del sitio conserva papel y verde petróleo.
- * Ocre de texto oscurecido (#8a5206) porque #a16207 daba 4,22:1 sobre la
- * superficie sutil. El oscuro se compone aparte: azul noche con versiones
- * claras de la marca y del ocre.
- */
-[data-variant="v2"] {
   --color-bg: #f8fafc;
   --color-bg-subtle: #e9eef5;
   --color-surface: #ffffff;
@@ -82,16 +24,31 @@
   --color-accent: #1e3a5f;
   --color-accent-fg: #ffffff;
   --color-ochre: #8a5206;
+
+  /*
+   * Región de marca (landing): el azul marino como fondo completo de una
+   * sección. El botón es blanco con texto azul para no ser azul sobre azul.
+   */
   --color-brand: #1e3a5f;
   --color-brand-fg: #ffffff;
   --color-brand-fg-muted: #c5d3e6;
   --color-brand-line: #6e8bb0;
   --color-brand-btn: #ffffff;
   --color-brand-btn-fg: #1e3a5f;
-  font-family: var(--font-atkinson), var(--font-geist-sans), system-ui, sans-serif;
 }
 
-:root[data-theme="dark"] [data-variant="v2"] {
+/*
+ * Solo los tokens semánticos cambian en modo oscuro. `--background` y
+ * `--foreground` alimentan el `body` de todas las rutas, y /analyzing y
+ * /report todavía usan clases claras fijas: si cambiaran acá, esas vistas
+ * heredarían texto claro sobre sus tarjetas blancas. Las páginas que sí
+ * adoptan la paleta fijan su propio fondo con `bg-bg text-fg`.
+ *
+ * El tema oscuro se compone aparte, no es una inversión: azul noche de fondo,
+ * y versiones claras de la marca y del ocre. Se activa por selección del
+ * usuario (atributo en <html>), no por el sistema.
+ */
+:root[data-theme="dark"] {
   --color-bg: #0b1220;
   --color-bg-subtle: #131c2e;
   --color-surface: #0f1829;
@@ -107,6 +64,12 @@
   --color-brand-line: #5f7fae;
   --color-brand-btn: #8fb4e3;
   --color-brand-btn-fg: #0b1220;
+  color-scheme: dark;
+}
+
+/* Las rutas de colores fijos nunca adoptan el esquema oscuro nativo. */
+:root[data-fixed-light] {
+  color-scheme: light;
 }
 
 @theme inline {
@@ -115,6 +78,8 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-serif: var(--font-newsreader), Georgia, serif;
+  /* Cuerpo de las pantallas con tokens (clase `font-body`); /report y /analyzing siguen en Geist. */
+  --font-body: var(--font-atkinson), var(--font-geist-sans), system-ui, sans-serif;
 
   --color-bg: var(--color-bg);
   --color-bg-subtle: var(--color-bg-subtle);

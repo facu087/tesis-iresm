@@ -1,7 +1,7 @@
 import { AlertIcon } from "@/components/icons";
 
 /**
- * Comparación "antes y después" de una cita (variante /v2).
+ * Comparación "antes y después" de una cita.
  *
  * El par sale de una corrida real del caso de prueba (2026-09-22,
  * `output/corrida_agente04/reporte.json`, PMID 23686244): lo que declaró el

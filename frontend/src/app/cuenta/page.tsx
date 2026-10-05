@@ -9,7 +9,7 @@ import type { CuentaEstado } from "@/lib/types";
 import { AlertIcon, ClockIcon, VerifiedIcon } from "@/components/icons";
 
 const inputClass =
-  "w-full rounded-lg border border-border bg-bg px-3.5 py-2.5 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-accent";
+  "w-full rounded-lg border border-fg-muted bg-bg px-3.5 py-2.5 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-accent";
 const labelClass = "mb-1.5 block text-sm font-medium text-fg";
 
 function Header({ onLogout }: { onLogout: () => void }) {
@@ -171,7 +171,7 @@ export default function CuentaPage() {
 
   if (cuenta === undefined) {
     return (
-      <div className="flex min-h-screen flex-col bg-bg text-fg">
+      <div className="flex min-h-screen font-body flex-col bg-bg text-fg">
         <Header onLogout={handleLogout} />
         <main className="flex-1 px-6 py-14 text-center text-sm text-fg-muted">Cargando...</main>
       </div>
@@ -181,7 +181,7 @@ export default function CuentaPage() {
   if (cuenta === null) return null;
 
   return (
-    <div className="flex min-h-screen flex-col bg-bg text-fg">
+    <div className="flex min-h-screen font-body flex-col bg-bg text-fg">
       <Header onLogout={handleLogout} />
       <main className="flex-1">
         <div className="mx-auto max-w-2xl px-6 py-14">

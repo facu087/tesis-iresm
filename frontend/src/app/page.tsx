@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import ScrollReveal from "@/components/ScrollReveal";
 import ThemeToggle from "@/components/ThemeToggle";
-import ReportPreview from "@/components/ReportPreview";
+import ReportDemo from "@/components/ReportDemo";
+import BeforeAfter from "@/components/BeforeAfter";
 import DebateDiagram from "@/components/DebateDiagram";
 import { PIPELINE_STEPS, PIPELINE_SUMMARY } from "@/lib/pipelineSteps";
 import {
@@ -12,10 +13,6 @@ import {
   ScaleIcon,
   CompassIcon,
   DocumentIcon,
-  ShieldCheckIcon,
-  LayersIcon,
-  SearchIcon,
-  DebateIcon,
 } from "@/components/icons";
 
 export const metadata: Metadata = {
@@ -27,71 +24,69 @@ export const metadata: Metadata = {
     "responsable.",
 };
 
-export default function LandingPage() {
+const focus =
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent";
+
+export default function LandingV2() {
   return (
-    <div className="flex min-h-screen flex-col bg-bg text-fg">
-      <SiteHeader />
+    <div className="flex min-h-screen flex-col bg-bg font-body text-fg">
+      <Header />
       <main className="flex-1">
         <ScrollReveal>
-          <HeroSection />
+          <Hero />
         </ScrollReveal>
         <ScrollReveal>
-          <HowItWorksSection />
+          <ProductSection />
+        </ScrollReveal>
+        <ScrollReveal>
+          <EvidenceSection />
+        </ScrollReveal>
+        <ScrollReveal>
+          <HowSection />
         </ScrollReveal>
         <ScrollReveal>
           <AgentsSection />
         </ScrollReveal>
         <ScrollReveal>
-          <FeaturesSection />
-        </ScrollReveal>
-        <ScrollReveal>
-          <CtaSection />
+          <ClosingSection />
         </ScrollReveal>
       </main>
-      <SiteFooter />
+      <Footer />
     </div>
   );
 }
 
-/* ── Header ────────────────────────────────────────────────────────────── */
+/* ── Encabezado ────────────────────────────────────────────────────────── */
 
-function SiteHeader() {
+function Header() {
   return (
     <header className="border-b border-border">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-        <span className="font-serif text-lg font-semibold tracking-tight text-accent">NEXUS</span>
-
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+        <span className="font-serif text-xl font-semibold tracking-tight text-accent">
+          NEXUS
+        </span>
         <div className="flex items-center gap-3 sm:gap-6">
-          <nav className="hidden items-center gap-6 text-sm text-fg-muted sm:flex">
-            <a
-              href="#como-funciona"
-              className="cursor-pointer rounded-sm transition-colors duration-200 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
-            >
+          <nav className="hidden items-center gap-6 text-sm text-fg-muted md:flex">
+            <a href="#reporte" className={`rounded-sm hover:text-accent ${focus}`}>
+              El reporte
+            </a>
+            <a href="#verificacion" className={`rounded-sm hover:text-accent ${focus}`}>
+              Verificación
+            </a>
+            <a href="#como-funciona" className={`rounded-sm hover:text-accent ${focus}`}>
               Cómo funciona
             </a>
-            <a
-              href="#agentes"
-              className="cursor-pointer rounded-sm transition-colors duration-200 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
-            >
+            <a href="#agentes" className={`rounded-sm hover:text-accent ${focus}`}>
               Agentes
             </a>
-            <a
-              href="#funcionalidades"
-              className="cursor-pointer rounded-sm transition-colors duration-200 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
-            >
-              Funcionalidades
-            </a>
-            <Link
-              href="/ingresar"
-              className="cursor-pointer rounded-sm transition-colors duration-200 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
-            >
+            <Link href="/ingresar" className={`rounded-sm hover:text-accent ${focus}`}>
               Ingresar
             </Link>
           </nav>
           <ThemeToggle />
           <Link
             href="/analizar"
-            className="cursor-pointer rounded-full bg-accent px-4 py-2 text-sm font-semibold text-accent-fg transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+            className={`rounded-full bg-accent px-4 py-2 text-sm font-bold text-accent-fg transition-opacity duration-200 hover:opacity-85 ${focus}`}
           >
             Analizar un caso
           </Link>
@@ -101,118 +96,202 @@ function SiteHeader() {
   );
 }
 
+/* ── Marco común de sección: numeración grande + filete ───────────────── */
+
+function Section({
+  id,
+  number,
+  label,
+  children,
+}: {
+  id?: string;
+  number: string;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section id={id} aria-label={label} className="border-t border-fg">
+      <div className="mx-auto grid max-w-7xl gap-x-8 gap-y-6 px-6 py-14 sm:py-20 lg:grid-cols-12">
+        <div className="lg:col-span-2">
+          <p
+            aria-hidden="true"
+            className="font-serif text-6xl leading-none font-semibold text-ochre sm:text-7xl"
+          >
+            {number}
+          </p>
+          <p className="mt-3 text-xs font-bold uppercase tracking-widest text-fg-muted">
+            {label}
+          </p>
+        </div>
+        <div className="lg:col-span-10">{children}</div>
+      </div>
+    </section>
+  );
+}
+
 /* ── Hero ──────────────────────────────────────────────────────────────── */
 
-function HeroSection() {
+function Hero() {
   return (
-    <section className="mx-auto grid max-w-6xl items-center gap-12 px-6 pt-14 pb-16 sm:pt-20 lg:grid-cols-[1.1fr_1fr] lg:gap-16">
-      <div className="max-w-2xl space-y-6">
-        <p className="text-xs font-semibold uppercase tracking-widest text-accent">
-          Tesis final · Analista en Sistemas · IRESM
-        </p>
-        <h1 className="font-serif text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
-          Hipótesis de investigación clínica, respaldadas por evidencia
-          verificable
-        </h1>
-        <p className="text-lg leading-relaxed text-fg-muted">
-          NEXUS analiza documentos clínicos con un pipeline de agentes de IA
-          que debaten entre sí en rondas adversariales, y verifica cada
-          referencia bibliográfica contra PubMed antes de mostrarla.
-        </p>
-        <div className="flex flex-wrap items-center gap-5 pt-1">
-          <Link
-            href="/analizar"
-            className="cursor-pointer rounded-full bg-accent px-6 py-3 text-sm font-semibold text-accent-fg transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
-          >
-            Analizar un caso →
-          </Link>
-          <a
-            href="#como-funciona"
-            className="cursor-pointer rounded-sm text-sm font-medium text-fg-muted transition-colors duration-200 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
-          >
-            Ver cómo funciona
-          </a>
+    <section className="mx-auto max-w-7xl px-6 pt-12 pb-14 sm:pt-16">
+      <p className="text-xs font-bold uppercase tracking-widest text-ochre">
+        Tesis final · Analista en Sistemas · IRESM
+      </p>
+      <h1 className="mt-4 max-w-5xl font-serif text-4xl leading-[1.05] font-semibold tracking-tight text-balance sm:text-6xl lg:text-7xl">
+        Cada hipótesis, con la evidencia a la vista.
+      </h1>
+      <div className="mt-10 grid gap-8 lg:grid-cols-12">
+        <div className="lg:col-span-6">
+          <p className="max-w-xl text-lg leading-relaxed text-fg-muted">
+            NEXUS analiza documentos clínicos con agentes de IA que debaten
+            entre sí, y contrasta cada referencia con PubMed antes de
+            mostrarla.
+          </p>
+          <div className="mt-6 flex flex-wrap items-center gap-5">
+            <Link
+              href="/analizar"
+              className={`rounded-full bg-accent px-6 py-3 text-sm font-bold text-accent-fg transition-opacity duration-200 hover:opacity-85 ${focus}`}
+            >
+              Analizar un caso →
+            </Link>
+            <a
+              href="#reporte"
+              className={`rounded-sm text-sm font-bold text-fg-muted hover:text-accent ${focus}`}
+            >
+              Ver un reporte de ejemplo
+            </a>
+          </div>
         </div>
-        <p className="rounded-xl border border-l-4 border-border border-l-accent bg-bg-subtle px-4 py-3 text-sm leading-relaxed text-fg-muted">
-          <strong className="font-semibold text-fg">
-            NEXUS no emite diagnósticos.
-          </strong>{" "}
+        <p className="self-start border-l-4 border-ochre bg-bg-subtle px-5 py-4 text-sm leading-relaxed text-fg-muted lg:col-span-5 lg:col-start-8">
+          <strong className="text-fg">NEXUS no emite diagnósticos.</strong>{" "}
           Genera hipótesis de investigación para que las evalúe el médico
           responsable.
         </p>
       </div>
-      <ReportPreview />
     </section>
   );
 }
 
-/* ── Cómo funciona ─────────────────────────────────────────────────────── */
+/* ── 01 El producto ────────────────────────────────────────────────────── */
 
-function HowItWorksSection() {
+function ProductSection() {
   return (
-    <section
-      id="como-funciona"
-      aria-labelledby="como-funciona-heading"
-      className="border-t border-border"
-    >
-      <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
-        <p className="text-xs font-semibold uppercase tracking-widest text-accent">
-          Cómo funciona
-        </p>
-        <h2
-          id="como-funciona-heading"
-          className="mt-2 max-w-2xl font-serif text-2xl font-semibold tracking-tight sm:text-3xl"
-        >
-          Un pipeline de agentes que debaten, verifican y recién entonces
-          reportan.
-        </h2>
+    <Section id="reporte" number="01" label="El reporte">
+      <h2 className="max-w-3xl font-serif text-3xl leading-tight font-semibold tracking-tight sm:text-4xl">
+        Esto es lo que recibe el médico: hipótesis ordenadas por evidencia y
+        no por seguridad con la que se enuncian.
+      </h2>
+      <div className="mt-10">
+        <ReportDemo />
+      </div>
+    </Section>
+  );
+}
 
-        {/*
-          Diagrama del flujo: `role="img"` + `aria-label` lo describe como una
-          sola imagen para lectores de pantalla; el contenido visual queda
-          `aria-hidden`, y la alternativa textual completa (misma secuencia,
-          mismo orden) vive en la lista `sr-only` de abajo (design, tarea 4.2).
-        */}
-        <div className="mt-12 grid items-start gap-12 lg:grid-cols-[1fr_1.1fr] lg:gap-16">
-        <div role="img" aria-label={PIPELINE_SUMMARY} className="max-w-2xl">
-          <div aria-hidden="true">
-            {PIPELINE_STEPS.map((step, i) => (
-              <div key={step.id} className="relative flex gap-5 pb-8 last:pb-0">
-                {i < PIPELINE_STEPS.length - 1 && (
-                  <span className="absolute top-9 left-4 h-[calc(100%-1rem)] w-px bg-border" />
-                )}
-                <span className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent font-serif text-sm font-semibold text-accent-fg">
-                  {step.id}
-                </span>
-                <div className="pt-0.5">
-                  <p className="text-sm font-semibold">{step.label}</p>
-                  <p className="mt-1 text-sm text-fg-muted">
-                    {step.description}
-                  </p>
-                </div>
+/* ── 02 Antes y después + cifras ───────────────────────────────────────── */
+
+const FIGURES = [
+  { value: "6", label: "agentes especializados", note: "El Agente 06 está en desarrollo." },
+  { value: "5", label: "rondas", note: "Análisis paralelo, tres de debate y una de recitación." },
+  { value: "3", label: "fuentes externas", note: "PubMed, ClinicalTrials.gov y Orphanet." },
+] as const;
+
+function EvidenceSection() {
+  return (
+    <Section id="verificacion" number="02" label="Verificación">
+      <h2 className="max-w-3xl font-serif text-3xl leading-tight font-semibold tracking-tight sm:text-4xl">
+        Un modelo puede citar con aplomo un artículo que no existe como lo
+        describe. NEXUS lo contrasta.
+      </h2>
+      <div className="mt-10 grid gap-10 lg:grid-cols-12">
+        <div className="lg:col-span-8">
+          <BeforeAfter />
+        </div>
+        <div className="lg:col-span-4">
+          <div className="bg-brand p-6 text-brand-fg sm:p-8">
+            <p className="font-serif text-6xl leading-none font-semibold">
+              14 <span className="text-3xl">de 18</span>
+            </p>
+            <p className="mt-3 text-sm font-bold uppercase tracking-widest">
+              citas no coincidieron con PubMed
+            </p>
+            <p className="mt-3 text-sm text-brand-fg-muted">
+              Corrida real del caso de prueba, 22 de septiembre de 2026: 3
+              coincidieron y 1 no traía PMID. Es un caso medido, no una tasa
+              general.
+            </p>
+          </div>
+          <dl className="mt-6 divide-y divide-border border-y border-border">
+            {FIGURES.map((f) => (
+              <div key={f.label} className="flex items-baseline gap-4 py-3">
+                <dt className="flex items-baseline gap-3">
+                  <span className="font-serif text-4xl font-semibold text-accent">
+                    {f.value}
+                  </span>
+                  <span className="text-sm font-bold">{f.label}</span>
+                </dt>
+                <dd className="text-xs text-fg-muted">{f.note}</dd>
               </div>
             ))}
-          </div>
+          </dl>
         </div>
-        {/* Bajo 768 px el texto del SVG quedaría ilegible: ahí queda solo la lista. */}
-        <DebateDiagram className="mx-auto hidden w-full max-w-xl md:block" />
-        </div>
+      </div>
+    </Section>
+  );
+}
 
-        {/* Alternativa textual accesible (design, tarea 4.2): mismos pasos,
-            mismo orden que el diagrama, para lectores de pantalla. */}
-        <ol className="sr-only">
+/* ── 03 Cómo funciona ──────────────────────────────────────────────────── */
+
+function HowSection() {
+  return (
+    <Section id="como-funciona" number="03" label="Cómo funciona">
+      <h2 className="max-w-3xl font-serif text-3xl leading-tight font-semibold tracking-tight sm:text-4xl">
+        Ocho etapas, de la ingesta al reporte.
+      </h2>
+      <div className="mt-10 grid gap-10 lg:grid-cols-12">
+        {/*
+          El diagrama se ve en todos los anchos. Bajo 768 px conserva un ancho
+          mínimo legible y se desplaza dentro de su propio contenedor, sin
+          provocar scroll horizontal de la página. La alternativa textual es la
+          lista de al lado (mismos pasos, mismo orden).
+        */}
+        <div
+          role="img"
+          aria-label={PIPELINE_SUMMARY}
+          tabIndex={0}
+          className={`overflow-x-auto rounded-sm md:overflow-visible lg:sticky lg:top-8 lg:col-span-5 lg:self-start ${focus}`}
+        >
+          <DebateDiagram className="min-w-[30rem] w-full max-w-md md:min-w-0" />
+        </div>
+        <ol className="divide-y divide-border border-y border-border lg:col-span-7">
           {PIPELINE_STEPS.map((step) => (
-            <li key={step.id}>
-              Paso {step.id}: {step.label}. {step.description}
+            <li
+              key={step.id}
+              className="grid gap-x-6 gap-y-1 py-5 sm:grid-cols-[3.5rem_1fr]"
+            >
+              <span
+                aria-hidden="true"
+                className="font-serif text-3xl leading-none font-semibold text-accent"
+              >
+                {step.id}
+              </span>
+              <div>
+                <p className="font-bold">
+                  <span className="sr-only">Paso {step.id}: </span>
+                  {step.label}
+                </p>
+                <p className="mt-1 text-sm text-fg-muted">{step.description}</p>
+              </div>
             </li>
           ))}
         </ol>
       </div>
-    </section>
+    </Section>
   );
 }
 
-/* ── Agentes ───────────────────────────────────────────────────────────── */
+
+/* ── 04 Agentes ────────────────────────────────────────────────────────── */
 
 /**
  * Descripciones verificadas contra el código y la documentación fuente de
@@ -275,187 +354,65 @@ const AGENTS = [
 
 function AgentsSection() {
   return (
-    <section
-      id="agentes"
-      aria-labelledby="agentes-heading"
-      className="border-t border-border"
-    >
-      <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
-        <p className="text-xs font-semibold uppercase tracking-widest text-accent">
-          Agentes
-        </p>
-        <h2
-          id="agentes-heading"
-          className="mt-2 max-w-2xl font-serif text-2xl font-semibold tracking-tight sm:text-3xl"
-        >
-          Seis agentes especializados, un solo consenso.
-        </h2>
-
-        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {AGENTS.map((agent) => (
-            <div
-              key={agent.id}
-              className={`rounded-2xl border p-6 transition-colors duration-200 hover:border-accent-muted ${
-                agent.pending
-                  ? "border-dashed border-border text-fg-muted"
-                  : "border-border"
-              }`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <agent.Icon
-                  className={`h-7 w-7 shrink-0 ${agent.pending ? "" : "text-accent"}`}
-                />
+    <Section id="agentes" number="04" label="Agentes">
+      <h2 className="max-w-3xl font-serif text-3xl leading-tight font-semibold tracking-tight sm:text-4xl">
+        Seis agentes especializados, un solo consenso.
+      </h2>
+      <ul className="mt-10 divide-y divide-border border-y border-border">
+        {AGENTS.map((agent) => (
+          <li
+            key={agent.id}
+            className="grid gap-x-8 gap-y-2 py-6 md:grid-cols-12"
+          >
+            <div className="flex items-start gap-4 md:col-span-4">
+              <agent.Icon
+                className={`mt-0.5 h-7 w-7 shrink-0 ${agent.pending ? "text-fg-muted" : "text-accent"}`}
+              />
+              <div>
+                <p className="font-serif text-2xl leading-none font-semibold text-fg-muted">
+                  {agent.id}
+                </p>
+                <p className="mt-1 font-bold">{agent.name}</p>
                 {agent.pending && (
-                  <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold tracking-wide text-fg-muted uppercase">
+                  <span className="mt-2 inline-block rounded-full border border-dashed border-fg-muted px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-widest text-fg-muted">
                     En desarrollo
                   </span>
                 )}
               </div>
-              <p className="mt-4 text-sm font-semibold text-fg">
-                Agente {agent.id} · {agent.name}
-              </p>
-              <p className="mt-1.5 text-sm text-fg-muted">
-                {agent.description}
-              </p>
             </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ── Funcionalidades clave ─────────────────────────────────────────────── */
-
-const FEATURES = [
-  {
-    Icon: ShieldCheckIcon,
-    title: "Verificación bibliográfica",
-    description:
-      "Cada referencia citada por los agentes se contrasta contra PubMed —título real contra título citado— antes de mostrarla en el reporte.",
-  },
-  {
-    Icon: LayersIcon,
-    title: "Clasificación EBM (I, II, III)",
-    description:
-      "Las hipótesis se priorizan por nivel de evidencia según el tipo de publicación verificado en PubMed, nunca por lo que el agente declara sin respaldo.",
-  },
-  {
-    Icon: SearchIcon,
-    title: "Navegación de ensayos clínicos",
-    description:
-      "Búsqueda de ensayos activos en ClinicalTrials.gov y enfermedades raras compatibles en Orphanet, con compatibilidad orientativa por caso.",
-  },
-  {
-    Icon: DebateIcon,
-    title: "Debate adversarial multi-agente",
-    description:
-      "Los agentes exponen sus hipótesis, se critican entre sí en varias rondas y ajustan su postura antes de llegar a un consenso.",
-  },
-] as const;
-
-function FeaturesSection() {
-  return (
-    <section
-      id="funcionalidades"
-      aria-labelledby="funcionalidades-heading"
-      className="border-t border-border"
-    >
-      <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
-        <p className="text-xs font-semibold uppercase tracking-widest text-accent">
-          Funcionalidades clave
-        </p>
-        <h2
-          id="funcionalidades-heading"
-          className="mt-2 max-w-2xl font-serif text-2xl font-semibold tracking-tight sm:text-3xl"
-        >
-          Evidencia verificable en cada paso, no solo en el resultado.
-        </h2>
-
-        <div className="mt-10 grid gap-4 sm:grid-cols-2">
-          {FEATURES.map((feature) => (
-            <div
-              key={feature.title}
-              className="rounded-2xl border border-border p-6 transition-colors duration-200 hover:border-accent-muted"
-            >
-              <feature.Icon className="h-7 w-7 text-accent" />
-              <p className="mt-4 text-sm font-semibold text-fg">
-                {feature.title}
-              </p>
-              <p className="mt-1.5 text-sm text-fg-muted">
-                {feature.description}
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ── Región de marca: cifras + CTA final ───────────────────────────────── */
-
-/** Cifras verificables del sistema; el 06 se aclara como en la sección de agentes. */
-const FIGURES = [
-  {
-    value: "6",
-    label: "agentes especializados",
-    note: "El Agente 06 está en desarrollo.",
-  },
-  {
-    value: "5",
-    label: "rondas",
-    note: "Análisis paralelo, tres de debate y una de recitación.",
-  },
-  {
-    value: "3",
-    label: "fuentes externas",
-    note: "PubMed, ClinicalTrials.gov y Orphanet.",
-  },
-] as const;
-
-function CtaSection() {
-  return (
-    <section
-      aria-labelledby="cta-heading"
-      className="bg-brand text-brand-fg"
-    >
-      <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
-        <dl className="grid gap-8 border-b border-brand-line pb-12 sm:grid-cols-3 sm:gap-10">
-          {FIGURES.map((f) => (
-            <div key={f.label}>
-              <dt className="flex items-baseline gap-3">
-                <span className="font-serif text-6xl font-semibold leading-none">
-                  {f.value}
-                </span>
-                <span className="text-sm font-semibold uppercase tracking-widest">
-                  {f.label}
-                </span>
-              </dt>
-              <dd className="mt-3 max-w-xs text-sm text-brand-fg-muted">
-                {f.note}
-              </dd>
-            </div>
-          ))}
-        </dl>
-
-        <div className="mt-12 flex flex-col gap-8 md:flex-row md:items-end md:justify-between">
-          <div className="max-w-xl">
-            <h2
-              id="cta-heading"
-              className="font-serif text-2xl font-semibold tracking-tight sm:text-3xl"
-            >
-              ¿Tenés un caso clínico para analizar?
-            </h2>
-            <p className="mt-3 text-brand-fg-muted">
-              Subí el documento o pegá el texto: el pipeline hace el resto y
-              devuelve un reporte con hipótesis priorizadas, junto con sus
-              fuentes.
+            <p className="max-w-prose text-sm leading-relaxed text-fg-muted md:col-span-8">
+              {agent.description}
             </p>
-          </div>
+          </li>
+        ))}
+      </ul>
+    </Section>
+  );
+}
+
+/* ── Cierre ────────────────────────────────────────────────────────────── */
+
+function ClosingSection() {
+  return (
+    <section aria-labelledby="cierre-heading" className="bg-brand text-brand-fg">
+      <div className="mx-auto grid max-w-7xl gap-8 px-6 py-16 sm:py-20 lg:grid-cols-12 lg:items-end">
+        <div className="lg:col-span-8">
+          <h2
+            id="cierre-heading"
+            className="font-serif text-3xl leading-tight font-semibold tracking-tight sm:text-5xl"
+          >
+            ¿Tenés un caso clínico para analizar?
+          </h2>
+          <p className="mt-4 max-w-xl text-brand-fg-muted">
+            Subí el documento o pegá el texto: el pipeline hace el resto y
+            devuelve un reporte con hipótesis priorizadas, junto con sus
+            fuentes.
+          </p>
+        </div>
+        <div className="lg:col-span-4 lg:justify-self-end">
           <Link
             href="/analizar"
-            className="shrink-0 cursor-pointer rounded-full bg-brand-btn px-8 py-3 text-center text-sm font-semibold text-brand-btn-fg transition-opacity duration-200 hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-fg"
+            className="inline-block rounded-full bg-brand-btn px-8 py-3 text-center text-sm font-bold text-brand-btn-fg transition-opacity duration-200 hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-fg"
           >
             Analizar un caso →
           </Link>
@@ -465,14 +422,14 @@ function CtaSection() {
   );
 }
 
-/* ── Footer ────────────────────────────────────────────────────────────── */
+/* ── Pie ───────────────────────────────────────────────────────────────── */
 
-function SiteFooter() {
+function Footer() {
   return (
     <footer className="border-t border-border">
-      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-8 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-8 sm:flex-row sm:items-center sm:justify-between">
         <p className="max-w-xl text-xs leading-relaxed text-fg-muted">
-          <span className="font-semibold text-fg">NEXUS</span> no emite
+          <span className="font-bold text-fg">NEXUS</span> no emite
           diagnósticos clínicos. Las hipótesis generadas son orientativas y
           deben ser evaluadas por el médico responsable.
         </p>
