@@ -24,7 +24,7 @@ export default function DebateDiagram({ className }: { className?: string }) {
       aria-hidden="true"
       focusable="false"
       className={className}
-      fontFamily="var(--font-geist-sans), system-ui, sans-serif"
+      fontFamily="inherit"
     >
       <defs>
         <marker
