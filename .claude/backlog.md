@@ -321,7 +321,7 @@ Suite de tests: **82 tests, 100% passing** (`pytest tests/`)
 > `Source` con tipo inválido (hallazgo G).
 
 > Nota (22) — **Registro de médicos** (cambio OpenSpec `registro-medicos-matricula`,
-> `openspec/changes/registro-medicos-matricula/`). `POST /api/analyze` no pedía
+> `openspec/changes/archive/2026-10-04-registro-medicos-matricula/`). `POST /api/analyze` no pedía
 > ninguna credencial: cualquiera que llegara al backend podía correr el pipeline con
 > datos clínicos reales. La verificación automática contra un padrón oficial
 > (SISA/REFEPS `WS020`) no es viable ahora — exige el Formulario A1 y aprobación
