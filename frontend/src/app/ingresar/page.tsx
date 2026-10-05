@@ -7,7 +7,7 @@ import { login } from "@/lib/api";
 import { LockIcon } from "@/components/icons";
 
 const inputClass =
-  "w-full rounded-lg border border-border bg-bg px-3.5 py-2.5 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-fg-muted";
+  "w-full rounded-lg border border-border bg-bg px-3.5 py-2.5 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-accent";
 const labelClass = "mb-1.5 block text-sm font-medium text-fg";
 
 function IngresarForm() {
@@ -38,7 +38,7 @@ function IngresarForm() {
     <div className="mx-auto max-w-md px-6 py-14">
       <div className="mb-8 flex items-center gap-3">
         <LockIcon className="h-7 w-7" />
-        <h1 className="text-xl font-semibold">Ingresar</h1>
+        <h1 className="font-serif text-2xl font-semibold">Ingresar</h1>
       </div>
 
       {recienRegistrado && (
@@ -84,7 +84,7 @@ function IngresarForm() {
         <button
           type="submit"
           disabled={enviando}
-          className="w-full cursor-pointer rounded-xl bg-fg py-3 font-semibold text-bg transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fg disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full cursor-pointer rounded-xl bg-accent py-3 font-semibold text-accent-fg transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-60"
         >
           {enviando ? "Ingresando..." : "Ingresar"}
         </button>
@@ -107,7 +107,7 @@ export default function IngresarPage() {
         <div className="mx-auto flex max-w-md items-center px-6 py-5">
           <Link
             href="/"
-            className="cursor-pointer rounded-sm text-sm font-semibold tracking-tight transition-colors duration-200 hover:text-fg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fg"
+            className="cursor-pointer rounded-sm font-serif text-lg font-semibold tracking-tight text-accent transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
           >
             NEXUS
           </Link>

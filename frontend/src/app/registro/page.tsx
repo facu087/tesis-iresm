@@ -7,7 +7,7 @@ import { registrarMedico } from "@/lib/api";
 import { UserPlusIcon } from "@/components/icons";
 
 const inputClass =
-  "w-full rounded-lg border border-border bg-bg px-3.5 py-2.5 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-fg-muted";
+  "w-full rounded-lg border border-border bg-bg px-3.5 py-2.5 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-accent";
 const labelClass = "mb-1.5 block text-sm font-medium text-fg";
 
 export default function RegistroPage() {
@@ -59,13 +59,13 @@ export default function RegistroPage() {
         <div className="mx-auto flex max-w-2xl items-center justify-between px-6 py-5">
           <Link
             href="/"
-            className="cursor-pointer rounded-sm text-sm font-semibold tracking-tight transition-colors duration-200 hover:text-fg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fg"
+            className="cursor-pointer rounded-sm font-serif text-lg font-semibold tracking-tight text-accent transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
           >
             NEXUS
           </Link>
           <Link
             href="/ingresar"
-            className="cursor-pointer rounded-sm text-sm text-fg-muted transition-colors duration-200 hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fg"
+            className="cursor-pointer rounded-sm text-sm text-fg-muted transition-colors duration-200 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
           >
             Ya tengo cuenta — Ingresar
           </Link>
@@ -77,7 +77,7 @@ export default function RegistroPage() {
           <div className="mb-8 flex items-center gap-3">
             <UserPlusIcon className="h-7 w-7" />
             <div>
-              <h1 className="text-xl font-semibold">Registro de médicos</h1>
+              <h1 className="font-serif text-2xl font-semibold">Registro de médicos</h1>
               <p className="text-sm text-fg-muted">
                 Tu cuenta queda pendiente hasta que un administrador la revise.
               </p>
@@ -145,7 +145,7 @@ export default function RegistroPage() {
                 type="checkbox"
                 checked={aceptaTratamientoDatos}
                 onChange={(e) => setAceptaTratamientoDatos(e.target.checked)}
-                className="mt-0.5 h-4 w-4 shrink-0 rounded border-border focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fg"
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-border focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               />
               <span>
                 Acepto el tratamiento de mis datos personales (nombre, DNI, matrícula, email y
@@ -163,7 +163,7 @@ export default function RegistroPage() {
             <button
               type="submit"
               disabled={enviando}
-              className="w-full cursor-pointer rounded-xl bg-fg py-3 font-semibold text-bg transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fg disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full cursor-pointer rounded-xl bg-accent py-3 font-semibold text-accent-fg transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-60"
             >
               {enviando ? "Enviando..." : "Registrarme"}
             </button>

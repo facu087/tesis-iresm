@@ -8,7 +8,7 @@ import type { CuentaEstado } from "@/lib/types";
 import { AlertIcon, ClockIcon, VerifiedIcon } from "@/components/icons";
 
 const inputClass =
-  "w-full rounded-lg border border-border bg-bg px-3.5 py-2.5 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-fg-muted";
+  "w-full rounded-lg border border-border bg-bg px-3.5 py-2.5 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-accent";
 const labelClass = "mb-1.5 block text-sm font-medium text-fg";
 
 function Header({ onLogout }: { onLogout: () => void }) {
@@ -17,14 +17,14 @@ function Header({ onLogout }: { onLogout: () => void }) {
       <div className="mx-auto flex max-w-2xl items-center justify-between px-6 py-5">
         <Link
           href="/"
-          className="cursor-pointer rounded-sm text-sm font-semibold tracking-tight transition-colors duration-200 hover:text-fg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fg"
+          className="cursor-pointer rounded-sm font-serif text-lg font-semibold tracking-tight text-accent transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
         >
           NEXUS
         </Link>
         <button
           type="button"
           onClick={onLogout}
-          className="cursor-pointer rounded-sm text-sm text-fg-muted transition-colors duration-200 hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fg"
+          className="cursor-pointer rounded-sm text-sm text-fg-muted transition-colors duration-200 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
         >
           Cerrar sesión
         </button>
@@ -136,7 +136,7 @@ function FormularioReenvio({ cuenta, onReenviado }: { cuenta: CuentaEstado; onRe
       <button
         type="submit"
         disabled={enviando}
-        className="w-full cursor-pointer rounded-xl bg-fg py-3 font-semibold text-bg transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fg disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full cursor-pointer rounded-xl bg-accent py-3 font-semibold text-accent-fg transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-60"
       >
         {enviando ? "Reenviando..." : "Reenviar solicitud"}
       </button>
@@ -181,7 +181,7 @@ export default function CuentaPage() {
       <Header onLogout={handleLogout} />
       <main className="flex-1">
         <div className="mx-auto max-w-2xl px-6 py-14">
-          <h1 className="mb-6 text-xl font-semibold">Mi cuenta</h1>
+          <h1 className="mb-6 font-serif text-2xl font-semibold">Mi cuenta</h1>
 
           {cuenta.estado === "pendiente" && (
             <div className="flex items-start gap-4 rounded-2xl border border-border bg-bg-subtle p-8">
@@ -221,7 +221,7 @@ export default function CuentaPage() {
                 </p>
                 <Link
                   href="/analizar"
-                  className="mt-4 inline-block cursor-pointer rounded-full bg-fg px-5 py-2.5 text-sm font-semibold text-bg transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fg"
+                  className="mt-4 inline-block cursor-pointer rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-accent-fg transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
                 >
                   Analizar un caso →
                 </Link>

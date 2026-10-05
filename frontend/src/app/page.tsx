@@ -56,38 +56,38 @@ function SiteHeader() {
   return (
     <header className="border-b border-border">
       <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-        <span className="text-sm font-semibold tracking-tight">NEXUS</span>
+        <span className="font-serif text-lg font-semibold tracking-tight text-accent">NEXUS</span>
 
         <div className="flex items-center gap-6">
           <nav className="hidden items-center gap-6 text-sm text-fg-muted sm:flex">
             <a
               href="#como-funciona"
-              className="cursor-pointer rounded-sm transition-colors duration-200 hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fg"
+              className="cursor-pointer rounded-sm transition-colors duration-200 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
             >
               Cómo funciona
             </a>
             <a
               href="#agentes"
-              className="cursor-pointer rounded-sm transition-colors duration-200 hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fg"
+              className="cursor-pointer rounded-sm transition-colors duration-200 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
             >
               Agentes
             </a>
             <a
               href="#funcionalidades"
-              className="cursor-pointer rounded-sm transition-colors duration-200 hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fg"
+              className="cursor-pointer rounded-sm transition-colors duration-200 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
             >
               Funcionalidades
             </a>
             <Link
               href="/ingresar"
-              className="cursor-pointer rounded-sm transition-colors duration-200 hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fg"
+              className="cursor-pointer rounded-sm transition-colors duration-200 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
             >
               Ingresar
             </Link>
           </nav>
           <Link
             href="/analizar"
-            className="cursor-pointer rounded-full bg-fg px-4 py-2 text-sm font-semibold text-bg transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fg"
+            className="cursor-pointer rounded-full bg-accent px-4 py-2 text-sm font-semibold text-accent-fg transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
           >
             Analizar un caso
           </Link>
@@ -103,10 +103,10 @@ function HeroSection() {
   return (
     <section className="mx-auto max-w-5xl px-6 pt-14 pb-16 sm:pt-20">
       <div className="max-w-2xl space-y-6">
-        <p className="text-xs font-semibold uppercase tracking-widest text-fg-muted">
+        <p className="text-xs font-semibold uppercase tracking-widest text-accent">
           Tesis final · Analista en Sistemas · IRESM
         </p>
-        <h1 className="text-4xl font-bold tracking-tight text-balance sm:text-5xl">
+        <h1 className="font-serif text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
           Hipótesis de investigación clínica, respaldadas por evidencia
           verificable
         </h1>
@@ -118,18 +118,18 @@ function HeroSection() {
         <div className="flex flex-wrap items-center gap-5 pt-1">
           <Link
             href="/analizar"
-            className="cursor-pointer rounded-full bg-fg px-6 py-3 text-sm font-semibold text-bg transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fg"
+            className="cursor-pointer rounded-full bg-accent px-6 py-3 text-sm font-semibold text-accent-fg transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
           >
             Analizar un caso →
           </Link>
           <a
             href="#como-funciona"
-            className="cursor-pointer rounded-sm text-sm font-medium text-fg-muted transition-colors duration-200 hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fg"
+            className="cursor-pointer rounded-sm text-sm font-medium text-fg-muted transition-colors duration-200 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
           >
             Ver cómo funciona
           </a>
         </div>
-        <p className="rounded-xl border border-border bg-bg-subtle px-4 py-3 text-sm leading-relaxed text-fg-muted">
+        <p className="rounded-xl border border-l-4 border-border border-l-accent bg-bg-subtle px-4 py-3 text-sm leading-relaxed text-fg-muted">
           <strong className="font-semibold text-fg">
             NEXUS no emite diagnósticos.
           </strong>{" "}
@@ -151,12 +151,12 @@ function HowItWorksSection() {
       className="border-t border-border"
     >
       <div className="mx-auto max-w-5xl px-6 py-16 sm:py-20">
-        <p className="text-xs font-semibold uppercase tracking-widest text-fg-muted">
+        <p className="text-xs font-semibold uppercase tracking-widest text-accent">
           Cómo funciona
         </p>
         <h2
           id="como-funciona-heading"
-          className="mt-2 max-w-2xl text-2xl font-semibold tracking-tight sm:text-3xl"
+          className="mt-2 max-w-2xl font-serif text-2xl font-semibold tracking-tight sm:text-3xl"
         >
           Un pipeline de agentes que debaten, verifican y recién entonces
           reportan.
@@ -179,7 +179,7 @@ function HowItWorksSection() {
                 {i < PIPELINE_STEPS.length - 1 && (
                   <span className="absolute top-9 left-4 h-[calc(100%-1rem)] w-px bg-border" />
                 )}
-                <span className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-fg text-xs font-bold text-bg">
+                <span className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent font-serif text-sm font-semibold text-accent-fg">
                   {step.id}
                 </span>
                 <div className="pt-0.5">
@@ -276,12 +276,12 @@ function AgentsSection() {
       className="border-t border-border"
     >
       <div className="mx-auto max-w-5xl px-6 py-16 sm:py-20">
-        <p className="text-xs font-semibold uppercase tracking-widest text-fg-muted">
+        <p className="text-xs font-semibold uppercase tracking-widest text-accent">
           Agentes
         </p>
         <h2
           id="agentes-heading"
-          className="mt-2 max-w-2xl text-2xl font-semibold tracking-tight sm:text-3xl"
+          className="mt-2 max-w-2xl font-serif text-2xl font-semibold tracking-tight sm:text-3xl"
         >
           Seis agentes especializados, un solo consenso.
         </h2>
@@ -290,7 +290,7 @@ function AgentsSection() {
           {AGENTS.map((agent) => (
             <div
               key={agent.id}
-              className={`rounded-2xl border p-6 transition-colors duration-200 hover:border-fg-muted ${
+              className={`rounded-2xl border p-6 transition-colors duration-200 hover:border-accent-muted ${
                 agent.pending
                   ? "border-dashed border-border text-fg-muted"
                   : "border-border"
@@ -355,12 +355,12 @@ function FeaturesSection() {
       className="border-t border-border"
     >
       <div className="mx-auto max-w-5xl px-6 py-16 sm:py-20">
-        <p className="text-xs font-semibold uppercase tracking-widest text-fg-muted">
+        <p className="text-xs font-semibold uppercase tracking-widest text-accent">
           Funcionalidades clave
         </p>
         <h2
           id="funcionalidades-heading"
-          className="mt-2 max-w-2xl text-2xl font-semibold tracking-tight sm:text-3xl"
+          className="mt-2 max-w-2xl font-serif text-2xl font-semibold tracking-tight sm:text-3xl"
         >
           Evidencia verificable en cada paso, no solo en el resultado.
         </h2>
@@ -369,7 +369,7 @@ function FeaturesSection() {
           {FEATURES.map((feature) => (
             <div
               key={feature.title}
-              className="rounded-2xl border border-border p-6 transition-colors duration-200 hover:border-fg-muted"
+              className="rounded-2xl border border-border p-6 transition-colors duration-200 hover:border-accent-muted"
             >
               <feature.Icon className="h-6 w-6" />
               <p className="mt-4 text-sm font-semibold text-fg">
@@ -392,7 +392,7 @@ function CtaSection() {
   return (
     <section className="border-t border-border">
       <div className="mx-auto max-w-5xl px-6 py-20 text-center">
-        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+        <h2 className="font-serif text-2xl font-semibold tracking-tight sm:text-3xl">
           ¿Tenés un caso clínico para analizar?
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-fg-muted">
@@ -403,7 +403,7 @@ function CtaSection() {
         <div className="mt-8">
           <Link
             href="/analizar"
-            className="cursor-pointer rounded-full bg-fg px-8 py-3 text-sm font-semibold text-bg transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fg"
+            className="cursor-pointer rounded-full bg-accent px-8 py-3 text-sm font-semibold text-accent-fg transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
           >
             Analizar un caso →
           </Link>
