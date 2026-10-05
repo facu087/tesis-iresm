@@ -1,7 +1,7 @@
-# Traspaso de sesión — 2026-09-15 (noche)
+# Traspaso de sesión — 2026-10-04
 
-Reemplaza al traspaso anterior del mismo día. Se cierra con el Sprint 4 casi terminado:
-quedan los agentes 04 y 06, y las tarjetas repartidas entre los tres integrantes.
+Reemplaza al traspaso del 2026-09-15. El Sprint 4 queda con un solo pendiente grande:
+el Agente 06, que espera una rama de Facundo.
 
 **Para retomar con Claude Code**: "Leé `.claude/traspaso.md` y seguí como orquestador
 desde la sección Pendiente."
@@ -10,30 +10,35 @@ desde la sección Pendiente."
 
 ## 1. Modo de trabajo acordado
 
-Claude funciona como **orquestador** del Sprint 4: planifica con OpenSpec y delega la
-implementación a un subagente. Reglas que eligió Matías:
+Claude funciona como **orquestador**: planifica con OpenSpec lo grande y delega la
+implementación a un subagente. Los arreglos chicos (un fix, un rebase, documentación) van
+directo, sin propuesta. Reglas que eligió Matías:
 
 | Tema | Regla |
 |------|-------|
 | Revisión | Frenar después de `/opsx:propose` o `/opsx:update` y mostrar el diseño. **No hacer apply sin su OK.** |
-| Git | Rama por tarea desde `origin/develop` → push → PR a `develop` → merge sin esperar revisión. Asunto del merge: `merge: <qué> (Sprint 4)`. |
-| Trello | Al terminar: adjuntar evidencia (capturas de la salida + `.json` + `.txt`), actualizar la descripción con los números medidos y mover a `QA`. |
-| Reparto | Por **área de archivos**, para que dos personas no toquen el mismo módulo. Ver `.claude/backlog.md` § "Reparto de tareas". |
+| Git | Rama por tarea desde `origin/develop` → push → PR a `develop` → merge sin esperar revisión. Asunto del merge: `merge: <qué> (Sprint 4)`. Sin `Co-Authored-By`. |
+| Trello | Al terminar: adjuntar evidencia, actualizar la descripción con los números medidos y mover a `QA`. Juan Lencina evalúa por tarjeta y rechaza la que no prueba que funciona. |
+| Cuota de Groq | Como máximo dos corridas reales por día. Los subagentes nunca llaman a Groq: verifican con el modo mock. |
 
 Lecciones prácticas:
-- **Cupo de tokens**: un subagente Opus corriendo solo ya agotó el límite de sesión una vez;
-  se retomó con su contexto intacto y sin perder trabajo. Pedirle que **commitee al cerrar
-  cada sección** de `tasks.md`, no al final.
-- **Adjuntos a Trello**: subirlos con la API REST vía `curl` (`POST /1/cards/{id}/attachments`
-  con `-F "file=@ruta"`), **no** con base64 por el MCP: así el archivo no entra al contexto.
-  Ojo: al leer las credenciales del `.env` hay que limpiar espacios, o la URL sale malformada.
-- **Trello MCP**: llamar `set_active_board` con `kdXM36sU` al empezar. El token vence: si da
-  401, se regenera en https://trello.com/power-ups/admin con `expiration=never`.
-- **Capturas de la vista**: copiar el reporte a `frontend/public/`, inyectarlo con
-  `sessionStorage.setItem('nexus_report', ...)` desde la consola y abrir `/report`.
-  Borrar después el archivo de `public/`.
-- **Permisos**: el modo automático bloquea pushear a la rama de otro y mergear PRs ajenos.
-  Hay que autorizarlo explícitamente.
+- **Un commit de "cierre" no significa cerrado.** El control de costos tenía 8 tareas
+  destildadas en `tasks.md` detrás de un commit con ese nombre. Antes de mergear, mirar
+  `rg '^\s*- \[ \]' openspec/changes/<cambio>/tasks.md`.
+- **Medir antes de dar por buena una decisión de costo.** Dos techos de tokens que se bajaron
+  "porque la salida es corta" rompieron al Árbitro (ver sección 3).
+- **Antes de proponer algo, leer los comentarios de la tarjeta.** El Agente 06 ya tenía una
+  propuesta de Facundo anunciada en un comentario.
+- **Adjuntos a Trello en la máquina Linux de Matías**: el conector solo adjunta desde una URL.
+  Para archivos locales, un script con `curl -F file=@...` contra
+  `POST /1/cards/{id}/attachments`, que Matías corre con `! bash <script>`. Las credenciales
+  están en `~/.claude.json`, dentro de `.projects["<ruta del repo>"].mcpServers.trello.env`,
+  **no** en el `.env` del repo. Claude tiene bloqueada la lectura de `.env` y `.env.example`.
+- **Trello MCP**: llamar `set_active_board` con `kdXM36sU` al empezar. Si da 401, el token
+  venció: se regenera en https://trello.com/power-ups/admin con `expiration=never`.
+- **Python**: el venv está en la raíz del repo (`.venv/bin/python`). Los worktrees no tienen
+  uno propio; se usa ese con la ruta absoluta.
+- **Worktrees**: van en `../tesis-iresm-worktrees/<nombre>`, nunca en `/tmp`.
 - IDs útiles: lista Sprint 4 `6a1f6864889d8c5fe2ae2e5d`, lista QA `6a1642161e9946c1c9109254`.
   Miembros: Facundo `6a16173f16a431ed777fb012`, Matías `68d12d1ee9c16db321ba0bdd`,
   Fede `68d1e0706a8d223491726de3`.
@@ -42,115 +47,166 @@ Lecciones prácticas:
 
 ## 2. Estado al cierre
 
-`develop` está en `8676ebe`. Todo lo de abajo ya está mergeado.
+`develop` está en `8560444`. La suite tiene 1009 tests en verde.
 
 ### Agentes
 | ID | Rol | Estado |
 |----|-----|--------|
 | 01 | Analista de Literatura | ✅ |
-| 02 | Especialista Genómica | ✅ PR #12 (Facundo) |
+| 02 | Especialista Genómica | ✅ PR #12 |
 | 03 | Consultor Clínico | ✅ |
-| 04 | Árbitro Verificador | ⬜ **pendiente — #52, la toma Matías** |
+| 04 | Árbitro Verificador | ✅ PR #19 |
 | 05 | Navegador de Ensayos | ✅ PR #13 |
-| 06 | Sintetizador | ⬜ pendiente — #62, va último |
+| 06 | Sintetizador | ⬜ **pendiente — #62, espera la rama de Facundo** |
 
-### Lo que se cerró hoy
-- **#54 Priorización EBM**: `pipeline/evidence.py`, con el nivel topeado por el tipo de
-  publicación de la mejor fuente verificada. En QA con evidencia.
-- **#53 Agente 05**: `agents/agent_05_trials.py` + `pipeline/trial_matching.py`. En QA.
-- **#51 Agente 02**: mergeado (PR #12), ya estaba en QA con su evidencia.
-- **4 fixes**: clientes Orphanet y PharmGKB (apuntaban a endpoints dados de baja), el debate
-  que se caía si un agente fallaba en la Ronda 1, y los falsos genes del extractor.
-- **Reparto de tareas** documentado en `.claude/backlog.md` y comentado en las tarjetas.
+### Lo que se mergeó el 2026-10-04
+| PR | Qué | Tarjeta |
+|----|-----|---------|
+| #22 | Control de costos: punto único de llamada al LLM, telemetría, modelo y techo por tarea, modo mock | #81, en QA |
+| #23 | Registro de médicos con matrícula, revisión admin y `POST /api/analyze` protegido | #83, en QA |
+| #24 | Script de medición y arreglo de los techos de tokens | #84, en QA |
+| #25 | Una fuente malformada no deja a un agente fuera de la Ronda 1 | #85, en QA |
+| #26 | Una hipótesis malformada no deja a un agente fuera de la ronda | #85, en QA |
 
-### Corrida real del Agente 05 sobre el caso de la tesis
-21 ensayos, 2 excluidos por edad, 10 en el reporte. 2 de compatibilidad media y 8 baja,
-**ninguna evaluación descartada** (el LLM no inventó NCT IDs). Orphanet marcó 1 coincidencia
-exacta: ORPHA:85443. Artefactos en `output/corrida_agente05/`.
+Antes, el 2026-09-28, había entrado la landing explicativa (PR #21, tarjeta #82, en QA).
 
 ---
 
-## 3. Pendiente (en orden)
+## 3. Lo que se midió (corridas reales del 2026-10-04)
 
-### 3.1 Matías — #52 Agente 04 (Árbitro Verificador)
-Tarjeta `6a1f68c7e380a0c147eb855a`. Toca `verification.py`, `evidence.py` y el paso 7 del
-router. Primero `/opsx:propose`, frenar y mostrar el diseño.
+`scripts/medir_costos.py` corre una sola pasada del pipeline y compara `GROQ_MAIN` contra
+`GROQ_FAST` sobre las mismas entradas. `--mock` lo recorre sin cuota. Los artefactos quedan en
+`output/medicion_costos/` (ignorado por git).
 
-- Consume `evidence.classify_hypothesis()` / `prioritize()` de #54, que ya están.
-- **Dato clave para el diseño**: en la corrida real de hoy, **ninguno** de los PMIDs que
-  citaron los agentes coincide con los que el RAG puso en el prompt, y los 15 resultaron
-  discordantes. Los agentes no usan la literatura recuperada.
-- Va junto con el **hallazgo G**: `BaseAgent.parse_hypotheses()` (`base_agent.py:92`) arma
-  `Source(**s)` con lo que manda el LLM, así que acepta campos de verificación inventados.
-
-### 3.2 Facundo — #73 y #71
-- **#73** (`6aa9c5774810fc902e01ac69`): el regex `[A-Z]{2,6}\d{0,2}` no detecta genes con un
-  dígito en el medio. Afecta a `SCN1A`, `SCN9A`, `SH3TC2` y `DYNC1H1`, los cuatro relevantes
-  para el caso. Hay 4 tests marcados `xfail` en `tests/test_biomarkers.py` esperando el fix.
-- **#71** (`6aa99fe42aca2b2e5c0a0dd2`): cliente ClinVar.
-
-### 3.3 Fede — #74 y los hallazgos del RAG
-- **#74** (`6aa9d25b6cbb6c906ac02064`): cliente Orphadata. Endpoint ya verificado:
-  `GET https://api.orphadata.com/rd-associated-genes/orphacodes/{code}` (200, sin apiKey).
-- **Hallazgo A**: el filtro de relevancia del RAG no filtra nada (`retriever.py:33`).
-- **Hallazgo B**: los tests del RAG no son herméticos, pegan a PubMed de verdad.
-- **Hallazgo H**: lint del frontend con 1 error y 1 warning previos.
-- **PDF**: en la portada "NEXUS" se pisa con el subtítulo (`pdf_exporter.py:118-121`) y las
-  celdas del resumen se salen del margen. Es lo que lee el médico.
-- **Chores de Trello**: borrar el adjunto duplicado de #65 y renombrar el PNG sin extensión
-  de #63.
-
-### 3.4 #62 Sintetizador, al final
-Depende de que exista el Agente 04 y pisa el `pdf_exporter.py` que va a tocar Fede.
-
-### 3.5 Decisión de alcance pendiente
-Fede midió que **los genes del caso (PMP22, MPZ, TTR) no tienen ninguna anotación en
-PharmGKB**: son genes de enfermedad, no farmacogenes. El Agente 02 no recibe nada útil de esa
-fuente en el caso base. Hay que decidir si la fuente correcta es ClinVar (#71) o si PharmGKB
-se consulta solo cuando el caso trae fármacos en el historial.
+- **Un caso completo consume 77.516 tokens** en 27 llamadas y tarda unos 8 minutos.
+  **Entran 2 casos por día** en la cuota gratuita de 200.000 tokens.
+- Por agente: 01 → 20.605; 02 → 20.396; 03 → 21.279; 04 → 4.861; 05 → 7.179.
+- **Los `gpt-oss` cuentan el razonamiento dentro de la salida.** Con techos de 512 y 1024,
+  la agrupación del Árbitro y la planificación de términos del Agente 05 se cortaban y caían
+  en el fallback. Volvieron a 4096. La agrupación usa unos 1.100 tokens de salida aunque
+  devuelva solo índices.
+- **Las tres tareas de salida validada se quedan en `GROQ_FAST`**: misma partición del
+  agrupamiento sobre 14 hipótesis y 10 de 10 etiquetas de compatibilidad iguales. Es una
+  corrida por modelo, no una muestra.
+- **La Ronda 4 del debate reescribe, no reclasifica**: 11 hipótesis cambiaron de enunciado y
+  ninguna de nivel ni de prioridad. Las revisiones del debate son un tercio del consumo.
 
 ---
 
-## 4. Demo para el profesor
+## 4. Pendiente (en orden)
+
+### 4.1 #62 Agente 06 (Sintetizador) — bloqueado
+Facundo escribió la propuesta OpenSpec el 2026-09-23 (`openspec/changes/agente-06-sintetizador`,
+commit `be1ce89`, rama `feature/s4-agente-06-sintetizador`) y **nunca la subió**: existe solo en
+su máquina. El 2026-10-04 se le pidió por comentario en la tarjeta que la pushee.
+
+**No escribir otra propuesta.** Cuando la rama esté en GitHub, revisar la suya con estos tres
+puntos, que cambiaron en `develop` después de que la escribió:
+- El Sintetizador necesita su tarea en `backend/agents/model_tasks.py` (modelo y techo, **no
+  menos de 4096** por lo medido) y su respuesta grabada para el modo mock.
+- Los tests que llamen a `POST /api/analyze` necesitan la fixture `client_medico_verificado`
+  de `tests/conftest.py`.
+- La tarjeta dice "reemplaza a `report_builder.py`" y su diseño agrega un `executive_summary`
+  sobre el builder actual. Conviene que la propuesta diga que el builder determinista se
+  conserva.
+
+Su diseño, según el comentario: `synthesize()` corre una vez al final, agrega un resumen en
+prosa como campo opcional de `StructuredReport`, nunca decide datos, y descarta el resumen
+entero si cita un PMID, NCT o gen que no está en el reporte.
+
+### 4.2 Verificar contra Groq los arreglos del parseo
+Los PR #25 y #26 se verificaron con tests, no con una corrida real: la falla del Agente 03 es
+intermitente y ese día no quedaba cuota. La próxima corrida real sirve de verificación: mirar
+si aparece el aviso `[NEXUS] Respuesta del modelo saneada: …` y que el debate tenga tres agentes.
+
+### 4.3 Cierre del control de costos
+En `openspec/changes/control-de-costos-del-pipeline/tasks.md` quedan tres tareas:
+- **6.2** Regenerar las respuestas grabadas del modo mock desde una corrida real. Hoy están
+  escritas a mano.
+- **6.4** Captura de la marca de modo mock en el frontend.
+- **7.5** Los números medidos ya están en `.claude/CLAUDE.md` y `.claude/backlog.md`; falta
+  llevarlos a `.claude/stack.md`.
+
+La comparación de costo contra Claude, GPT-4o y Gemini que muestra `scripts/demo_costos.py`
+usa una **muestra sintética**. Con el `costos.jsonl` real ya se puede recalcular con
+`usage.recalculate()` y una tabla de tarifas.
+
+### 4.4 Decisiones abiertas
+- **Recorte de la Ronda 4**: ahorraría hasta un tercio del consumo. Hace falta más de una
+  corrida para decidirlo.
+- **Nivel III por saneamiento**: si el modelo manda un nivel de evidencia inválido, la
+  hipótesis queda en III y en el reporte se ve igual que una declarada como III. Si para la
+  tesis importa distinguirlas, hay que marcarlo en el reporte.
+- **PharmGKB**: los genes del caso (PMP22, MPZ, TTR) no tienen anotaciones ahí. Sigue sin
+  decidirse si la fuente correcta para el Agente 02 es ClinVar (#71).
+
+### 4.5 Orden y limpieza
+- Archivar con `/opsx:archive` los cambios OpenSpec ya cerrados: `agente-04`, `agente-05`,
+  `landing-explicativa` y `registro-medicos-matricula`. `agente-02-genomica` figura con 0 de
+  26 tareas aunque está mergeado desde el 2026-09-16: hay que tildarlo antes.
+- Borrar los worktrees de ramas ya mergeadas (`git worktree list` muestra diez además del
+  principal).
+- Tarjetas #73 y #75 (Facundo y Fede): mergeadas el 2026-09-16 y todavía en Sprint 4 sin
+  evidencia.
+
+### 4.6 De otros integrantes
+- **Facundo**: #71 cliente ClinVar.
+- **Fede**: #74 cliente Orphadata, #76 filtro de relevancia del RAG, #77 lint del frontend,
+  #78 portada del PDF.
+- Sin asignar: #79 (comentario en el `.env` que desactiva la verificación) y #80 (un agente
+  como sostén y objetor de la misma hipótesis).
+
+---
+
+## 5. Demo para el profesor
 
 ### Levantar el sistema
 ```bash
 git checkout develop && git pull origin develop
-# Backend (raíz del repo), con el Python del venv:
-.venv/Scripts/python.exe -m uvicorn backend.main:app --port 8000   # :8000
+# Backend, desde la raíz del repo:
+.venv/bin/python -m uvicorn backend.main:app --port 8000    # :8000
 # Frontend:
-cd frontend && npm run dev                                        # :3000
+cd frontend && npm run dev                                   # :3000
 ```
-El `.env` de la máquina de Matías ya está bien: no hace falta el `env PUBMED_API_KEY=`.
-Falta **Tesseract**, así que los PDFs escaneados no andan y 3 tests de ingesta fallan.
-Los PDFs con texto sí funcionan: hay uno listo en `output/demo_ingesta/informe_clinico.pdf`.
 
-El caso de la tesis en texto está en `output/demo/caso.txt`. Una corrida completa tardaba
-~4 min con dos agentes; **ahora son tres en la Ronda 1 más el Agente 05**, así que tarda más
-y gasta más cuota de Groq.
+**Desde el PR #23 el análisis exige sesión.** Antes de la demo:
+1. Definir `SECRET_KEY` en el `.env`.
+2. Crear el primer admin: `.venv/bin/python -m backend.cli crear-admin --email <email>`
+   (pide la contraseña sin mostrarla).
+3. Registrar un médico en `/registro`, entrar como admin en `/ingresar` y aprobarlo en
+   `/admin/pendientes`.
 
-**Respaldo por si Groq falla en vivo**: `output/demo/reporte.json` y `reporte.pdf` (con dos
-agentes), y `output/corrida_agente05/` (con el Agente 05).
+Una corrida real tarda unos 8 minutos y gasta más de un tercio de la cuota diaria: no hacer
+pruebas con Groq el mismo día de la demo.
+
+**Respaldo por si Groq falla en vivo**: arrancar el backend con `NEXUS_MOCK_LLM=1`. El pipeline
+corre completo con respuestas grabadas del LLM (PubMed, ClinicalTrials.gov y Orphanet se
+siguen consultando de verdad) y el reporte queda marcado como mock en el JSON, el PDF y la
+pantalla. Los archivos de respaldo de `output/demo/` que nombraba el traspaso
+anterior **no están en la máquina Linux de Matías**.
 
 ### Guion (~10 min)
-1. Qué es NEXUS: genera **hipótesis de investigación**, no diagnósticos.
-2. Cargar el caso (texto pegado o el PDF de `demo_ingesta`).
-3. Vista de pipeline en tiempo real: ingesta → PICO → RAG → Ronda 1 → debate → Agente 05 y
-   verificación en paralelo.
-4. Reporte: hipótesis agrupadas por estado con el nivel EBM topeado, ensayos con
-   compatibilidad orientativa, sede en Argentina y Orphanet, y la bibliografía con título
-   citado vs. real. **Dato fuerte**: las 15 citas de los agentes eran discordantes con
-   PubMed, y el sistema lo detecta. Por eso existe el Árbitro.
-5. Exportar el PDF.
-6. Qué sigue: Árbitro y Sintetizador, planificados con OpenSpec.
+1. Qué es NEXUS: genera **hipótesis de investigación**, no diagnósticos. La landing en `/` lo
+   explica.
+2. Registro e ingreso: solo un médico con matrícula verificada por un admin puede analizar.
+3. Cargar el caso en `/analizar`.
+4. Vista de pipeline en tiempo real: ingesta → PICO → RAG → Ronda 1 → debate → verificación →
+   Árbitro → Navegador de ensayos.
+5. Reporte: hipótesis de consenso con el nivel EBM topeado, veredictos del Árbitro, ensayos
+   con compatibilidad y la bibliografía con título citado vs. real.
+6. Exportar el PDF.
+7. Costos: 77.516 tokens por caso, medidos; y cómo medir destapó tres defectos que el sistema
+   escondía detrás de un fallback.
+8. Qué sigue: el Sintetizador.
 
 ---
 
-## 5. Setup de otra computadora
+## 6. Setup de otra computadora
 - `npm install -g @fission-ai/openspec@latest` (v1.11.0 o superior).
-- MCP de Trello: `claude mcp add trello -s user -e TRELLO_API_KEY=... -e TRELLO_TOKEN=... -- cmd /c npx -y @delorenj/mcp-server-trello`.
-  En Windows va **todo en una línea**: los backticks de continuación rompen el registro.
+- MCP de Trello: `claude mcp add trello -s user -e TRELLO_API_KEY=... -e TRELLO_TOKEN=... -- npx -y @delorenj/mcp-server-trello`.
+  En Windows va con `cmd /c` adelante de `npx` y **todo en una línea**.
 - `gh auth login`. Ojo: la cuenta `lussofacundo-iresm` no tiene permiso de push.
-- `.env` con las keys, **comentarios en su propia línea** (si no, se reintroduce el bug de #65).
-- Dependencias de Python en el venv del repo:
-  `.venv/Scripts/python.exe -m pip install -r backend/requirements.txt`.
+- `.env` con las keys y `SECRET_KEY`, **comentarios en su propia línea**.
+- Dependencias de Python en el venv del repo: `.venv/bin/python -m pip install -r backend/requirements.txt`
+  (en Windows, `.venv/Scripts/python.exe`).
+- Tesseract para los PDFs escaneados. En la máquina Linux de Matías está instalado.
