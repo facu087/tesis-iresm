@@ -16,6 +16,19 @@
   --color-border: #e2dccd;
   --color-accent: #0f5c55;
   --color-accent-fg: #faf7f0;
+
+  /*
+   * Región de marca (landing): el verde petróleo como fondo completo de una
+   * sección. Se compone aparte en oscuro: un verde profundo, no el menta del
+   * acento, que encandilaría sobre un fondo casi negro. El botón es del
+   * color del papel (claro) o del acento (oscuro) para no ser verde sobre verde.
+   */
+  --color-brand: #0f5c55;
+  --color-brand-fg: #faf7f0;
+  --color-brand-fg-muted: #c3d9d3;
+  --color-brand-line: #7fb0a9;
+  --color-brand-btn: #faf7f0;
+  --color-brand-btn-fg: #0f5c55;
 }
 
 /*
@@ -34,6 +47,12 @@
     --color-border: #26332f;
     --color-accent: #5fc4b6;
     --color-accent-fg: #0e1715;
+    --color-brand: #17504a;
+    --color-brand-fg: #ece7da;
+    --color-brand-fg-muted: #b4cdc6;
+    --color-brand-line: #67a89d;
+    --color-brand-btn: #5fc4b6;
+    --color-brand-btn-fg: #0e1715;
   }
 }
 
@@ -51,6 +70,12 @@
   --color-border: var(--color-border);
   --color-accent: var(--color-accent);
   --color-accent-fg: var(--color-accent-fg);
+  --color-brand: var(--color-brand);
+  --color-brand-fg: var(--color-brand-fg);
+  --color-brand-fg-muted: var(--color-brand-fg-muted);
+  --color-brand-line: var(--color-brand-line);
+  --color-brand-btn: var(--color-brand-btn);
+  --color-brand-btn-fg: var(--color-brand-btn-fg);
 }
 
 body {

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import ScrollReveal from "@/components/ScrollReveal";
+import ReportPreview from "@/components/ReportPreview";
+import DebateDiagram from "@/components/DebateDiagram";
 import { PIPELINE_STEPS, PIPELINE_SUMMARY } from "@/lib/pipelineSteps";
 import {
   BookIcon,
@@ -55,7 +57,7 @@ export default function LandingPage() {
 function SiteHeader() {
   return (
     <header className="border-b border-border">
-      <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <span className="font-serif text-lg font-semibold tracking-tight text-accent">NEXUS</span>
 
         <div className="flex items-center gap-6">
@@ -101,7 +103,7 @@ function SiteHeader() {
 
 function HeroSection() {
   return (
-    <section className="mx-auto max-w-5xl px-6 pt-14 pb-16 sm:pt-20">
+    <section className="mx-auto grid max-w-6xl items-center gap-12 px-6 pt-14 pb-16 sm:pt-20 lg:grid-cols-[1.1fr_1fr] lg:gap-16">
       <div className="max-w-2xl space-y-6">
         <p className="text-xs font-semibold uppercase tracking-widest text-accent">
           Tesis final · Analista en Sistemas · IRESM
@@ -137,6 +139,7 @@ function HeroSection() {
           responsable.
         </p>
       </div>
+      <ReportPreview />
     </section>
   );
 }
@@ -150,7 +153,7 @@ function HowItWorksSection() {
       aria-labelledby="como-funciona-heading"
       className="border-t border-border"
     >
-      <div className="mx-auto max-w-5xl px-6 py-16 sm:py-20">
+      <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
         <p className="text-xs font-semibold uppercase tracking-widest text-accent">
           Cómo funciona
         </p>
@@ -168,11 +171,8 @@ function HowItWorksSection() {
           `aria-hidden`, y la alternativa textual completa (misma secuencia,
           mismo orden) vive en la lista `sr-only` de abajo (design, tarea 4.2).
         */}
-        <div
-          role="img"
-          aria-label={PIPELINE_SUMMARY}
-          className="mt-12 max-w-2xl"
-        >
+        <div className="mt-12 grid items-start gap-12 lg:grid-cols-[1fr_1.1fr] lg:gap-16">
+        <div role="img" aria-label={PIPELINE_SUMMARY} className="max-w-2xl">
           <div aria-hidden="true">
             {PIPELINE_STEPS.map((step, i) => (
               <div key={step.id} className="relative flex gap-5 pb-8 last:pb-0">
@@ -191,6 +191,9 @@ function HowItWorksSection() {
               </div>
             ))}
           </div>
+        </div>
+        {/* Bajo 768 px el texto del SVG quedaría ilegible: ahí queda solo la lista. */}
+        <DebateDiagram className="mx-auto hidden w-full max-w-xl md:block" />
         </div>
 
         {/* Alternativa textual accesible (design, tarea 4.2): mismos pasos,
@@ -275,7 +278,7 @@ function AgentsSection() {
       aria-labelledby="agentes-heading"
       className="border-t border-border"
     >
-      <div className="mx-auto max-w-5xl px-6 py-16 sm:py-20">
+      <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
         <p className="text-xs font-semibold uppercase tracking-widest text-accent">
           Agentes
         </p>
@@ -297,7 +300,9 @@ function AgentsSection() {
               }`}
             >
               <div className="flex items-start justify-between gap-3">
-                <agent.Icon className="h-6 w-6 shrink-0" />
+                <agent.Icon
+                  className={`h-7 w-7 shrink-0 ${agent.pending ? "" : "text-accent"}`}
+                />
                 {agent.pending && (
                   <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold tracking-wide text-fg-muted uppercase">
                     En desarrollo
@@ -354,7 +359,7 @@ function FeaturesSection() {
       aria-labelledby="funcionalidades-heading"
       className="border-t border-border"
     >
-      <div className="mx-auto max-w-5xl px-6 py-16 sm:py-20">
+      <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
         <p className="text-xs font-semibold uppercase tracking-widest text-accent">
           Funcionalidades clave
         </p>
@@ -371,7 +376,7 @@ function FeaturesSection() {
               key={feature.title}
               className="rounded-2xl border border-border p-6 transition-colors duration-200 hover:border-accent-muted"
             >
-              <feature.Icon className="h-6 w-6" />
+              <feature.Icon className="h-7 w-7 text-accent" />
               <p className="mt-4 text-sm font-semibold text-fg">
                 {feature.title}
               </p>
@@ -386,24 +391,69 @@ function FeaturesSection() {
   );
 }
 
-/* ── CTA final ─────────────────────────────────────────────────────────── */
+/* ── Región de marca: cifras + CTA final ───────────────────────────────── */
+
+/** Cifras verificables del sistema; el 06 se aclara como en la sección de agentes. */
+const FIGURES = [
+  {
+    value: "6",
+    label: "agentes especializados",
+    note: "El Agente 06 está en desarrollo.",
+  },
+  {
+    value: "5",
+    label: "rondas",
+    note: "Análisis paralelo, tres de debate y una de recitación.",
+  },
+  {
+    value: "3",
+    label: "fuentes externas",
+    note: "PubMed, ClinicalTrials.gov y Orphanet.",
+  },
+] as const;
 
 function CtaSection() {
   return (
-    <section className="border-t border-border">
-      <div className="mx-auto max-w-5xl px-6 py-20 text-center">
-        <h2 className="font-serif text-2xl font-semibold tracking-tight sm:text-3xl">
-          ¿Tenés un caso clínico para analizar?
-        </h2>
-        <p className="mx-auto mt-3 max-w-xl text-fg-muted">
-          Subí el documento o pegá el texto: el pipeline hace el resto y
-          devuelve un reporte con hipótesis priorizadas, junto con sus
-          fuentes.
-        </p>
-        <div className="mt-8">
+    <section
+      aria-labelledby="cta-heading"
+      className="bg-brand text-brand-fg"
+    >
+      <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
+        <dl className="grid gap-8 border-b border-brand-line pb-12 sm:grid-cols-3 sm:gap-10">
+          {FIGURES.map((f) => (
+            <div key={f.label}>
+              <dt className="flex items-baseline gap-3">
+                <span className="font-serif text-6xl font-semibold leading-none">
+                  {f.value}
+                </span>
+                <span className="text-sm font-semibold uppercase tracking-widest">
+                  {f.label}
+                </span>
+              </dt>
+              <dd className="mt-3 max-w-xs text-sm text-brand-fg-muted">
+                {f.note}
+              </dd>
+            </div>
+          ))}
+        </dl>
+
+        <div className="mt-12 flex flex-col gap-8 md:flex-row md:items-end md:justify-between">
+          <div className="max-w-xl">
+            <h2
+              id="cta-heading"
+              className="font-serif text-2xl font-semibold tracking-tight sm:text-3xl"
+            >
+              ¿Tenés un caso clínico para analizar?
+            </h2>
+            <p className="mt-3 text-brand-fg-muted">
+              Subí el documento o pegá el texto: el pipeline hace el resto y
+              devuelve un reporte con hipótesis priorizadas, junto con sus
+              fuentes.
+            </p>
+          </div>
           <Link
             href="/analizar"
-            className="cursor-pointer rounded-full bg-accent px-8 py-3 text-sm font-semibold text-accent-fg transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+            className="shrink-0 cursor-pointer rounded-full bg-brand-btn px-8 py-3 text-center text-sm font-semibold text-brand-btn-fg transition-opacity duration-200 hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-fg"
           >
             Analizar un caso →
           </Link>
@@ -418,7 +468,7 @@ function CtaSection() {
 function SiteFooter() {
   return (
     <footer className="border-t border-border">
-      <div className="mx-auto flex max-w-5xl flex-col gap-4 px-6 py-8 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-8 sm:flex-row sm:items-center sm:justify-between">
         <p className="max-w-xl text-xs leading-relaxed text-fg-muted">
           <span className="font-semibold text-fg">NEXUS</span> no emite
           diagnósticos clínicos. Las hipótesis generadas son orientativas y
