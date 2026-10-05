@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import ThemeToggle from "@/components/ThemeToggle";
 import { useRouter } from "next/navigation";
 import { aprobarCuenta, listarPendientes, logout, obtenerCuenta, rechazarCuenta } from "@/lib/api";
 import type { CuentaPendiente } from "@/lib/types";
 
 const inputClass =
-  "w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-fg-muted";
+  "w-full rounded-lg border border-fg-muted bg-bg px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-accent";
 
 function FilaPendiente({
   cuenta,
@@ -97,7 +98,7 @@ function FilaPendiente({
           <button
             type="submit"
             disabled={enviando !== null}
-            className="w-full cursor-pointer rounded-lg bg-fg py-2 text-sm font-semibold text-bg transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fg disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full cursor-pointer rounded-lg bg-accent py-2 text-sm font-semibold text-accent-fg transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-60"
           >
             {enviando === "aprobar" ? "Aprobando..." : "Aprobar"}
           </button>
@@ -118,7 +119,7 @@ function FilaPendiente({
           <button
             type="submit"
             disabled={enviando !== null}
-            className="w-full cursor-pointer rounded-lg border border-border py-2 text-sm font-semibold text-fg transition-colors duration-200 hover:bg-bg-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fg disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full cursor-pointer rounded-lg border border-border py-2 text-sm font-semibold text-fg transition-colors duration-200 hover:bg-bg-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-60"
           >
             {enviando === "rechazar" ? "Rechazando..." : "Rechazar"}
           </button>
@@ -165,28 +166,31 @@ export default function AdminPendientesPage() {
   const quitarDeLaLista = (id: number) => setPendientes((p) => (p ? p.filter((c) => c.id !== id) : p));
 
   return (
-    <div className="flex min-h-screen flex-col bg-bg text-fg">
+    <div className="flex min-h-screen font-body flex-col bg-bg text-fg">
       <header className="border-b border-border">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-5">
           <Link
             href="/"
-            className="cursor-pointer rounded-sm text-sm font-semibold tracking-tight transition-colors duration-200 hover:text-fg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fg"
+            className="cursor-pointer rounded-sm font-serif text-lg font-semibold tracking-tight text-accent transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
           >
             NEXUS
           </Link>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="cursor-pointer rounded-sm text-sm text-fg-muted transition-colors duration-200 hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fg"
-          >
-            Cerrar sesión
-          </button>
+          <div className="flex items-center gap-2 sm:gap-4">
+            <ThemeToggle />
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="cursor-pointer rounded-sm text-sm text-fg-muted transition-colors duration-200 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+            >
+              Cerrar sesión
+            </button>
+          </div>
         </div>
       </header>
 
       <main className="flex-1">
         <div className="mx-auto max-w-3xl px-6 py-14">
-          <h1 className="mb-1 text-xl font-semibold">Cuentas pendientes</h1>
+          <h1 className="mb-1 font-serif text-2xl font-semibold">Cuentas pendientes</h1>
           <p className="mb-8 text-sm text-fg-muted">
             Revisá cada matrícula contra los buscadores públicos antes de decidir.
           </p>

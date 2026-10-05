@@ -48,7 +48,7 @@ evidencia, respaldadas por referencias bibliográficas verificables de PubMed.
 - [x] Generación de JSON estructurado con todas las secciones del reporte (pipeline/report_builder.py)
 - [x] Exportación del reporte a PDF (ReportLab — pipeline/pdf_exporter.py)
 - [x] Setup Next.js + conexión al backend FastAPI (frontend/src/lib/api.ts, types.ts)
-- [x] Vista de carga de documentos (frontend/src/app/page.tsx + components/UploadForm.tsx)
+- [x] Vista de carga de documentos (frontend/src/app/analizar/page.tsx + components/UploadForm.tsx)
 - [x] Vista de pipeline con animación de progreso en tiempo real (frontend/src/app/analyzing/page.tsx)
 - [x] Vista de reporte: hipótesis, ensayos clínicos, divergencias y fuentes (frontend/src/app/report/page.tsx)
 
@@ -333,7 +333,8 @@ tesis-iresm/
 ├── frontend/
 │   ├── src/
 │   │   ├── app/
-│   │   │   ├── page.tsx            ← landing explicativa (S4) — Server Component
+│   │   │   ├── page.tsx            ← landing demostrativa (S4) — Server Component
+│   │   │   ├── globals.css         ← tokens: azul marino + ocre, tema claro/oscuro por atributo (S4)
 │   │   │   ├── analizar/
 │   │   │   │   ├── page.tsx        ← vista de carga (S4, movida desde `/`; guard de
 │   │   │   │   │                      sesión — capa de UX, no de seguridad)
@@ -347,7 +348,12 @@ tesis-iresm/
 │   │   ├── components/
 │   │   │   ├── UploadForm.tsx      ← formulario de carga PDF/texto
 │   │   │   ├── ScrollReveal.tsx    ← animación de aparición al hacer scroll (S4)
-│   │   │   └── icons.tsx           ← iconos SVG inline (landing + cuentas, S4)
+│   │   │   ├── ReportDemo.tsx      ← vista del reporte de ejemplo (ilustrativa) de la landing (S4)
+│   │   │   ├── BeforeAfter.tsx     ← cita declarada vs. título real de PubMed (dato real, S4)
+│   │   │   ├── DebateDiagram.tsx   ← diagrama SVG del flujo del pipeline (S4)
+│   │   │   ├── ThemeToggle.tsx     ← selector claro/oscuro de la barra (S4)
+│   │   │   ├── ThemeScope.tsx      ← mantiene /report y /analyzing en claro (S4)
+│   │   │   └── icons.tsx           ← iconos SVG inline (agentes, cuentas y tema, S4)
 │   │   └── lib/
 │   │       ├── api.ts              ← cliente HTTP al backend FastAPI (credentials: "include", S4)
 │   │       ├── types.ts            ← tipos TypeScript del reporte y de cuentas (S4)
@@ -377,6 +383,17 @@ tesis-iresm/
 ├── .gitignore
 └── README.md
 ```
+
+---
+
+### Identidad visual del frontend (S4)
+
+Azul marino institucional con acento ocre, títulos en Newsreader y cuerpo en
+Atkinson Hyperlegible, para las pantallas que usan los tokens (`/`, `/analizar`,
+`/registro`, `/ingresar`, `/cuenta`, `/admin/pendientes`). El tema claro es el
+predeterminado; el oscuro se elige con el selector de la barra (atributo
+`data-theme` en `<html>`, clave `nexus-theme` en `localStorage`). `/report` y
+`/analyzing` siguen con colores fijos claros y Geist: se migran en otra etapa.
 
 ---
 

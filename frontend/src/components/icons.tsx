@@ -146,43 +146,25 @@ export function CheckIcon({ className }: IconProps) {
   );
 }
 
-/** Funcionalidad — verificación bibliográfica: escudo con check. */
-export function ShieldCheckIcon({ className }: IconProps) {
+
+
+
+
+/** Selector de tema — sol: acción "cambiar a tema claro". */
+export function SunIcon({ className }: IconProps) {
   return (
     <svg {...BASE_PROPS} className={className}>
-      <path d="M12 3.5 5 6v6c0 4.5 3 7.5 7 8.5 4-1 7-4 7-8.5V6l-7-2.5Z" />
-      <path d="m9 12 2 2 4-4.5" />
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4" />
     </svg>
   );
 }
 
-/** Funcionalidad — clasificación EBM: capas/niveles. */
-export function LayersIcon({ className }: IconProps) {
+/** Selector de tema — luna: acción "cambiar a tema oscuro". */
+export function MoonIcon({ className }: IconProps) {
   return (
     <svg {...BASE_PROPS} className={className}>
-      <path d="m12 3.5 8 4.5-8 4.5-8-4.5 8-4.5Z" />
-      <path d="m4 12 8 4.5 8-4.5" />
-      <path d="m4 15.5 8 4.5 8-4.5" />
-    </svg>
-  );
-}
-
-/** Funcionalidad — navegación de ensayos: lupa. */
-export function SearchIcon({ className }: IconProps) {
-  return (
-    <svg {...BASE_PROPS} className={className}>
-      <circle cx="10.5" cy="10.5" r="6.5" />
-      <path d="m20 20-4.3-4.3" />
-    </svg>
-  );
-}
-
-/** Funcionalidad — debate adversarial multi-agente: dos burbujas de diálogo. */
-export function DebateIcon({ className }: IconProps) {
-  return (
-    <svg {...BASE_PROPS} className={className}>
-      <rect x="2.5" y="4.5" width="13" height="8" rx="3" />
-      <rect x="8.5" y="12.5" width="13" height="7" rx="3" />
+      <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" />
     </svg>
   );
 }

@@ -64,10 +64,10 @@ export default function UploadForm({ onReady }: Props) {
             key={m}
             type="button"
             onClick={() => { setMode(m); setError(null); }}
-            className={`flex-1 cursor-pointer rounded-md py-2 text-sm font-medium transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fg ${
+            className={`flex-1 cursor-pointer rounded-md py-2 text-sm font-medium transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
               mode === m
                 ? "bg-bg text-fg shadow-sm ring-1 ring-border"
-                : "text-fg-muted hover:text-fg"
+                : "text-fg-muted hover:text-accent"
             }`}
           >
             {m === "file" ? "Subir PDF" : "Ingresar texto"}
@@ -84,10 +84,10 @@ export default function UploadForm({ onReady }: Props) {
           onClick={() => fileInputRef.current?.click()}
           className={`cursor-pointer select-none rounded-xl border-2 border-dashed p-10 text-center transition-colors ${
             isDragging
-              ? "border-fg bg-bg-subtle"
+              ? "border-accent bg-bg-subtle"
               : file
-              ? "border-fg bg-bg"
-              : "border-border hover:border-fg-muted hover:bg-bg-subtle"
+              ? "border-accent bg-bg"
+              : "border-border hover:border-accent-muted hover:bg-bg-subtle"
           }`}
         >
           <input
@@ -105,7 +105,7 @@ export default function UploadForm({ onReady }: Props) {
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setFile(null); }}
-                className="mt-2 cursor-pointer text-xs text-fg-muted underline hover:text-fg"
+                className="mt-2 cursor-pointer text-xs text-fg-muted underline hover:text-accent"
               >
                 Cambiar archivo
               </button>
@@ -127,7 +127,7 @@ export default function UploadForm({ onReady }: Props) {
           onChange={(e) => setText(e.target.value)}
           placeholder="Pegá el texto del caso clínico aquí..."
           rows={10}
-          className="w-full resize-none rounded-xl border border-border bg-bg px-4 py-3 text-sm leading-relaxed text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-fg-muted"
+          className="w-full resize-none rounded-xl border border-fg-muted bg-bg px-4 py-3 text-sm leading-relaxed text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-accent"
         />
       )}
 
@@ -142,7 +142,7 @@ export default function UploadForm({ onReady }: Props) {
       <button
         type="submit"
         disabled={!canSubmit}
-        className="w-full cursor-pointer rounded-xl bg-fg py-3 font-semibold text-bg transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fg disabled:cursor-not-allowed disabled:bg-bg-subtle disabled:text-fg-muted disabled:ring-1 disabled:ring-border disabled:hover:opacity-100"
+        className="w-full cursor-pointer rounded-xl bg-accent py-3 font-semibold text-accent-fg transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent disabled:cursor-not-allowed disabled:bg-bg-subtle disabled:text-fg-muted disabled:ring-1 disabled:ring-border disabled:hover:opacity-100"
       >
         Analizar caso clínico →
       </button>
