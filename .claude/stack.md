@@ -156,7 +156,7 @@ endpoint. Tampoco alcanza "son orígenes distintos": `SameSite` opera por
 `localhost:8000` son el mismo sitio en desarrollo. La validación de
 `Origin`/`Referer` contra `ALLOWED_ORIGINS` cubre el vector real sin
 depender de que el navegador decida no disparar preflight; ver
-`openspec/changes/registro-medicos-matricula/design.md` — D3 para el detalle
+`openspec/changes/archive/2026-10-04-registro-medicos-matricula/design.md` — D3 para el detalle
 completo, incluida la corrección sobre una versión anterior de esta decisión.
 
 ---

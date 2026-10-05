@@ -5,7 +5,7 @@
  * la lista compacta que se muestra en `/analizar`. Refleja el flujo real
  * descrito en `.claude/architecture.md`, no una versión simplificada aparte:
  * evita que ambas vistas describan el pipeline de forma distinta con el
- * tiempo (design D4 de `openspec/changes/landing-explicativa/design.md`).
+ * tiempo (design D4 de `openspec/changes/archive/2026-10-04-landing-explicativa/design.md`).
  *
  * No confundir con los `STEPS` de `app/analyzing/page.tsx`: esa vista anima
  * el progreso mientras la API corre y necesita una granularidad de tiempos

@@ -141,11 +141,12 @@ usa una **muestra sintética**. Con el `costos.jsonl` real ya se puede recalcula
   decidirse si la fuente correcta para el Agente 02 es ClinVar (#71).
 
 ### 4.5 Orden y limpieza
-- Archivar con `/opsx:archive` los cambios OpenSpec ya cerrados: `agente-04`, `agente-05`,
-  `landing-explicativa` y `registro-medicos-matricula`. `agente-02-genomica` figura con 0 de
-  26 tareas aunque está mergeado desde el 2026-09-16: hay que tildarlo antes.
-- Borrar los worktrees de ramas ya mergeadas (`git worktree list` muestra diez además del
-  principal).
+- `agente-02-genomica` es el único cambio OpenSpec cerrado que falta archivar: figura con 0 de
+  26 tareas aunque está mergeado desde el 2026-09-16. Hay que tildar sus tareas antes de
+  correr `/opsx:archive`. Los otros cuatro se archivaron el 2026-10-04 y sus specs están en
+  `openspec/specs/` (12 en total).
+- Quedan 6 ramas locales `worktree-agent-*` sin revisar. Los worktrees y las demás ramas ya
+  mergeadas se borraron; lo que tenían en `output/` se copió a `output/de-worktrees/`.
 - Tarjetas #73 y #75 (Facundo y Fede): mergeadas el 2026-09-16 y todavía en Sprint 4 sin
   evidencia.
 
