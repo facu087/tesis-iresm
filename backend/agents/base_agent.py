@@ -18,8 +18,6 @@ import sys
 import time
 from abc import ABC, abstractmethod
 
-from pydantic import ValidationError
-
 from ..mock.mode import ENV_VAR, is_mock_active
 from ..mock.responses import get_mock_response
 from ..models.hypothesis import EvidenceLevel, Hypothesis, Priority, Source
@@ -282,45 +280,109 @@ class BaseAgent(ABC):
         return None
 
     @staticmethod
+    def _as_priority(value: object) -> Priority | None:
+        """Prioridad declarada, sin distinguir mayúsculas; `None` si no es una de las tres."""
+        if not isinstance(value, str):
+            return None
+        try:
+            return Priority(value.strip().upper())
+        except ValueError:
+            return None
+
+    @staticmethod
+    def _as_evidence_level(value: object) -> EvidenceLevel | None:
+        """
+        Nivel de evidencia declarado. Acepta el número romano sin distinguir
+        mayúsculas y también 1, 2 o 3, que es como a veces lo escribe el modelo.
+        """
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, int):
+            value = str(value)
+        if not isinstance(value, str):
+            return None
+        normalized = value.strip().upper()
+        normalized = {"1": "I", "2": "II", "3": "III"}.get(normalized, normalized)
+        try:
+            return EvidenceLevel(normalized)
+        except ValueError:
+            return None
+
+    @staticmethod
     def parse_hypotheses(raw: str) -> list[Hypothesis]:
         """
         Parsea y valida la lista de hipótesis del JSON de respuesta.
         Espera un objeto con clave "hypotheses": [...].
+
+        Un campo malformado no invalida la respuesta completa: antes, una sola
+        hipótesis con una prioridad desconocida dejaba al agente fuera de la
+        ronda. Solo se descarta la hipótesis que no trae enunciado, porque no
+        hay nada que mostrar. Para el resto se aplica el valor más conservador:
+        prioridad `LOW`, nivel de evidencia `III` (la regla del proyecto ante
+        una hipótesis sin respaldo defendible) y fundamento vacío. Las fuentes
+        se sanean en `_build_source()`.
+
+        Levanta `ValueError` si no queda ninguna hipótesis utilizable.
         """
         data = BaseAgent.extract_json(raw)
-        hypotheses = []
+        declared = data.get("hypotheses", [])
+        if not isinstance(declared, list):
+            declared = []
 
+        hypotheses: list[Hypothesis] = []
+        discarded = 0
+        priority_defaults = 0
+        level_defaults = 0
         discarded_sources = 0
 
-        for h in data.get("hypotheses", []):
+        for h in declared:
+            if not isinstance(h, dict):
+                discarded += 1
+                continue
+
+            text = h.get("text")
+            if not isinstance(text, str) or not text.strip():
+                discarded += 1
+                continue
+
+            priority = BaseAgent._as_priority(h.get("priority"))
+            if priority is None:
+                priority = Priority.LOW
+                priority_defaults += 1
+
+            evidence_level = BaseAgent._as_evidence_level(h.get("evidence_level"))
+            if evidence_level is None:
+                evidence_level = EvidenceLevel.III
+                level_defaults += 1
+
             declared_sources = h.get("sources", [])
             if not isinstance(declared_sources, list):
                 declared_sources = []
             built = [BaseAgent._build_source(s) for s in declared_sources]
             sources = [s for s in built if s is not None]
             discarded_sources += len(built) - len(sources)
-            try:
-                hypothesis = Hypothesis(
-                    text=h["text"],
-                    priority=Priority(h["priority"]),
-                    evidence_level=EvidenceLevel(h["evidence_level"]),
-                    rationale=h["rationale"],
-                    sources=sources,
-                )
-                hypotheses.append(hypothesis)
-            except (KeyError, ValidationError) as e:
-                raise ValueError(f"Hipótesis malformada: {e}\nDatos: {h}")
+
+            hypotheses.append(Hypothesis(
+                text=text,
+                priority=priority,
+                evidence_level=evidence_level,
+                rationale=BaseAgent._as_text(h.get("rationale")) or "",
+                sources=sources,
+            ))
 
         if not hypotheses:
             raise ValueError("El modelo no devolvió ninguna hipótesis.")
 
-        if discarded_sources:
-            # Solo la cantidad: el contenido de una cita no se registra.
-            print(
-                f"[NEXUS] {discarded_sources} fuente(s) descartada(s) por no traer "
-                "un título utilizable; sus hipótesis se conservan.",
-                file=sys.stderr,
-            )
+        # Solo cantidades: el contenido de una hipótesis o de una cita no se registra.
+        adjustments = [
+            (discarded, "hipótesis descartada(s) por no traer enunciado"),
+            (priority_defaults, "prioridad(es) inválida(s) llevada(s) a LOW"),
+            (level_defaults, "nivel(es) de evidencia inválido(s) llevado(s) a III"),
+            (discarded_sources, "fuente(s) descartada(s) por no traer un título utilizable"),
+        ]
+        notes = [f"{count} {label}" for count, label in adjustments if count]
+        if notes:
+            print(f"[NEXUS] Respuesta del modelo saneada: {'; '.join(notes)}.", file=sys.stderr)
 
         return hypotheses
 

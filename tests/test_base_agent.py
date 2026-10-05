@@ -215,6 +215,19 @@ class TestExtractJson:
 
 # ── Parseo de hipótesis ───────────────────────────────────────────────────────
 
+_VALIDA = {
+    "text": "Hipótesis de prueba",
+    "priority": "HIGH",
+    "evidence_level": "II",
+    "rationale": "Fundamento de prueba.",
+}
+
+
+def _hipotesis(items: list) -> str:
+    """Arma una respuesta del modelo con las hipótesis dadas, tal cual."""
+    return json.dumps({"hypotheses": items})
+
+
 class TestParseHypotheses:
 
     def test_hipotesis_valida(self):
@@ -228,20 +241,87 @@ class TestParseHypotheses:
         with pytest.raises(ValueError, match="ninguna hipótesis"):
             BaseAgent.parse_hypotheses('{"hypotheses": []}')
 
-    def test_hipotesis_sin_campo_obligatorio_lanza_error(self):
-        raw = json.dumps({"hypotheses": [{"text": "Algo", "priority": "HIGH"}]})
-        with pytest.raises(ValueError, match="malformada"):
-            BaseAgent.parse_hypotheses(raw)
+    # ── Tolerancia a campos malformados ──────────────────────────────────────
+    # Un campo inválido en una hipótesis no puede costar las demás ni dejar al
+    # agente fuera de la ronda. Solo se descarta la que no trae enunciado; el
+    # resto se conserva con el valor más conservador.
 
-    def test_prioridad_invalida_lanza_error(self):
-        raw = json.dumps({"hypotheses": [{
-            "text": _HIPOTESIS_BASE,
-            "priority": "URGENTÍSIMA",
-            "evidence_level": "II",
-            "rationale": "…",
-        }]})
-        with pytest.raises(ValueError):
-            BaseAgent.parse_hypotheses(raw)
+    @pytest.mark.parametrize("prioridad", ["URGENTÍSIMA", None, 3, ["HIGH"]])
+    def test_prioridad_invalida_queda_en_low(self, prioridad):
+        raw = _hipotesis([{**_VALIDA, "priority": prioridad}])
+        hypothesis = BaseAgent.parse_hypotheses(raw)[0]
+        assert hypothesis.priority is Priority.LOW
+        assert hypothesis.text == _VALIDA["text"]
+
+    @pytest.mark.parametrize(
+        "prioridad, esperada",
+        [("high", Priority.HIGH), (" Medium ", Priority.MEDIUM), ("LOW", Priority.LOW)],
+    )
+    def test_prioridad_se_normaliza(self, prioridad, esperada):
+        raw = _hipotesis([{**_VALIDA, "priority": prioridad}])
+        assert BaseAgent.parse_hypotheses(raw)[0].priority is esperada
+
+    @pytest.mark.parametrize("nivel", ["IV", None, "alto", 7, ["II"]])
+    def test_nivel_invalido_queda_en_iii(self, nivel):
+        """Regla del proyecto: sin un nivel defendible, el nivel es III, no se descarta."""
+        raw = _hipotesis([{**_VALIDA, "evidence_level": nivel}])
+        assert BaseAgent.parse_hypotheses(raw)[0].evidence_level is EvidenceLevel.III
+
+    @pytest.mark.parametrize(
+        "nivel, esperado",
+        [("ii", EvidenceLevel.II), (" I ", EvidenceLevel.I), (2, EvidenceLevel.II),
+         ("3", EvidenceLevel.III)],
+    )
+    def test_nivel_se_normaliza(self, nivel, esperado):
+        raw = _hipotesis([{**_VALIDA, "evidence_level": nivel}])
+        assert BaseAgent.parse_hypotheses(raw)[0].evidence_level is esperado
+
+    def test_campos_ausentes_no_descartan_la_hipotesis(self):
+        hypothesis = BaseAgent.parse_hypotheses(_hipotesis([{"text": "Algo"}]))[0]
+        assert hypothesis.text == "Algo"
+        assert hypothesis.priority is Priority.LOW
+        assert hypothesis.evidence_level is EvidenceLevel.III
+        assert hypothesis.rationale == ""
+
+    @pytest.mark.parametrize("fundamento", [None, 12, ["a"]])
+    def test_fundamento_invalido_queda_vacio(self, fundamento):
+        raw = _hipotesis([{**_VALIDA, "rationale": fundamento}])
+        assert BaseAgent.parse_hypotheses(raw)[0].rationale == ""
+
+    @pytest.mark.parametrize("texto", [None, "", "   ", 5])
+    def test_hipotesis_sin_enunciado_se_descarta_y_las_demas_se_conservan(self, texto):
+        raw = _hipotesis([{**_VALIDA, "text": texto}, {**_VALIDA, "text": "La segunda"}])
+        assert [h.text for h in BaseAgent.parse_hypotheses(raw)] == ["La segunda"]
+
+    def test_elemento_que_no_es_objeto_se_ignora(self):
+        raw = _hipotesis(["una hipótesis en texto libre", _VALIDA])
+        assert [h.text for h in BaseAgent.parse_hypotheses(raw)] == [_VALIDA["text"]]
+
+    def test_si_ninguna_trae_enunciado_lanza_error(self):
+        with pytest.raises(ValueError, match="ninguna hipótesis"):
+            BaseAgent.parse_hypotheses(_hipotesis([{"priority": "HIGH"}, "texto suelto"]))
+
+    @pytest.mark.parametrize("valor", [None, "no es lista", {"text": "Algo"}])
+    def test_hypotheses_que_no_es_lista_lanza_error(self, valor):
+        with pytest.raises(ValueError, match="ninguna hipótesis"):
+            BaseAgent.parse_hypotheses(json.dumps({"hypotheses": valor}))
+
+    def test_los_ajustes_se_avisan_sin_volcar_el_contenido(self, capsys):
+        raw = _hipotesis([
+            {**_VALIDA, "priority": "URGENTÍSIMA", "evidence_level": "IV"},
+            {**_VALIDA, "text": None},
+        ])
+        BaseAgent.parse_hypotheses(raw)
+        aviso = capsys.readouterr().err
+        assert "1 hipótesis descartada" in aviso
+        assert "1 prioridad" in aviso
+        assert "1 nivel" in aviso
+        assert _VALIDA["text"] not in aviso
+        assert "URGENTÍSIMA" not in aviso
+
+    def test_una_respuesta_bien_formada_no_avisa_nada(self, capsys):
+        BaseAgent.parse_hypotheses(_respuesta())
+        assert capsys.readouterr().err == ""
 
     def test_varias_hipotesis_conservan_el_orden(self):
         raw = json.dumps({"hypotheses": [
