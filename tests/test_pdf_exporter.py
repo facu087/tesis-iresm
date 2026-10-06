@@ -643,3 +643,24 @@ def test_resumen_ejecutivo_en_pdf_solo_si_existe():
     r.executive_summary = "Resumen de prueba."
     assert len(pdf_exporter._executive_summary(r, s)) > 1
     assert pdf_exporter.generate_pdf(r)[:4] == b"%PDF"
+
+
+class TestResumenEjecutivoLiteral:
+    """El resumen es prosa libre del LLM: se dibuja como texto, nunca como marcado."""
+
+    def _pdf_con_resumen(self, resumen: str) -> str:
+        report = _make_report()
+        report.executive_summary = resumen
+        return _texto_del_pdf(generate_pdf(report))
+
+    def test_menor_y_mayor_sin_etiqueta_no_rompen(self):
+        texto = self._pdf_con_resumen("Si a<b y c>d entonces la hipótesis se sostiene.")
+        assert "a<b y c>d" in texto
+
+    def test_ampersand_se_muestra_literal(self):
+        assert "B12 & folato" in self._pdf_con_resumen("Déficit de B12 & folato.")
+
+    def test_el_marcado_se_muestra_como_texto(self):
+        texto = self._pdf_con_resumen("Ver <font size=40>grande</font> y </b> suelto.")
+        assert "<font size=40>grande</font>" in texto
+        assert "</b>" in texto
