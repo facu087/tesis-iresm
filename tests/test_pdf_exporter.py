@@ -746,7 +746,7 @@ def test_menor_o_igual_traducido_no_se_vuelve_marcado():
 
 
 def test_el_marcado_propio_del_exportador_sigue_funcionando():
-    texto = _texto_del_pdf(generate_pdf(_reporte_hostil()))
+    texto = " ".join(_texto_del_pdf(generate_pdf(_reporte_hostil())).split())
     assert "<b>" not in texto and "<font color" not in texto
     assert "Narrativa clínica:" in texto and "NO CORRESPONDE" in texto
     assert "Justificación:" in texto and "Veredicto del Árbitro:" in texto
