@@ -86,7 +86,7 @@
 - [x] 6.1 Agregar el tipo `executive_summary?: string | null` a `StructuredReport` en
   `frontend/src/lib/types.ts`. Verificar con `npx tsc --noEmit` en `frontend/`.
 
-- [ ] 6.2 Mostrar el `executive_summary` en `frontend/src/app/report/page.tsx`: si no es
+- [x] 6.2 Mostrar el `executive_summary` en `frontend/src/app/report/page.tsx`: si no es
   `null` ni `undefined`, renderizar una sección "Resumen ejecutivo" antes de la lista de
   hipótesis. Si es `null`, no mostrar nada (sin placeholder). Verificar con
   `npm run build` en `frontend/` y viendo la sección en la vista de reporte con el mock
@@ -97,6 +97,11 @@
   las rutas generadas). _Sin verificar:_ nadie vio la sección en el navegador; con el mock
   activo hoy `executive_summary` es `None` (la guarda descarta el resumen grabado), así que
   eso depende de T4 de `odd/tasks/agente06-pendientes.md`.
+  _Resultado (2026-10-06):_ `npm run build` sin errores; con un reporte cargado en
+  `sessionStorage` la sección "Resumen ejecutivo" aparece arriba de "Hipótesis respaldadas",
+  y con `executive_summary: null` no aparece nada (sin errores de consola). Con el mock
+  activo el resumen es `None` (la guarda lo descarta, ver 5.2), por eso se verificó con un
+  reporte de prueba.
 
 - [x] 6.3 Mostrar el `executive_summary` en el PDF (`backend/pipeline/pdf_exporter.py`):
   si no es `None`, agregar un bloque de texto con título "Resumen ejecutivo" al inicio del
