@@ -17,6 +17,7 @@ import re
 import sys
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Collection
 
 from ..mock import recorder as response_recorder
 from ..mock.mode import ENV_VAR, is_mock_active
@@ -509,7 +510,9 @@ class BaseAgent(ABC):
             "    }\n  ]\n}"
         )
         raw = self._call_llm(prompt, task="debate_critica")
-        return self._parse_critiques(raw)
+        return self._parse_critiques(
+            raw, valid_targets={output.agent_id for output in other_outputs}
+        )
 
     def revise(
         self,
@@ -632,8 +635,19 @@ class BaseAgent(ABC):
 
         return recitaciones
 
-    def _parse_critiques(self, raw: str) -> list[Critique]:
-        """Parsea el JSON de críticas devuelto por el modelo."""
+    def _parse_critiques(
+        self,
+        raw: str,
+        valid_targets: Collection[str] | None = None,
+    ) -> list[Critique]:
+        """
+        Parsea el JSON de críticas devuelto por el modelo.
+
+        `valid_targets` son los IDs de los agentes realmente criticados. Si se
+        indica, una crítica cuyo destinatario normalizado no figura ahí (incluida
+        una dirigida al propio autor) queda sin atribuir (""). Sin él solo rige la
+        regla de formato de `_normalize_agent_id()`.
+        """
         data = self.extract_json(raw)
         critiques = []
         for c in data.get("critiques", []):
@@ -643,7 +657,9 @@ class BaseAgent(ABC):
             critiques.append(Critique(
                 from_agent_id=self.AGENT_ID,
                 from_agent_name=self.AGENT_NAME,
-                target_agent_id=_normalize_agent_id(c.get("target_agent_id")),
+                target_agent_id=_normalize_agent_id(
+                    c.get("target_agent_id"), valid_targets
+                ),
                 target_hypothesis=c.get("target_hypothesis", ""),
                 critique_text=c.get("critique_text", ""),
                 severity=severity,
@@ -652,20 +668,45 @@ class BaseAgent(ABC):
         return critiques
 
 
-def _normalize_agent_id(value: object) -> str:
+def _normalize_agent_id(
+    value: object,
+    valid_targets: Collection[str] | None = None,
+) -> str:
     """
     Lleva el destinatario que declara el modelo al ID canónico ("01", "02"…).
 
     El modelo no devuelve el ID pelado: en la corrida real del 2026-10-06 las
     21 críticas llegaron como "Agent 02", "Agent01" o "Agent03", y como el
     debate enruta por igualdad contra el ID, ninguna alcanzó a su destinatario.
-    Sin un número reconocible devuelve "": la crítica queda sin atribuir, no se
-    le asigna a otro agente.
+
+    Solo se atribuye cuando el destinatario es inequívoco: el valor contiene
+    exactamente una corrida de dígitos ASCII, de uno o dos dígitos, y ningún
+    otro dígito Unicode. Todo lo demás devuelve "" (sin atribuir) y nunca se
+    reasigna a otro agente: sin número ("Consultor Clínico"), con varios
+    ("hipótesis 2 del Agente 03", "Agentes 01 y 03", "3.0"), con tres o más
+    dígitos ("003") o con dígitos no ASCII.
+
+    Tipos: un `str` sigue la regla anterior; un `int` no negativo se trata como
+    su representación decimal; `float`, `bool`, `None` y cualquier otro tipo
+    devuelven "" (un `3.0` no es un ID: no se lo enruta por accidente).
+
+    Si se indica `valid_targets` (los IDs de los agentes criticados), un ID
+    normalizado que no esté en ese conjunto también devuelve "".
     """
-    if value is None or isinstance(value, bool):
+    if isinstance(value, bool) or not isinstance(value, (str, int)):
         return ""
-    numero = re.search(r"\d+", str(value))
-    return numero.group().zfill(2) if numero else ""
+    if isinstance(value, int) and value < 0:
+        return ""
+    texto = str(value)
+    if any(c.isdigit() and not c.isascii() for c in texto):
+        return ""
+    corridas = re.findall(r"[0-9]+", texto)
+    if len(corridas) != 1 or len(corridas[0]) > 2:
+        return ""
+    agent_id = corridas[0].zfill(2)
+    if valid_targets is not None and agent_id not in valid_targets:
+        return ""
+    return agent_id
 
 
 # ── Helpers de formateo para el debate ────────────────────────────────────────

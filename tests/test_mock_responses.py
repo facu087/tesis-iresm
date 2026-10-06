@@ -195,3 +195,116 @@ class TestParseoRealPorSitioDeLlamada:
         assert estado == "ok" and nct in evaluaciones
         assert evaluaciones[nct].compatibility in {"alta", "media", "baja"}
         assert descartadas == len(datos["evaluations"]) - 1  # solo los no enviados
+
+
+# ── Carga diferida del archivo de datos ───────────────────────────────────────
+
+_REPO = Path(__file__).resolve().parents[1]
+
+
+@pytest.fixture
+def archivo_de_datos(monkeypatch, tmp_path):
+    """Apunta el cargador a un archivo temporal y descarta la caché al terminar."""
+    destino = tmp_path / "grabadas.json"
+    monkeypatch.setattr(mock_responses, "_ARCHIVO_GRABADAS", destino)
+    monkeypatch.setattr(mock_responses, "_CACHE", None)
+    return destino
+
+
+class TestCargaDiferida:
+    def test_importar_los_agentes_no_lee_el_archivo_de_datos(self):
+        """Prueba en un proceso limpio: cualquier lectura de `grabadas.json` falla."""
+        import subprocess
+        import sys
+
+        codigo = (
+            "from pathlib import Path\n"
+            "orig = Path.read_text\n"
+            "def guardia(self, *a, **k):\n"
+            "    if self.name == 'grabadas.json':\n"
+            "        raise AssertionError('se leyó grabadas.json al importar')\n"
+            "    return orig(self, *a, **k)\n"
+            "Path.read_text = guardia\n"
+            "import backend.agents.base_agent\n"
+            "import backend.mock.responses as r\n"
+            "assert r._CACHE is None\n"
+        )
+        resultado = subprocess.run(
+            [sys.executable, "-c", codigo], cwd=_REPO, capture_output=True, text=True
+        )
+        assert resultado.returncode == 0, resultado.stderr
+
+    def test_camino_real_no_toca_el_archivo_aunque_este_roto(
+        self, archivo_de_datos, monkeypatch
+    ):
+        from unittest.mock import MagicMock, patch
+
+        from backend.agents.base_agent import call_provider
+
+        archivo_de_datos.write_text("{ esto no es json", encoding="utf-8")
+        monkeypatch.delenv(ENV_VAR, raising=False)
+        monkeypatch.setenv("GROQ_API_KEY", "clave-falsa")
+        respuesta = MagicMock()
+        respuesta.choices = [MagicMock()]
+        respuesta.choices[0].message.content = "{}"
+        respuesta.usage.prompt_tokens = 1
+        respuesta.usage.completion_tokens = 1
+        with patch("groq.Groq") as groq:
+            groq.return_value.chat.completions.create.return_value = respuesta
+            call_provider(system_prompt="s", user_message="u", model="m",
+                          max_tokens=10, task="pico_sintesis")
+        assert mock_responses._CACHE is None
+
+    def test_el_archivo_se_lee_una_sola_vez(self, archivo_de_datos):
+        archivo_de_datos.write_text(
+            json.dumps({"tasks": {"t": {"response": "{\"a\": 1}"}}}), encoding="utf-8"
+        )
+        assert mock_responses.get_mock_response("t") == '{"a": 1}'
+        archivo_de_datos.unlink()  # una segunda lectura fallaría
+        assert mock_responses.get_mock_response("t") == '{"a": 1}'
+        assert mock_responses.MOCK_RESPONSES == {"t": '{"a": 1}'}
+        assert set(mock_responses.RECORDED_RESPONSES) == {"t"}
+
+    def test_archivo_ausente_falla_con_el_error_claro(self, archivo_de_datos):
+        with pytest.raises(mock_responses.RespuestasGrabadasInvalidas) as e:
+            mock_responses.get_mock_response("pico_sintesis")
+        assert "grabadas.json" in str(e.value)
+
+    @pytest.mark.parametrize("contenido", [
+        "{ esto no es json",
+        "[]",
+        "{}",
+        '{"tasks": []}',
+        '{"tasks": {"t": "texto"}}',
+        '{"tasks": {"t": {}}}',
+        '{"tasks": {"t": {"response": ""}}}',
+        '{"tasks": {"t": {"response": "   "}}}',
+        '{"tasks": {"t": {"response": 3}}}',
+    ])
+    def test_archivo_malformado_falla_con_el_error_claro(self, archivo_de_datos, contenido):
+        archivo_de_datos.write_text(contenido, encoding="utf-8")
+        with pytest.raises(mock_responses.RespuestasGrabadasInvalidas) as e:
+            mock_responses.get_mock_response("t")
+        assert "grabadas.json" in str(e.value)
+
+    def test_un_fallo_no_deja_una_cache_a_medias(self, archivo_de_datos):
+        archivo_de_datos.write_text("{ roto", encoding="utf-8")
+        with pytest.raises(mock_responses.RespuestasGrabadasInvalidas):
+            mock_responses.get_mock_response("t")
+        assert mock_responses._CACHE is None
+        archivo_de_datos.write_text(
+            json.dumps({"tasks": {"t": {"response": "{}"}}}), encoding="utf-8"
+        )
+        assert mock_responses.get_mock_response("t") == "{}"
+
+    def test_el_error_no_contiene_texto_de_respuestas(self, archivo_de_datos):
+        archivo_de_datos.write_text(
+            '{"tasks": {"t": {"response": 3, "x": "SECRETO-CLINICO"}}}', encoding="utf-8"
+        )
+        with pytest.raises(mock_responses.RespuestasGrabadasInvalidas) as e:
+            mock_responses.get_mock_response("t")
+        assert "SECRETO-CLINICO" not in str(e.value)
+
+    def test_un_nombre_inexistente_del_modulo_sigue_siendo_attribute_error(self):
+        with pytest.raises(AttributeError):
+            mock_responses.NO_EXISTE  # noqa: B018
