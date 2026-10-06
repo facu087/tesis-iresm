@@ -14,9 +14,9 @@ existe, leer los nombres de campo correctos, y distinguir "sin resultados"
 import httpx
 import pytest
 
+from backend.external.orphadata import OrphadataClient
 from backend.external.orphanet import (
     OrphanetClient,
-    OrphanetGenesNoDisponibles,
     RareDisease,
 )
 from backend.external.rate_limiter import ExternalApiError
@@ -69,6 +69,23 @@ def _transporte(*respuestas):
             return secuencia.pop(0) if len(secuencia) > 1 else secuencia[0]
 
     return _Fake()
+
+
+class _OrphadataFalso:
+    """
+    Doble del cliente de Orphadata: registra los códigos consultados.
+
+    La forma real de la respuesta de Orphadata y su taxonomía de errores se
+    prueban en `tests/test_orphadata.py`; acá solo interesa la delegación.
+    """
+
+    def __init__(self, simbolos: list[str]):
+        self._simbolos = simbolos
+        self.codigos: list[str] = []
+
+    async def get_gene_symbols(self, orpha_code: str, *, solo_causales: bool = False):
+        self.codigos.append(orpha_code)
+        return list(self._simbolos)
 
 
 @pytest.fixture
@@ -194,24 +211,79 @@ class TestParseo:
         assert (await cliente.get_by_code("64746")).definition == ""
 
 
-# ── Genes: no se puede, y se dice ──────────────────────────────────────────────
+# ── Genes: los trae Orphadata, no esta API ─────────────────────────────────────
 
 class TestGenes:
-    @pytest.mark.asyncio
-    async def test_get_genes_levanta_en_vez_de_devolver_vacio(self, cliente):
-        """
-        Devolver [] haría creer que la enfermedad no tiene genes asociados. La
-        ORPHAcodes API simplemente no expone ese dato: 32 rutas, ninguna de genes.
-        """
-        with pytest.raises(OrphanetGenesNoDisponibles) as exc:
-            await cliente.get_genes("64746")
-        assert "orphadata" in str(exc.value).lower()
+    """
+    La ORPHAcodes API no expone genes (32 rutas, ninguna de genes), así que
+    `get_genes()` delega en `OrphadataClient` (tarjeta #74). Acá se verifica la
+    delegación: que no vaya nunca al host de nomenclatura y que devuelva lo que
+    trae el cliente de Orphadata. La forma real de esa respuesta y su taxonomía
+    de errores se ejercitan en `tests/test_orphadata.py`.
+    """
 
     @pytest.mark.asyncio
-    async def test_enrich_with_genes_levanta_igual(self, cliente):
+    async def test_get_genes_delega_en_orphadata(self, cliente):
+        nomenclatura = _transporte(_RespuestaFalsa(200, _ORPHACODE))
+        cliente._client = nomenclatura
+        cliente._orphadata = _OrphadataFalso(["TTR"])
+
+        assert await cliente.get_genes("85447") == ["TTR"]
+        assert cliente._orphadata.codigos == ["85447"]
+        # El host de nomenclatura no se toca: no tiene este dato.
+        assert nomenclatura.urls == []
+
+    @pytest.mark.asyncio
+    async def test_enrich_with_genes_completa_la_enfermedad(self, cliente):
+        cliente._orphadata = _OrphadataFalso(["TTR"])
+        disease = RareDisease(orpha_code="85447", name="ATTRV30M amyloidosis",
+                              definition="")
+
+        resultado = await cliente.enrich_with_genes(disease)
+
+        assert resultado is disease
+        assert disease.genes == ["TTR"]
+
+    @pytest.mark.asyncio
+    async def test_sin_asociacion_genica_deja_la_lista_vacia(self, cliente):
+        """
+        Orphadata devuelve 404 'Query not found' para los códigos sin asociación
+        cargada (ORPHA:64746 es un grupo de enfermedades). El cliente lo traduce
+        a [], que acá sí es el dato: no hay asociación para *ese* código.
+        """
+        cliente._orphadata = _OrphadataFalso([])
         disease = RareDisease(orpha_code="64746", name="CMT2", definition="")
-        with pytest.raises(OrphanetGenesNoDisponibles):
-            await cliente.enrich_with_genes(disease)
+        assert (await cliente.enrich_with_genes(disease)).genes == []
+
+    @pytest.mark.asyncio
+    async def test_fuera_del_async_with_abre_su_propio_cliente(self, cliente, monkeypatch):
+        """Sin `async with`, `get_genes()` abre un OrphadataClient para la consulta."""
+        abiertos: list[str] = []
+
+        class _Efimero(_OrphadataFalso):
+            def __init__(self):
+                super().__init__(["TTR"])
+
+            async def __aenter__(self):
+                abiertos.append("abierto")
+                return self
+
+            async def __aexit__(self, *_):
+                abiertos.append("cerrado")
+
+        monkeypatch.setattr("backend.external.orphanet.OrphadataClient", _Efimero)
+
+        assert cliente._orphadata is None
+        assert await cliente.get_genes("85447") == ["TTR"]
+        assert abiertos == ["abierto", "cerrado"]
+
+    @pytest.mark.asyncio
+    async def test_el_async_with_abre_y_cierra_el_cliente_de_genes(self):
+        """Dentro del contexto hay un OrphadataClient propio, y se cierra al salir."""
+        async with OrphanetClient() as abierto:
+            assert isinstance(abierto._orphadata, OrphadataClient)
+            assert abierto._orphadata._client is not None
+        assert abierto._orphadata is None
 
 
 # ── Dataclass ──────────────────────────────────────────────────────────────────

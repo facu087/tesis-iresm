@@ -28,7 +28,7 @@ porque ese endpoint no existe, y atrapaba `except (httpx.HTTPError, Exception)`
 devolviendo `[]`. El cliente "funcionaba" sin haber traído nunca un resultado
 real, y `demo_orphanet.py` usaba datos simulados, así que tampoco se notaba ahí.
 
-## Genes: esta API no los tiene
+## Genes: esta API no los tiene, los trae Orphadata
 
 `_get_genes()` apuntaba a `/DisorderGene/{code}`, que da 404. No es un path
 equivocado: bajando la especificación OpenAPI, la API expone **32 rutas y
@@ -39,22 +39,29 @@ Los genes viven en otro producto de Orphanet, **Orphadata**, en otro host:
 
     GET https://api.orphadata.com/rd-associated-genes/orphacodes/{code}
 
-que responde 200 con `DisorderGeneAssociation` (CC-BY-4.0) y no pide apiKey; un
-404 ahí significa "esa enfermedad no tiene asociación génica". Integrarlo es
-una tarjeta aparte: el pipeline no consume genes de Orphanet hoy, y el diseño
-del Agente 05 lo deja explícitamente fuera de alcance. Hasta entonces
-`get_genes()` levanta OrphanetGenesNoDisponibles en vez de mentir con `[]`.
+Ese cliente es `backend/external/orphadata.py` (tarjeta #74), y `get_genes()` /
+`enrich_with_genes()` **delegan en él**: para el pipeline los genes siguen
+siendo "lo que Orphanet asocia a este ORPHAcode", y el reparto en dos hosts
+queda como detalle interno. `OrphanetGenesNoDisponibles` ya no existe: la
+levantaba este módulo mientras el dato no se podía traer.
+
+Ojo con lo que significa una lista vacía: Orphadata devuelve 404 "Query not
+found" cuando *ese* ORPHAcode no tiene asociación cargada, lo cual es habitual
+en los grupos de enfermedades (la asociación cuelga del subtipo). No es "no se
+conoce gen para esta enfermedad". Ver el docstring de `orphadata.py`.
 """
 
 from __future__ import annotations
 
 import os
+from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
 from typing import Any, Optional
 from urllib.parse import quote
 
 import httpx
 
+from .orphadata import OrphadataClient
 from .rate_limiter import ExternalApiError, orphanet_limiter
 
 _API_NAME = "Orphanet"
@@ -64,19 +71,6 @@ _ORPHANET_URL_TEMPLATE = "https://www.orpha.net/en/disease/detail/{code}"
 # La API acepta `test` como clave. Ver el docstring: hoy no la exige, pero
 # mandarla es gratis y cubre el caso de que empiece a exigirla.
 _DEFAULT_API_KEY = "test"
-
-# Host y ruta de Orphadata, para la tarjeta que integre los genes.
-_ORPHADATA_GENES_URL = "https://api.orphadata.com/rd-associated-genes/orphacodes/{code}"
-
-
-class OrphanetGenesNoDisponibles(NotImplementedError):
-    """
-    Los genes no se pueden traer de la ORPHAcodes API: no expone ese dato.
-
-    Se levanta en vez de devolver [] para que nadie construya encima el supuesto
-    de que Orphanet no tiene genes para esa enfermedad. Ver el docstring del
-    módulo y la tarjeta de Orphadata.
-    """
 
 
 @dataclass
@@ -114,25 +108,39 @@ class OrphanetClient:
     No silencia los errores: un fallo real levanta ExternalApiError. "Sin
     resultados" (404 con "Query not found") devuelve lista vacía o None.
 
+    Los genes salen de Orphadata, otro host: el cliente mantiene un
+    `OrphadataClient` propio mientras está abierto y le delega `get_genes()` y
+    `enrich_with_genes()`. Para quien lo usa sigue siendo un solo cliente de
+    Orphanet.
+
     Uso básico:
         async with OrphanetClient() as client:
             diseases = await client.search("hereditary transthyretin amyloidosis")
+            genes = await client.get_genes(diseases[0].orpha_code)
     """
 
     def __init__(self) -> None:
         self._api_key: str = os.getenv("ORPHANET_API_KEY") or _DEFAULT_API_KEY
         self._client: Optional[httpx.AsyncClient] = None
+        self._orphadata: Optional[OrphadataClient] = None
+        self._pila: Optional[AsyncExitStack] = None
 
     async def __aenter__(self) -> "OrphanetClient":
         self._client = httpx.AsyncClient(
             timeout=30.0,
             headers={"apiKey": self._api_key, "accept": "application/json"},
         )
+        self._pila = AsyncExitStack()
+        self._orphadata = await self._pila.enter_async_context(OrphadataClient())
         return self
 
     async def __aexit__(self, *_: object) -> None:
         if self._client:
             await self._client.aclose()
+        if self._pila:
+            await self._pila.aclose()
+            self._pila = None
+            self._orphadata = None
 
     async def _request(self, path: str) -> Any:
         """
@@ -254,26 +262,40 @@ class OrphanetClient:
 
     async def get_genes(self, orpha_code: str) -> list[str]:
         """
-        No implementado: esta API no expone genes.
+        Trae los símbolos de los genes asociados a un código ORPHA.
+
+        El dato no está en la ORPHAcodes API: se delega en `OrphadataClient`
+        (ver el docstring del módulo). Dentro de un `async with` reusa la
+        conexión que el cliente mantiene abierta; fuera de él abre una para la
+        consulta, así los tests y los usos puntuales siguen funcionando.
+
+        Args:
+            orpha_code: Código ORPHA numérico (ej: "85447")
+
+        Returns:
+            Lista de símbolos (ej: ["TTR"]). Vacía si **ese** ORPHAcode no tiene
+            asociación génica cargada en Orphadata, que es frecuente en grupos
+            de enfermedades: la asociación suele colgar del subtipo. No se debe
+            leer como "no se conoce gen para esta enfermedad".
 
         Raises:
-            OrphanetGenesNoDisponibles: siempre. Ver el docstring del módulo:
-            los genes están en Orphadata, otro host, y su integración es una
-            tarjeta aparte.
+            ValueError: si el código no es un entero positivo.
+            ExternalApiError: ante un fallo real de Orphadata.
         """
-        raise OrphanetGenesNoDisponibles(
-            "La ORPHAcodes API no expone genes (32 rutas, ninguna de genes). "
-            f"Los genes de ORPHA:{orpha_code} están en Orphadata: "
-            f"{_ORPHADATA_GENES_URL.format(code=orpha_code)}. "
-            "Integrarlo es una tarjeta aparte."
-        )
+        if self._orphadata is not None:
+            return await self._orphadata.get_gene_symbols(orpha_code)
+        async with OrphadataClient() as orphadata:
+            return await orphadata.get_gene_symbols(orpha_code)
 
     async def enrich_with_genes(self, disease: RareDisease) -> RareDisease:
         """
-        No implementado por el mismo motivo que `get_genes()`.
+        Completa `disease.genes` con los genes que Orphadata asocia a su código.
+
+        Modifica y devuelve la misma instancia, como hacía la versión original.
 
         Raises:
-            OrphanetGenesNoDisponibles: siempre.
+            ValueError: si el código de la enfermedad no es un entero positivo.
+            ExternalApiError: ante un fallo real de Orphadata.
         """
-        await self.get_genes(disease.orpha_code)
-        return disease  # pragma: no cover — get_genes() siempre levanta
+        disease.genes = await self.get_genes(disease.orpha_code)
+        return disease

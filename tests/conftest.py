@@ -81,6 +81,7 @@ def _limitadores_aislados():
     for limitador in (
         rate_limiter.pubmed_limiter,
         rate_limiter.orphanet_limiter,
+        rate_limiter.orphadata_limiter,
         rate_limiter.pharmgkb_limiter,
         rate_limiter.clinical_trials_limiter,
     ):
@@ -88,6 +89,7 @@ def _limitadores_aislados():
     for breaker in (
         rate_limiter.pubmed_breaker,
         rate_limiter.orphanet_breaker,
+        rate_limiter.orphadata_breaker,
         rate_limiter.pharmgkb_breaker,
         rate_limiter.clinical_trials_breaker,
     ):
