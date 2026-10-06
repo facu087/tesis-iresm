@@ -116,6 +116,9 @@ def _rank_from_consensus(
                 declared_evidence_level=evaluacion.declared_level.value,
                 evidence_note=evaluacion.note,
                 refuting_agents=list(item.refuting_agents) if item else [],
+                agents_with_reservations=(
+                    item.agents_with_reservations if item else []
+                ),
                 contradictions=[
                     ContradictionOut(
                         from_agent_name=c.from_agent_name,
