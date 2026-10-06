@@ -294,7 +294,17 @@ def test_hermetico_sin_red_analisis_completo_en_modo_mock():
     """
     import re
 
-    entorno = dict(os.environ, PYTHONPATH=str(_RAIZ / "scripts"))
+    # PYTHONIOENCODING es obligatorio, no decorativo: abajo se lee la salida del
+    # subproceso con encoding="utf-8", y en Windows el hijo escribe en cp1252 si
+    # no se le dice otra cosa. La decodificación falla en el hilo lector, stdout
+    # queda en None y el test revienta con un TypeError que no tiene nada que ver
+    # con lo que se está probando. Mismo criterio que
+    # scripts/demo_tests_rag_hermeticos.py, de donde sale este patrón.
+    entorno = dict(
+        os.environ,
+        PYTHONPATH=str(_RAIZ / "scripts"),
+        PYTHONIOENCODING="utf-8",
+    )
 
     proceso = subprocess.run(
         [sys.executable, "-m", "pytest",
