@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { downloadPdf } from "@/lib/api";
+import { reportStore } from "@/lib/reportStore";
 import type {
   ArbitrationSummary,
   StructuredReport,
@@ -22,15 +23,20 @@ type Tab = "hipotesis" | "caso" | "debate" | "ensayos" | "bibliografia";
 
 export default function ReportPage() {
   const router = useRouter();
-  const [report, setReport] = useState<StructuredReport | null>(null);
+  const report = useSyncExternalStore(
+    reportStore.subscribe,
+    reportStore.getSnapshot,
+    reportStore.getServerSnapshot,
+  );
   const [tab, setTab] = useState<Tab>("hipotesis");
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
   useEffect(() => {
-    const stored = sessionStorage.getItem("nexus_report");
-    if (!stored) { router.replace("/"); return; }
-    setReport(JSON.parse(stored) as StructuredReport);
+    // Se consulta el almacén en vez de `report`: durante la hidratación esa
+    // variable todavía vale null (es la instantánea del servidor) aunque sí
+    // haya un reporte guardado, y redirigiría al inicio por error.
+    if (reportStore.getSnapshot() === null) router.replace("/");
   }, [router]);
 
   const handleDownload = async () => {

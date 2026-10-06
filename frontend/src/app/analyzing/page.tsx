@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { analyzeFile, analyzeText } from "@/lib/api";
 import { inputStore } from "@/lib/inputStore";
+import { reportStore } from "@/lib/reportStore";
 import type { StructuredReport } from "@/lib/types";
 
 const STEPS = [
@@ -51,7 +52,7 @@ export default function AnalyzingPage() {
 
     const navigate = () => {
       if (canceledRef.current) return;
-      sessionStorage.setItem("nexus_report", JSON.stringify(reportRef.current));
+      reportStore.save(reportRef.current);
       router.push("/report");
     };
 
@@ -119,7 +120,7 @@ export default function AnalyzingPage() {
     })();
 
     return () => { canceledRef.current = true; };
-  }, [router]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [router]);
 
   /* ── Error ──────────────────────────────────────────────────────────── */
   if (error) {
