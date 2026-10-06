@@ -55,6 +55,49 @@ class TestConsensusHypothesis:
     def test_support_count_sin_agentes(self):
         assert ConsensusHypothesis(hypothesis=_hypothesis()).support_count == 0
 
+    def test_agents_with_reservations_son_los_que_estan_en_ambas_listas(self):
+        """Un agente que aportó al grupo y además lo objetó lo sostiene con reservas."""
+        c = ConsensusHypothesis(
+            hypothesis=_hypothesis(),
+            supporting_agents=[
+                "Analista de Literatura", "Especialista Genómica", "Consultor Clínico",
+            ],
+            # A propósito en otro orden: manda el de `supporting_agents`.
+            refuting_agents=["Consultor Clínico", "Analista de Literatura"],
+        )
+        assert c.agents_with_reservations == [
+            "Analista de Literatura", "Consultor Clínico",
+        ]
+
+    def test_agents_with_reservations_sin_solapamiento(self):
+        c = ConsensusHypothesis(
+            hypothesis=_hypothesis(),
+            supporting_agents=["Analista de Literatura"],
+            refuting_agents=["Consultor Clínico"],
+        )
+        assert c.agents_with_reservations == []
+        assert ConsensusHypothesis(hypothesis=_hypothesis()).agents_with_reservations == []
+
+    def test_agents_with_reservations_no_repite_nombres(self):
+        c = ConsensusHypothesis(
+            hypothesis=_hypothesis(),
+            supporting_agents=["Consultor Clínico", "Consultor Clínico"],
+            refuting_agents=["Consultor Clínico"],
+        )
+        assert c.agents_with_reservations == ["Consultor Clínico"]
+
+    def test_agents_with_reservations_no_altera_las_listas(self):
+        """Es un dato derivado: el respaldo que ordena el reporte no cambia."""
+        c = ConsensusHypothesis(
+            hypothesis=_hypothesis(),
+            supporting_agents=["Analista de Literatura", "Consultor Clínico"],
+            refuting_agents=["Consultor Clínico"],
+        )
+        assert c.agents_with_reservations == ["Consultor Clínico"]
+        assert c.supporting_agents == ["Analista de Literatura", "Consultor Clínico"]
+        assert c.refuting_agents == ["Consultor Clínico"]
+        assert c.support_count == 2
+
     def test_envuelve_la_hipotesis_sin_reemplazarla(self):
         """evidence.py sigue recibiendo Hypothesis: el consenso no la transforma."""
         h = _hypothesis()

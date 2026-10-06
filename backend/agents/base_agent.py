@@ -117,7 +117,8 @@ def call_provider(
     para que una llamada funcione.
 
     En modo mock (S4 — D7, variable `NEXUS_MOCK_LLM`), devuelve una respuesta
-    grabada para `task` sin tocar la red ni instanciar el proveedor. Es la
+    grabada para `task` y `agent_id` sin tocar la red ni instanciar el
+    proveedor (la regla de elección está en `backend/mock/responses.py`). Es la
     intercepción, no un endpoint alternativo: la respuesta grabada atraviesa
     después el mismo parseo que una real, porque quien llamó a `_call_llm()`
     no se entera de la diferencia.
@@ -128,7 +129,9 @@ def call_provider(
     """
     if is_mock_active():
         inicio = time.perf_counter()
-        contenido = get_mock_response(task)
+        # El agente que llama elige entre las grabaciones de la tarea: cada
+        # uno recibe la suya, en el orden en que las produjo la corrida real.
+        contenido = get_mock_response(task, agent_id=agent_id)
         usage_telemetry.record_call(
             task=task, model=model, agent_id=agent_id, agent_name=agent_name,
             ok=True, latency_seconds=time.perf_counter() - inicio,

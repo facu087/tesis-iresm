@@ -30,7 +30,8 @@ registra y no detiene las demás.
 
 Con `--grabar` (solo corrida real) la pasada base deja además las respuestas
 crudas del modelo en `grabacion.json`, para regenerar las respuestas del modo
-mock (`backend/mock/responses.py`). No se graba durante la comparación, que
+mock (`backend/mock/responses.py`) con `scripts/regenerar_mock.py`. No se graba
+durante la comparación, que
 repite las mismas tareas con otros modelos, ni el prompt ni el mensaje del
 usuario. Esas respuestas pueden contener texto del caso: la carpeta es local e
 ignorada por git. Con `--mock` no hay nada que grabar y se avisa.
@@ -71,6 +72,7 @@ from backend.api.router import _arbitrate_safe, _navigate_trials_safe, _synthesi
 from backend.ingestion.biomarker_extractor import extract as extract_biomarkers
 from backend.ingestion.normalizer import normalize
 from backend.mock import recorder
+from backend.mock import responses as mock_responses
 from backend.mock.mode import ENV_VAR, is_mock_active
 from backend.models.arbitration import ArbitrationResult
 from backend.models.case import ClinicalCase
@@ -253,12 +255,16 @@ async def _en_registro_aparte(
     """
     token = usage_telemetry.open_registry()
     registro = usage_telemetry.current()
+    # Sesión de reproducción propia: en modo mock la rama recibe la primera
+    # grabación de su tarea, sin heredar el conteo de la pasada base.
+    token_reproduccion = mock_responses.open_replay_session()
     try:
         resultado = await rama()
         error: BaseException | None = None
     except Exception as exc:  # una rama que falla no tira las demás
         resultado, error = None, exc
     finally:
+        mock_responses.close_replay_session(token_reproduccion)
         usage_telemetry.close_registry(
             token, output_path=carpeta / "costos_comparacion.jsonl", mock=mock
         )
@@ -472,6 +478,10 @@ async def correr(carpeta: Path, mock: bool, grabar: bool = False) -> int:
     # Pasada base, en su propio registro: costos.jsonl.
     token = usage_telemetry.open_registry()
     registro = usage_telemetry.current()
+    # Sesión de reproducción del modo mock, abierta antes de la pasada como en
+    # `router.analyze()`: cuenta las llamadas de cada agente para entregarle su
+    # grabación de cada ronda. En una corrida real nadie la consulta.
+    token_reproduccion = mock_responses.open_replay_session()
     inicio = time.perf_counter()
     error_base: str | None = None
     try:
@@ -482,6 +492,7 @@ async def correr(carpeta: Path, mock: bool, grabar: bool = False) -> int:
               "se miden los pasos que sí corrieron.", file=sys.stderr)
     finally:
         espera = time.perf_counter() - inicio
+        mock_responses.close_replay_session(token_reproduccion)
         usage_telemetry.close_registry(token, output_path=carpeta / "costos.jsonl", mock=mock)
         if token_grabador is not None:
             # Aunque la pasada falle a mitad de camino: lo ya pagado no se pierde.

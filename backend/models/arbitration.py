@@ -79,6 +79,21 @@ class ConsensusHypothesis(BaseModel):
         """Cuántos agentes sostienen la hipótesis. Pesa en el orden del reporte."""
         return len(self.supporting_agents)
 
+    @property
+    def agents_with_reservations(self) -> list[str]:
+        """
+        Agentes que sostienen la hipótesis y además la objetan.
+
+        Un agente puede estar en las dos listas: aportó una hipótesis al grupo y
+        mantuvo una objeción de peso contra otra que terminó agrupada con la
+        suya. Las listas no se tocan —el orden del reporte usa la cantidad de
+        agentes que sostienen—; este dato derivado permite mostrarlo una sola
+        vez, como quien la sostiene con reservas. Sigue el orden de
+        `supporting_agents` y no repite nombres.
+        """
+        objetan = set(self.refuting_agents)
+        return list(dict.fromkeys(a for a in self.supporting_agents if a in objetan))
+
 
 class ArbitrationInput(BaseModel):
     """
