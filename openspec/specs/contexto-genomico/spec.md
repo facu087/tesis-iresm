@@ -86,7 +86,8 @@ consulta externa. El sistema MUST NOT consultar PharmGKB por nombres de fármaco
   `consultada`
 
 ### Requirement: Anonimización de las consultas externas
-Toda solicitud a una fuente genómica externa MUST contener únicamente símbolos de genes saneados. Las
+Toda solicitud a una fuente genómica externa MUST contener únicamente símbolos de genes saneados; las
+consultas a ClinVar agregan además la notación de la variante (ver `clinvar-variantes`). Las
 solicitudes MUST NOT contener narrativa clínica, perfil del paciente, antecedentes, estudios negativos,
 nombres de fármacos ni ningún otro texto del documento clínico.
 
