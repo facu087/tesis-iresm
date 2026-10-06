@@ -175,8 +175,19 @@
       `TestActivacion::test_sin_api_key_y_sin_mock_falla_claro` y
       `test_sin_api_key_pero_con_mock_no_falla`. `backend/main.py` informa el modo
       mock al arrancar (test `test_lo_informa_al_arrancar`).
-- [ ] 6.4 Marcar el reporte producido en modo mock, y mostrarlo en el frontend y en el PDF con la misma visibilidad que la advertencia del consenso de IA. Verificar con `tests/test_pdf_exporter.py` sobre el texto extraído, y con `npm run build` más una captura de la vista.
-      **Parcial — código hecho, verificación de build/visual incompleta.** El código
+- [x] 6.4 Marcar el reporte producido en modo mock, y mostrarlo en el frontend y en el PDF con la misma visibilidad que la advertencia del consenso de IA. Verificar con `tests/test_pdf_exporter.py` sobre el texto extraído, y con `npm run build` más una captura de la vista.
+      **Verificación completada el 2026-10-06** (sobre `develop` `50f5c65`, checkout
+      principal): `npm run build` compila sin rodeos (Next.js 16.2.7, 11 de 11
+      páginas; acá `frontend/node_modules` es un directorio real, la falla anterior
+      era propia del worktree). Captura tomada recorriendo el flujo real en un
+      navegador con `NEXUS_MOCK_LLM=1`: `/ingresar` → `/analizar` → `/analyzing` →
+      `/report`, 19 llamadas mock y 0 reales. El aviso es lo primero bajo el
+      encabezado, antes de la meta bar y de los demás avisos, en rojo pleno con
+      texto blanco: más visible que la línea del consenso de IA, que va dentro del
+      aviso del Árbitro. `metadata.mock` es `true` en el reporte que guarda el
+      frontend. Evidencia en `output/evidencia/83/` (local, no versionada). La
+      nota que sigue es el estado previo, conservado como registro.
+      **Estado al 2026-09 — parcial — código hecho, verificación de build/visual incompleta.** El código
       está: `ReportMetadata.mock` (schemas.py) ← `build_export(mock=...)` ←
       `router.py`; banner rojo primero en el PDF (`pdf_exporter.py`) y en el
       frontend (`<MockBanner/>` en `report/page.tsx`, antes que la meta bar).
