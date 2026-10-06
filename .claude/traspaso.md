@@ -213,6 +213,24 @@ Con 6.2, 6.4 y 7.5 hechas, `control-de-costos-del-pipeline` quedó sin tareas ab
 archivó el 2026-10-06 junto con `landing-demostrativa`. Sus specs están en `openspec/specs/`
 (`modo-mock-pipeline`, `presupuesto-por-tarea` y `telemetria-de-costos`).
 
+**El modo mock puede reproducir la corrida completa** (rama
+`feature/s4-mock-reproduce-corrida`, 2026-10-06; detalle en
+`odd/tasks/mock-reproduce-corrida.md`). `backend/mock/grabadas.json` admite varias grabaciones
+por tarea y cada agente recibe la suya, en el orden en que la pidió. El archivo versionado
+sigue con una por tarea, así que el reporte mock todavía sale con hipótesis duplicadas y notas
+del Árbitro que no corresponden (medido en el ensayo del 2026-10-06: 10 hipótesis de consenso,
+5 textos repetidos). Para que salga fiel hace falta una corrida real:
+
+```bash
+python scripts/medir_costos.py --grabar
+python scripts/regenerar_mock.py output/medicion_costos/grabacion.json backend/mock/grabadas.json
+pytest tests/test_mock_responses.py -q
+```
+
+`regenerar_mock.py` nunca se corrió contra una grabación real: la primera vez hay que mirar el
+resultado. Esa misma corrida sirve para cerrar la T4 del Agente 06 (4.1), exportar el PDF de
+respaldo de la demo y sacar la captura real de la tarjeta #80.
+
 La comparación de costo contra Claude, GPT-4o y Gemini que muestra `scripts/demo_costos.py`
 usa una **muestra sintética**. Con el `costos.jsonl` real ya se puede recalcular con
 `usage.recalculate()` y una tabla de tarifas.
