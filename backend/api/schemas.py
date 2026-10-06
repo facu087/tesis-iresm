@@ -66,6 +66,12 @@ class RankedHypothesis(BaseModel):
     # Consenso del Árbitro (Agente 04). Aditivo: un reporte anterior al Árbitro
     # llega con estas listas vacías y se renderiza como antes.
     refuting_agents: list[str] = []
+    # Dato derivado: los nombres que están a la vez en `supporting_agents` y en
+    # `refuting_agents` (aportaron una hipótesis al grupo y mantienen una
+    # objeción contra otra del mismo grupo). Las dos listas no cambian; la vista
+    # y el PDF lo usan para mostrar a ese agente una sola vez, como quien
+    # sostiene con reservas. Aditivo: vacío en un reporte anterior al campo.
+    agents_with_reservations: list[str] = []
     contradictions: list["ContradictionOut"] = []
     arbiter_note: str = ""           # veredicto del Árbitro, en lenguaje llano
     recitation: str = "no_aplica"    # no_aplica | mejorada | sin_cambio | fallida

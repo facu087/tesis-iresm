@@ -268,6 +268,47 @@ class TestAnalisisCompletoEnModoMock:
         assert response.status_code == 200
         assert response.json()["metadata"]["mock"] is True
 
+    def test_cada_analisis_abre_y_cierra_su_sesion_de_reproduccion(
+        self, monkeypatch, client_medico_verificado_sin_relanzar
+    ):
+        """
+        El conteo de llamadas del modo mock es por análisis: el endpoint abre
+        la sesión antes de la primera llamada al modelo, todas las llamadas del
+        análisis la ven y al terminar queda cerrada.
+        """
+        abiertas: list[object] = []
+        vistas: list[object] = []
+        cerradas: list[object] = []
+        abrir, cerrar = mock_responses.open_replay_session, mock_responses.close_replay_session
+        elegir = mock_responses.get_mock_response
+
+        def abrir_espiado():
+            token = abrir()
+            abiertas.append(mock_responses.current_replay_session())
+            return token
+
+        def cerrar_espiado(token):
+            cerradas.append(mock_responses.current_replay_session())
+            cerrar(token)
+
+        def elegir_espiado(task, **kwargs):
+            vistas.append(mock_responses.current_replay_session())
+            return elegir(task, **kwargs)
+
+        monkeypatch.setattr(mock_responses, "open_replay_session", abrir_espiado)
+        monkeypatch.setattr(mock_responses, "close_replay_session", cerrar_espiado)
+        monkeypatch.setattr("backend.agents.base_agent.get_mock_response", elegir_espiado)
+
+        for _ in range(2):
+            assert self._correr(
+                monkeypatch, client_medico_verificado_sin_relanzar
+            ).status_code == 200
+
+        assert len(abiertas) == 2 and abiertas[0] is not abiertas[1]  # una por análisis
+        assert cerradas == abiertas
+        assert vistas and all(v is not None for v in vistas)
+        assert {id(v) for v in vistas} == {id(a) for a in abiertas}
+
     def test_sin_modo_mock_el_reporte_no_esta_marcado(self, monkeypatch):
         """Complemento: un reporte real (aquí, con todo mockeado igual) no lo declara."""
         monkeypatch.delenv(ENV_VAR, raising=False)
