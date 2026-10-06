@@ -3,23 +3,28 @@ Construcción y enriquecimiento del contexto genómico para el Agente 02.
 
 - build(case): determinista, sin red. Sanea símbolos, detecta estudios negativos
   y construye GenomicContext desde los datos del caso.
-- enrich(ctx, genes): consulta PharmGKB de forma asíncrona. Nunca lanza excepción:
-  ante cualquier error actualiza el estado de la fuente y devuelve el contexto.
+- enrich(ctx): consulta PharmGKB (por gen) y ClinVar (por variante) en paralelo.
+  Nunca lanza excepción: ante cualquier error actualiza el estado de la fuente
+  y devuelve el contexto.
 """
 
 from __future__ import annotations
 
+import asyncio
 import re
 import sys
 
+from ..external.clinvar import ClinVarClient
 from ..external.pharmgkb import PharmGKBClient
 from ..external.rate_limiter import ApiUnavailableError, RateLimitError
 from ..models.case import ClinicalCase
 from ..models.genomics import (
+    ClinVarStatus,
     GenomicContext,
     GenomicSource,
     GenomicSourceStatus,
     PharmacogenomicAnnotation,
+    VariantClassification,
 )
 
 # Siglas que el regex de genes captura pero son enfermedades o abreviaturas clínicas
@@ -39,6 +44,9 @@ _NEGATIVE_KEYWORDS: tuple[str, ...] = (
 
 # Número máximo de genes a consultar en PharmGKB por corrida
 _MAX_PHARMGKB_GENES = 3
+
+# Número máximo de variantes a consultar en ClinVar por análisis (2 solicitudes c/u)
+_MAX_CLINVAR_VARIANTS = 5
 
 
 def _is_negative_sentence(sentence: str) -> bool:
@@ -142,9 +150,9 @@ def build(case: ClinicalCase) -> GenomicContext:
     )
 
 
-async def enrich(ctx: GenomicContext) -> GenomicContext:
+async def _enrich_pharmgkb(ctx: GenomicContext) -> GenomicContext:
     """
-    Enriquece el contexto con anotaciones de PharmGKB. Nunca lanza excepción.
+    Anotaciones de PharmGKB. Nunca lanza excepción.
 
     Consulta hasta _MAX_PHARMGKB_GENES genes. Si no hay genes, marca la fuente
     como no_consultada. Cualquier error de red o de la API actualiza el estado
@@ -208,4 +216,93 @@ async def enrich(ctx: GenomicContext) -> GenomicContext:
     return ctx.model_copy(update={
         "annotations": all_annotations,
         "sources": [GenomicSource(name="PharmGKB", status=status)],
+    })
+
+
+def pair_variants(ctx: GenomicContext) -> tuple[list[tuple[str, str]], list[str]]:
+    """
+    Empareja cada variante con su gen, de forma determinista (design.md D4).
+
+    Devuelve (pares gen-variante consultables, variantes sin gen identificable).
+    Orden de prioridad: el gen escrito en la propia variante; el gen que comparte
+    una frase de `genetic_findings` con la variante; el único gen del caso.
+    """
+    genes = [g for g in ctx.genes if g]
+    pairs: list[tuple[str, str]] = []
+    unpaired: list[str] = []
+    for raw in ctx.variants:
+        variant = raw.strip()
+        gene = next((g for g in genes if re.search(rf"\b{re.escape(g)}\b", variant)), None)
+        if gene:
+            variant = re.sub(rf"\b{re.escape(gene)}\b[:\s]*", "", variant).strip()
+        else:
+            for finding in ctx.genetic_findings:
+                if variant in finding:
+                    gene = next(
+                        (g for g in genes if re.search(rf"\b{re.escape(g)}\b", finding)), None
+                    )
+                    if gene:
+                        break
+        if gene is None and len(genes) == 1:
+            gene = genes[0]
+        if gene and variant and (gene, variant) not in pairs:
+            pairs.append((gene, variant))
+        elif not gene:
+            unpaired.append(raw)
+    return pairs, unpaired
+
+
+def _clinvar_source(results: list[VariantClassification], detail: str) -> GenomicSource:
+    statuses = {r.status for r in results}
+    if ClinVarStatus.encontrada in statuses:
+        status = GenomicSourceStatus.consultada
+    elif statuses == {ClinVarStatus.no_disponible}:
+        status = GenomicSourceStatus.no_disponible
+    else:
+        status = GenomicSourceStatus.sin_resultados
+    return GenomicSource(name="ClinVar", status=status, detail=detail)
+
+
+async def _enrich_clinvar(ctx: GenomicContext) -> tuple[list[VariantClassification], GenomicSource]:
+    """Clasificaciones de ClinVar para las variantes del caso. Nunca lanza excepción."""
+    pairs, unpaired = pair_variants(ctx)
+    notes: list[str] = []
+    if unpaired:
+        notes.append(f"{len(unpaired)} variante(s) sin gen identificable, no consultadas")
+    if len(pairs) > _MAX_CLINVAR_VARIANTS:
+        notes.append(f"{len(pairs) - _MAX_CLINVAR_VARIANTS} variante(s) sobre el máximo de "
+                     f"{_MAX_CLINVAR_VARIANTS}, no consultadas")
+        pairs = pairs[:_MAX_CLINVAR_VARIANTS]
+    detail = "; ".join(notes)
+
+    if not pairs:
+        return [], GenomicSource(
+            name="ClinVar", status=GenomicSourceStatus.no_consultada,
+            detail=detail or "Sin variantes en el caso.",
+        )
+
+    try:
+        async with ClinVarClient() as client:
+            results = [await client.classify(gene, variant) for gene, variant in pairs]
+    except Exception as exc:
+        print(f"[NEXUS] ClinVar no disponible: {type(exc).__name__}", file=sys.stderr)
+        results = [
+            VariantClassification(gene=g, variant=v, status=ClinVarStatus.no_disponible,
+                                  detail=type(exc).__name__)
+            for g, v in pairs
+        ]
+    return results, _clinvar_source(results, detail)
+
+
+async def enrich(ctx: GenomicContext) -> GenomicContext:
+    """
+    Enriquece el contexto con PharmGKB (por gen) y ClinVar (por variante), en
+    paralelo. Nunca lanza excepción; las dos fuentes quedan en `sources`.
+    """
+    pharm_ctx, (clinvar, clinvar_source) = await asyncio.gather(
+        _enrich_pharmgkb(ctx), _enrich_clinvar(ctx)
+    )
+    return pharm_ctx.model_copy(update={
+        "clinvar": clinvar,
+        "sources": [*pharm_ctx.sources, clinvar_source],
     })

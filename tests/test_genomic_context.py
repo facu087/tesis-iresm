@@ -366,3 +366,118 @@ class TestEnrichConGenes:
         for llamada in llamadas:
             assert "neuropatía" not in llamada.lower()
             assert "42" not in llamada
+
+
+# ── Sección 3: enrich() — ClinVar ────────────────────────────────────────────
+
+from backend.models.genomics import ClinVarStatus, VariantClassification  # noqa: E402
+from backend.pipeline.genomic_context import pair_variants  # noqa: E402
+
+
+def _clinvar_mock(por_variante: dict[str, VariantClassification] | None = None,
+                  llamadas: list | None = None):
+    por_variante = por_variante or {}
+    mock = AsyncMock()
+    mock.__aenter__ = AsyncMock(return_value=mock)
+    mock.__aexit__ = AsyncMock(return_value=False)
+
+    async def classify(gene: str, variant: str):
+        if llamadas is not None:
+            llamadas.append((gene, variant))
+        return por_variante.get(variant, VariantClassification(
+            gene=gene, variant=variant, status=ClinVarStatus.sin_resultados))
+
+    mock.classify = classify
+    return mock
+
+
+_TTR_PATOGENICA = VariantClassification(
+    gene="TTR", variant="c.148G>A", status=ClinVarStatus.encontrada,
+    classification="Pathogenic",
+    review_status="criteria provided, multiple submitters, no conflicts",
+    accession="VCV000013417", url="https://www.ncbi.nlm.nih.gov/clinvar/variation/13417/",
+)
+
+
+class TestEmparejamientoVarianteGen:
+    def test_gen_en_la_frase_del_hallazgo(self):
+        ctx = GenomicContext(genes=["PMP22", "TTR"], variants=["p.Val30Met"],
+                             genetic_findings=["Variante p.Val30Met en gen TTR heterocigoto"])
+        assert pair_variants(ctx) == ([("TTR", "p.Val30Met")], [])
+
+    def test_gen_unico_del_caso(self):
+        ctx = GenomicContext(genes=["TTR"], variants=["c.148G>A"])
+        assert pair_variants(ctx) == ([("TTR", "c.148G>A")], [])
+
+    def test_gen_escrito_en_la_variante(self):
+        ctx = GenomicContext(genes=["PMP22", "TTR"], variants=["TTR c.148G>A"])
+        assert pair_variants(ctx) == ([("TTR", "c.148G>A")], [])
+
+    def test_varios_genes_sin_vinculo_no_se_consulta(self):
+        ctx = GenomicContext(genes=["PMP22", "TTR"], variants=["c.148G>A"])
+        assert pair_variants(ctx) == ([], ["c.148G>A"])
+
+
+class TestEnrichClinVar:
+    def test_caso_base_sin_variantes_no_hace_solicitudes(self):
+        ctx = GenomicContext(genes=["PMP22"])
+        with patch("backend.pipeline.genomic_context.ClinVarClient") as mock_cls, \
+             patch("backend.pipeline.genomic_context.PharmGKBClient", return_value=_make_mock_client()):
+            r = asyncio.run(enrich(ctx))
+        mock_cls.assert_not_called()
+        clinvar = next(s for s in r.sources if s.name == "ClinVar")
+        assert clinvar.status == GenomicSourceStatus.no_consultada
+
+    def test_variante_ttr_encontrada_y_pharmgkb_conservada(self):
+        ctx = GenomicContext(genes=["TTR"], variants=["c.148G>A"])
+        with patch("backend.pipeline.genomic_context.ClinVarClient",
+                   return_value=_clinvar_mock({"c.148G>A": _TTR_PATOGENICA})), \
+             patch("backend.pipeline.genomic_context.PharmGKBClient", return_value=_make_mock_client()):
+            r = asyncio.run(enrich(ctx))
+        assert [s.name for s in r.sources] == ["PharmGKB", "ClinVar"]
+        assert r.sources[1].status == GenomicSourceStatus.consultada
+        assert r.clinvar == [_TTR_PATOGENICA]
+        bloque = r.to_prompt_block()
+        assert "Pathogenic" in bloque and "VCV000013417" in bloque
+
+    def test_clinvar_caido_no_pisa_pharmgkb(self):
+        ctx = GenomicContext(genes=["TTR"], variants=["c.148G>A"])
+        caido = AsyncMock()
+        caido.__aenter__ = AsyncMock(side_effect=RuntimeError("red"))
+        with patch("backend.pipeline.genomic_context.ClinVarClient", return_value=caido), \
+             patch("backend.pipeline.genomic_context.PharmGKBClient",
+                   return_value=_make_mock_client({"TTR": [_gene_ann("TTR", "tafamidis")]})):
+            r = asyncio.run(enrich(ctx))
+        assert r.annotations and r.sources[0].status == GenomicSourceStatus.consultada
+        assert r.sources[1].status == GenomicSourceStatus.no_disponible
+        assert r.clinvar[0].status == ClinVarStatus.no_disponible
+
+    def test_pharmgkb_caido_no_pisa_clinvar(self):
+        ctx = GenomicContext(genes=["TTR"], variants=["c.148G>A"])
+        caido = AsyncMock()
+        caido.__aenter__ = AsyncMock(side_effect=RuntimeError("red"))
+        with patch("backend.pipeline.genomic_context.ClinVarClient",
+                   return_value=_clinvar_mock({"c.148G>A": _TTR_PATOGENICA})), \
+             patch("backend.pipeline.genomic_context.PharmGKBClient", return_value=caido):
+            r = asyncio.run(enrich(ctx))
+        assert r.sources[0].status == GenomicSourceStatus.no_disponible
+        assert r.sources[1].status == GenomicSourceStatus.consultada
+
+    def test_tope_de_cinco_variantes(self):
+        variantes = [f"c.{i}A>G" for i in range(1, 8)]
+        ctx = GenomicContext(genes=["TTR"], variants=variantes)
+        llamadas: list = []
+        with patch("backend.pipeline.genomic_context.ClinVarClient",
+                   return_value=_clinvar_mock(llamadas=llamadas)), \
+             patch("backend.pipeline.genomic_context.PharmGKBClient", return_value=_make_mock_client()):
+            r = asyncio.run(enrich(ctx))
+        assert len(llamadas) == 5
+        assert "2 variante(s)" in r.sources[1].detail
+
+    def test_bloque_muestra_ambigua_sin_clasificacion(self):
+        ctx = GenomicContext(genes=["TTR"], variants=["Val30Met"], clinvar=[
+            VariantClassification(gene="TTR", variant="Val30Met",
+                                  status=ClinVarStatus.ambigua, candidates=5)])
+        bloque = ctx.to_prompt_block()
+        assert "ambigua" in bloque and "5 registros" in bloque
+        assert "Pathogenic" not in bloque

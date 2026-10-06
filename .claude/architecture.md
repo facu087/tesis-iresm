@@ -351,7 +351,7 @@ El declarado queda en `declared_evidence_level` y la explicación en `evidence_n
 | ID | Rol | Modelo (prod) | Modelo (proto) | Herramientas |
 |----|-----|---------------|----------------|--------------|
 | agente_01 | Analista de Literatura | Claude Opus | Groq `gpt-oss-120b` | PubMed API, RAG |
-| agente_02 | Especialista Genómica | GPT-4o | Groq `gpt-oss-120b` | PharmGKB, ClinVar |
+| agente_02 | Especialista Genómica ✅ | GPT-4o | Groq `gpt-oss-120b` | PharmGKB, ClinVar |
 | agente_03 | Consultor Clínico | Gemini Pro | Groq `gpt-oss-120b` | NCCN Guidelines |
 | agente_04 | Árbitro Verificador ✅ | Claude Opus | Groq `gpt-oss-120b` | PubMed |
 | agente_05 | Navegador de Ensayos ✅ | Dedicado | Groq `gpt-oss-120b` | ClinicalTrials.gov, Orphanet |
