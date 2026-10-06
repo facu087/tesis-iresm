@@ -68,6 +68,12 @@ class TestContrato:
 
 # ── Fidelidad de lo grabado ───────────────────────────────────────────────────
 
+def _entradas_del_archivo(tarea: str) -> list[dict]:
+    """Entradas de `tarea` leídas del archivo, tenga una sola o una lista."""
+    entrada = json.loads(_ARCHIVO.read_text(encoding="utf-8"))["tasks"][tarea]
+    return entrada if isinstance(entrada, list) else [entrada]
+
+
 class TestGrabacionFiel:
     def test_el_archivo_de_datos_esta_versionado_y_es_utf8(self):
         assert _ARCHIVO.is_file()
@@ -75,22 +81,37 @@ class TestGrabacionFiel:
 
     @pytest.mark.parametrize("tarea", sorted(_ESPERADAS_GRABADAS))
     def test_la_respuesta_es_el_texto_del_archivo_sin_retocar(self, tarea):
-        datos = json.loads(_ARCHIVO.read_text(encoding="utf-8"))
-        assert mock_responses.MOCK_RESPONSES[tarea] == datos["tasks"][tarea]["response"]
+        entradas = _entradas_del_archivo(tarea)
+        primera = min(entradas, key=lambda e: e["seq"])
+        assert mock_responses.MOCK_RESPONSES[tarea] == primera["response"]
+        assert sorted(_grabaciones(tarea)) == sorted(e["response"] for e in entradas)
 
     @pytest.mark.parametrize("tarea", sorted(_ESPERADAS_GRABADAS))
     def test_cada_entrada_trae_su_procedencia(self, tarea):
-        entrada = json.loads(_ARCHIVO.read_text(encoding="utf-8"))["tasks"][tarea]
-        assert entrada["model"].startswith("openai/gpt-oss-")
-        assert isinstance(entrada["seq"], int)
-        assert "agent_id" in entrada
-        assert entrada["recorded_at"] == "2026-10-06"
+        for entrada in _entradas_del_archivo(tarea):
+            assert entrada["model"].startswith("openai/gpt-oss-")
+            assert isinstance(entrada["seq"], int)
+            assert "agent_id" in entrada
+            assert entrada["recorded_at"] == "2026-10-06"
 
-    def test_el_modelo_de_la_grabacion_coincide_con_el_presupuesto_de_la_tarea(self):
+    @pytest.mark.parametrize("tarea", sorted(_ESPERADAS_GRABADAS))
+    def test_el_modelo_de_la_grabacion_coincide_con_el_presupuesto_de_la_tarea(self, tarea):
         """Una respuesta de `gpt-oss-20b` no puede hacerse pasar por una de `120b`."""
+        for entrada in _entradas_del_archivo(tarea):
+            assert entrada["model"] == model_tasks.TASK_BUDGETS[tarea].model
+
+    def test_el_archivo_versionado_trae_una_entrada_por_tarea(self):
+        """
+        Con una sola entrada por tarea el modo mock se comporta como antes de
+        la reproducción por agente: la corrida completa no está grabada acá.
+        """
         datos = json.loads(_ARCHIVO.read_text(encoding="utf-8"))["tasks"]
-        for tarea, entrada in datos.items():
-            assert entrada["model"] == model_tasks.TASK_BUDGETS[tarea].model, tarea
+        assert all(isinstance(entrada, dict) for entrada in datos.values())
+        for agente in (None, "01", "02", "03", "04", "05", "06"):
+            for tarea, entrada in datos.items():
+                assert mock_responses.get_mock_response(tarea, agent_id=agente) == (
+                    entrada["response"]
+                )
 
     def test_las_respuestas_conservan_el_formato_crudo_del_modelo(self):
         """Un JSON re-serializado por nosotros no traería sangría de dos espacios."""
@@ -117,13 +138,79 @@ def _entrada_arbitro(n: int) -> ArbitrationInput:
     )
 
 
+def _grabaciones(tarea: str) -> list[str]:
+    """
+    Todas las respuestas grabadas de `tarea`, en orden de `seq`.
+
+    El modo mock puede devolver cualquiera de ellas según el agente y el número
+    de llamada, así que las verificaciones de parseo recorren todas y no solo la
+    primera.
+    """
+    entradas = mock_responses.get_recorded_entries()[tarea]
+    assert entradas, tarea
+    return [entrada["response"] for entrada in entradas]
+
+
+@pytest.fixture
+def sesion_de_reproduccion():
+    """
+    Sesión de reproducción abierta durante el test: dentro de ella, la n-ésima
+    llamada de un agente a una tarea recibe su n-ésima grabación, y así un test
+    que llama una vez por grabación las recorre todas.
+    """
+    token = mock_responses.open_replay_session()
+    yield
+    mock_responses.close_replay_session(token)
+
+
+class TestTodasLasGrabacionesSeVerifican:
+    """Las verificaciones de parseo alcanzan a cada entrada de un archivo con varias."""
+
+    def test_grabaciones_expone_cada_entrada_de_una_tarea_con_varias(self, archivo_de_datos):
+        archivo_de_datos.write_text(json.dumps({"tasks": {
+            "t": [
+                {"agent_id": "02", "model": "m", "seq": 7, "recorded_at": "x", "response": "b"},
+                {"agent_id": "01", "model": "m", "seq": 6, "recorded_at": "x", "response": "a"},
+                {"agent_id": "01", "model": "m", "seq": 9, "recorded_at": "x", "response": "c"},
+            ],
+            "u": {"agent_id": "04", "model": "m", "seq": 1, "recorded_at": "x", "response": "d"},
+        }}), encoding="utf-8")
+        assert _grabaciones("t") == ["a", "b", "c"]
+        assert _grabaciones("u") == ["d"]
+
+    def test_una_grabacion_que_no_parsea_se_detecta_aunque_no_sea_la_primera(
+        self, archivo_de_datos
+    ):
+        buena = json.dumps({"hypotheses": [{
+            "text": "Hipótesis", "priority": "LOW", "evidence_level": "III",
+            "rationale": "Fundamento.", "sources": [],
+        }]})
+        archivo_de_datos.write_text(json.dumps({"tasks": {"debate_revision": [
+            {"agent_id": "01", "model": "m", "seq": 1, "recorded_at": "x", "response": buena},
+            {"agent_id": "02", "model": "m", "seq": 2, "recorded_at": "x",
+             "response": '{"hypotheses": []}'},
+        ]}}), encoding="utf-8")
+        # El parser real rechaza una respuesta sin hipótesis con un ValueError.
+        with pytest.raises(ValueError):
+            TestParseoRealPorSitioDeLlamada().test_hipotesis_parsean_y_no_quedan_vacias(
+                "debate_revision"
+            )
+
+
 class TestParseoRealPorSitioDeLlamada:
     @pytest.mark.parametrize("tarea", ["agente01_hipotesis", "agente02_hipotesis",
                                        "agente03_hipotesis", "debate_revision"])
     def test_hipotesis_parsean_y_no_quedan_vacias(self, tarea):
-        hipotesis = BaseAgent.parse_hypotheses(mock_responses.get_mock_response(tarea))
-        assert len(hipotesis) >= 1
-        assert all(h.text.strip() for h in hipotesis)
+        for respuesta in _grabaciones(tarea):
+            hipotesis = BaseAgent.parse_hypotheses(respuesta)
+            assert len(hipotesis) >= 1
+            assert all(h.text.strip() for h in hipotesis)
+
+    def test_cada_critica_grabada_parsea_con_ids_canonicos(self):
+        for respuesta in _grabaciones("debate_critica"):
+            criticas = ArbiterAgent()._parse_critiques(respuesta)
+            assert criticas
+            assert all(re.fullmatch(r"\d{2}", c.target_agent_id) for c in criticas)
 
     def test_la_critica_grabada_parsea_con_ids_canonicos(self):
         """El modelo real nombra "Agent 02"; el parser real lo lleva a "02"."""
@@ -141,35 +228,44 @@ class TestParseoRealPorSitioDeLlamada:
         assert _critiques_for("01", criticas) == []  # nadie critica al autor de la grabación
 
     def test_recitacion_parsea_con_fuentes(self):
-        recitadas = ArbiterAgent()._parse_recitation(
-            mock_responses.get_mock_response("debate_recitacion"), total=3
-        )
-        assert recitadas and all(fuentes for fuentes in recitadas.values())
+        for respuesta in _grabaciones("debate_recitacion"):
+            recitadas = ArbiterAgent()._parse_recitation(respuesta, total=3)
+            assert recitadas and all(fuentes for fuentes in recitadas.values())
 
     def test_pico_parsea(self):
-        sintesis = pico._parse_pico(mock_responses.get_mock_response("pico_sintesis"))
-        assert sintesis.condition_en and sintesis.clinical_narrative
+        for respuesta in _grabaciones("pico_sintesis"):
+            sintesis = pico._parse_pico(respuesta)
+            assert sintesis.condition_en and sintesis.clinical_narrative
 
-    def test_biomarcadores_extract_combina_regex_y_respuesta_grabada(self):
-        perfil = biomarker_extractor.extract("Paciente con neuropatía axonal progresiva.")
-        assert perfil.antibodies  # los que aportó la respuesta grabada
+    # Los cuatro tests que siguen llegan a la grabación a través de
+    # `call_provider()`: llaman una vez por grabación dentro de una sesión de
+    # reproducción, que les entrega una distinta en cada llamada.
 
-    def test_agrupacion_no_cae_en_el_estado_degradado(self):
+    def test_biomarcadores_extract_combina_regex_y_respuesta_grabada(
+        self, sesion_de_reproduccion
+    ):
+        for _ in _grabaciones("biomarcadores_extraccion"):
+            perfil = biomarker_extractor.extract("Paciente con neuropatía axonal progresiva.")
+            assert perfil.antibodies  # los que aportó la respuesta grabada
+
+    def test_agrupacion_no_cae_en_el_estado_degradado(self, sesion_de_reproduccion):
         agente = ArbiterAgent()
-        grupos, estado = asyncio.run(agente._group(_entrada_arbitro(14)))
-        assert estado is ArbitrationStatus.OK
-        assert sorted(i for g in grupos for i in g) == list(range(14))  # nadie se pierde
+        for _ in _grabaciones("arbitro_agrupacion"):
+            grupos, estado = asyncio.run(agente._group(_entrada_arbitro(14)))
+            assert estado is ArbitrationStatus.OK
+            assert sorted(i for g in grupos for i in g) == list(range(14))  # nadie se pierde
 
     def test_veredictos_ninguno_cita_un_pmid_que_lo_descartaria(self):
-        datos = BaseAgent.extract_json(mock_responses.get_mock_response("arbitro_veredictos"))
-        veredictos = datos["verdicts"]
-        assert veredictos
-        for item in veredictos:
-            assert isinstance(item["hypothesis"], int)
-            assert item["verdict"].strip()
-            assert not _PMID_EN_TEXTO.findall(item["verdict"])
+        for respuesta in _grabaciones("arbitro_veredictos"):
+            datos = BaseAgent.extract_json(respuesta)
+            veredictos = datos["verdicts"]
+            assert veredictos
+            for item in veredictos:
+                assert isinstance(item["hypothesis"], int)
+                assert item["verdict"].strip()
+                assert not _PMID_EN_TEXTO.findall(item["verdict"])
 
-    def test_planificacion_de_terminos_produce_planes(self):
+    def test_planificacion_de_terminos_produce_planes(self, sesion_de_reproduccion):
         agente = TrialNavigatorAgent()
         entrada = TrialNavigationInput(
             condition_en="axonal neuropathy",
@@ -179,22 +275,26 @@ class TestParseoRealPorSitioDeLlamada:
                 for i in range(3)
             ],
         )
-        planes, estado = asyncio.run(agente._plan_terms(entrada))
-        assert estado == "ok" and planes
+        for _ in _grabaciones("agente05_planificacion_terminos"):
+            planes, estado = asyncio.run(agente._plan_terms(entrada))
+            assert estado == "ok" and planes
 
-    def test_evaluacion_de_compatibilidad_conserva_el_ensayo_que_nombra(self):
+    def test_evaluacion_de_compatibilidad_conserva_el_ensayo_que_nombra(
+        self, sesion_de_reproduccion
+    ):
         """El NCT que la grabación evalúa sobrevive a la validación si fue enviado."""
-        datos = json.loads(mock_responses.get_mock_response("agente05_evaluacion_compatibilidad"))
-        nct = datos["evaluations"][0]["nct_id"]
-        ensayo = ClinicalTrial(nct_id=nct, title="Ensayo de prueba", status="RECRUITING",
-                               brief_summary="Resumen.")
         agente = TrialNavigatorAgent()
-        evaluaciones, estado, descartadas = asyncio.run(
-            agente._evaluate(TrialNavigationInput(), [ensayo])
-        )
-        assert estado == "ok" and nct in evaluaciones
-        assert evaluaciones[nct].compatibility in {"alta", "media", "baja"}
-        assert descartadas == len(datos["evaluations"]) - 1  # solo los no enviados
+        for respuesta in _grabaciones("agente05_evaluacion_compatibilidad"):
+            datos = json.loads(respuesta)
+            nct = datos["evaluations"][0]["nct_id"]
+            ensayo = ClinicalTrial(nct_id=nct, title="Ensayo de prueba", status="RECRUITING",
+                                   brief_summary="Resumen.")
+            evaluaciones, estado, descartadas = asyncio.run(
+                agente._evaluate(TrialNavigationInput(), [ensayo])
+            )
+            assert estado == "ok" and nct in evaluaciones
+            assert evaluaciones[nct].compatibility in {"alta", "media", "baja"}
+            assert descartadas == len(datos["evaluations"]) - 1  # solo los no enviados
 
 
 # ── Carga diferida del archivo de datos ───────────────────────────────────────
@@ -286,6 +386,46 @@ class TestCargaDiferida:
         with pytest.raises(mock_responses.RespuestasGrabadasInvalidas) as e:
             mock_responses.get_mock_response("t")
         assert "grabadas.json" in str(e.value)
+
+    def test_acepta_una_tarea_con_una_lista_de_entradas(self, archivo_de_datos):
+        archivo_de_datos.write_text(json.dumps({"tasks": {
+            "varias": [
+                {"agent_id": "02", "model": "m", "seq": 7, "recorded_at": "x", "response": "b"},
+                {"agent_id": None, "model": "m", "seq": 6, "recorded_at": "x", "response": "a"},
+            ],
+            "una": {"agent_id": "04", "model": "m", "seq": 1, "recorded_at": "x",
+                    "response": "c"},
+        }}), encoding="utf-8")
+        todas = mock_responses.get_recorded_entries()
+        assert [e["response"] for e in todas["varias"]] == ["a", "b"]  # por seq
+        assert [e["response"] for e in todas["una"]] == ["c"]
+        # La vista de una entrada por tarea toma la primera por seq.
+        assert mock_responses.RECORDED_RESPONSES["varias"]["seq"] == 6
+        assert mock_responses.MOCK_RESPONSES == {"varias": "a", "una": "c"}
+
+    @pytest.mark.parametrize("entradas", [
+        [],
+        ["texto"],
+        [{"agent_id": "01", "seq": 1}],
+        [{"agent_id": "01", "seq": 1, "response": ""}],
+        [{"agent_id": "01", "seq": 1, "response": 3}],
+        [{"agent_id": "01", "response": "a"}],
+        [{"agent_id": "01", "seq": "1", "response": "a"}],
+        [{"agent_id": "01", "seq": True, "response": "a"}],
+        [{"agent_id": "01", "seq": 1.5, "response": "a"}],
+        [{"seq": 1, "response": "a"}],
+        [{"agent_id": 1, "seq": 1, "response": "a"}],
+        [{"agent_id": "01", "seq": 1, "response": "a"},
+         {"agent_id": "02", "seq": 1, "response": "b"}],
+        [{"agent_id": "01", "seq": 1, "response": "a"}, "texto"],
+        [[{"agent_id": "01", "seq": 1, "response": "a"}]],
+    ])
+    def test_una_lista_malformada_falla_con_el_error_claro(self, archivo_de_datos, entradas):
+        archivo_de_datos.write_text(json.dumps({"tasks": {"t": entradas}}), encoding="utf-8")
+        with pytest.raises(mock_responses.RespuestasGrabadasInvalidas) as e:
+            mock_responses.get_mock_response("t")
+        assert "grabadas.json" in str(e.value)
+        assert mock_responses._CACHE is None
 
     def test_un_fallo_no_deja_una_cache_a_medias(self, archivo_de_datos):
         archivo_de_datos.write_text("{ roto", encoding="utf-8")
