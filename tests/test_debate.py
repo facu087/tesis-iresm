@@ -146,7 +146,8 @@ class TestBaseAgentDebateMethods:
             "critique_text": "C", "severity": "HIGH",
         }]})
         with patch.object(agent, "_call_llm", return_value=mock_json):
-            critiques = agent.critique("ctx", _output("01", "A01", []), [_output("03", "A03", ["H"])])
+            criticados = [_output(i, f"A{i}", ["H"]) for i in ("01", "02", "03")]
+            critiques = agent.critique("ctx", _output("04", "A04", []), criticados)
         assert critiques[0].target_agent_id == esperado
 
     def test_critique_con_destinatario_normalizado_llega_al_agente(self):
@@ -169,6 +170,60 @@ class TestBaseAgentDebateMethods:
         with patch.object(agent, "_call_llm", return_value=mock_json):
             critiques = agent.critique("ctx", _output("01", "A01", []), [_output("03", "A03", ["H"])])
         assert not any(_critiques_for(i, critiques) for i in ("01", "02", "03"))
+
+    @pytest.mark.parametrize("declarado", [
+        "hipótesis 2 del Agente 03",   # dos números: no se elige uno por posición
+        "Agentes 01 y 03",
+        "3.0",                         # dos corridas de dígitos
+        3.0,                           # un float nunca es un ID
+        "003",                         # tres dígitos
+        "Agente ٣",                    # dígito Unicode no ASCII
+        "Agente 03 ٢",
+        True,
+        -3,
+    ])
+    def test_critique_con_destinatario_ambiguo_queda_sin_atribuir(self, declarado):
+        agent = self._make_agent()
+        mock_json = json.dumps({"critiques": [{
+            "target_agent_id": declarado, "target_hypothesis": "H",
+            "critique_text": "C", "severity": "HIGH",
+        }]})
+        with patch.object(agent, "_call_llm", return_value=mock_json):
+            critiques = agent.critique(
+                "ctx", _output("01", "A01", []),
+                [_output("02", "A02", ["H"]), _output("03", "A03", ["H"])],
+            )
+        assert critiques[0].target_agent_id == ""
+
+    @pytest.mark.parametrize("declarado", ["Agent 04", "04", 4, "Agente 99"])
+    def test_critique_a_un_agente_que_no_fue_criticado_queda_sin_atribuir(self, declarado):
+        agent = self._make_agent()
+        mock_json = json.dumps({"critiques": [{
+            "target_agent_id": declarado, "target_hypothesis": "H",
+            "critique_text": "C", "severity": "HIGH",
+        }]})
+        with patch.object(agent, "_call_llm", return_value=mock_json):
+            critiques = agent.critique("ctx", _output("01", "A01", []), [_output("03", "A03", ["H"])])
+        assert critiques[0].target_agent_id == ""
+
+    def test_critique_dirigida_al_propio_autor_queda_sin_atribuir(self):
+        agent = self._make_agent()
+        mock_json = json.dumps({"critiques": [{
+            "target_agent_id": "Agent 01", "target_hypothesis": "H",
+            "critique_text": "C", "severity": "HIGH",
+        }]})
+        with patch.object(agent, "_call_llm", return_value=mock_json):
+            critiques = agent.critique("ctx", _output("01", "A01", []), [_output("03", "A03", ["H"])])
+        assert critiques[0].target_agent_id == ""
+
+    def test_parse_critiques_con_un_solo_argumento_aplica_solo_la_regla_de_formato(self):
+        agent = self._make_agent()
+        raw = json.dumps({"critiques": [
+            {"target_agent_id": "Agent 07", "target_hypothesis": "H", "critique_text": "C"},
+            {"target_agent_id": "Agentes 01 y 03", "target_hypothesis": "H", "critique_text": "C"},
+        ]})
+        criticas = agent._parse_critiques(raw)
+        assert [c.target_agent_id for c in criticas] == ["07", ""]
 
     def test_critique_pide_el_id_de_dos_digitos_en_el_prompt(self):
         agent = self._make_agent()
