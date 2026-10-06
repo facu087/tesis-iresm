@@ -377,6 +377,13 @@ def _group_status(status: str) -> str:
     return status if status in conocidos else "especulativa"
 
 
+def _executive_summary(report: StructuredReport, s: dict) -> list:
+    """Resumen del Agente 06; vacío si no hay (reporte previo o descartado)."""
+    if not report.executive_summary:
+        return []
+    return [*_section("RESUMEN EJECUTIVO", s), _par(report.executive_summary, s["body"])]
+
+
 def _hypotheses(report: StructuredReport, s: dict) -> list:
     elems = _section("HIPÓTESIS DE INVESTIGACIÓN", s)
 
@@ -709,6 +716,7 @@ def generate_pdf(report: StructuredReport) -> bytes:
     elements: list = []
     elements.extend(_cover(report, s))
     elements.extend(_case_summary(report, s))
+    elements.extend(_executive_summary(report, s))
     elements.extend(_hypotheses(report, s))
     elements.extend(_debate_summary(report, s))
     elements.extend(_clinical_trials(report, s))

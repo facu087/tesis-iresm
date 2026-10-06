@@ -113,7 +113,7 @@ Suite de tests: **82 tests, 100% passing** (`pytest tests/`)
 | 10 | Agente 05 (Navegador de Ensayos): búsqueda en ClinicalTrials + Orphanet | ✅ Hecho (`agents/agent_05_trials.py`, `pipeline/trial_matching.py`) |
 | 11 | Priorización de hipótesis por nivel de evidencia EBM (I, II, III) | ✅ Hecho (`pipeline/evidence.py`) |
 | 12 | Integrar contexto RAG (búsqueda semántica PubMed) a la Ronda 1 del orquestador | ✅ Hecho |
-| 13 | Agente 06 (Sintetizador): reporte final asistido por LLM | 📋 Pendiente |
+| 13 | Agente 06 (Sintetizador): reporte final asistido por LLM | ✅ Hecho (agents/agent_06_synthesizer.py, api/router.py paso 9, campo `executive_summary`) — ver nota (13) |
 | 14 | Embeddings biomédicos configurables en el RAG (elegidos midiendo) | ✅ Hecho |
 | 15 | Fix: el RAG consultaba PubMed en español — ahora usa `condition_en` | ✅ Hecho |
 | 16 | Verificación bibliográfica de PMIDs: título real vs. citado (`pipeline/verification.py`) | ✅ Hecho |
@@ -479,7 +479,7 @@ decisiones de fondo y distinto texto. Se resolvió en el merge del PR #13.
 | **Facundo** | #51 Agente 02 (en curso), #73 fix del regex de genes, #71 cliente ClinVar | Genómica e ingesta: `orchestrator.py`, `debate.py`, `models/case.py`, `pharmgkb.py`, `biomarker_extractor.py`, `external/clinvar.py` |
 | **Matías** | #52 Agente 04 (Árbitro) + hallazgo G | Verificación: `verification.py`, `evidence.py`, paso 7 del router, `base_agent.parse_hypotheses()` |
 | **Fede** | #74 cliente Orphadata, hallazgos A, B y H, arreglos del PDF (portada y celdas del resumen), y los dos arreglos manuales de Trello (#65 adjunto duplicado, #63 PNG sin extensión) | RAG, frontend y calidad: `rag/retriever.py`, `tests/test_rag_integration.py`, `pdf_exporter.py`, `frontend/` |
-| **Sin asignar** | #62 Agente 06 (Sintetizador) | Va **última**: depende de que exista el Agente 04 y pisa el `pdf_exporter.py` que toca Fede. La toma quien se libere primero. |
+| **Facundo** | #62 Agente 06 (Sintetizador) | Implementado en `feature/s4-agente-06-sintetizador`. Falta grabar la respuesta mock con una corrida real. |
 
 ### Reglas para no pisarnos
 
@@ -524,3 +524,17 @@ el alcance de la tarea en la que aparecieron. Con archivo y línea, para retomar
 - Las 3 tarjetas en **RECHAZADO** (los módulos de ingesta, EP-01) ya tienen la evidencia
   adjunta desde el 2026-06-15, cinco días después del rechazo, pero nadie las movió de
   vuelta a QA — así que el profesor nunca las re-revisó.
+
+
+> **Nota (13) — Agente 06 (Sintetizador), 2026-10-06.** `SynthesizerAgent.synthesize()`
+> recibe el `StructuredReport` ya construido por `build_export()` y devuelve un párrafo
+> (≤5 oraciones) que va en el campo nuevo `executive_summary: str | None` del contrato JSON
+> (`None` = reporte previo al agente, LLM caído o resumen descartado). Guarda anti-invención:
+> se descarta el resumen entero si cita un PMID, NCT o símbolo génico ausente del reporte.
+> Tarea de presupuesto `agente06_sintesis` (GROQ_MAIN, 4096). Se muestra arriba de las
+> hipótesis en el frontend y como "RESUMEN EJECUTIVO" en el PDF.
+> **Respuesta mock:** grabada de la corrida real del 2026-10-06 (`agente06_sintesis` en
+> `backend/mock/grabadas.json`); en esa corrida la guarda aceptó el resumen. En modo mock la
+> guarda lo **descarta** (cita SPTLC1/DNMT1, que no llegan al reporte mock porque las grabadas
+> guardan solo la primera respuesta de cada tarea): `executive_summary` queda `None`. Es la
+> guarda funcionando, no un fallo; no se afloja para el modo mock.

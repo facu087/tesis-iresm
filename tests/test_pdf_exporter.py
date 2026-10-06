@@ -631,3 +631,15 @@ class TestCaracteresNoSoportados:
         texto = " ".join(_texto_del_pdf(generate_pdf(reporte)).split())
 
         assert "Amiloidosis ATTR - variante \"Val30Met\" con seguimiento >= 24 meses" in texto
+
+
+def test_resumen_ejecutivo_en_pdf_solo_si_existe():
+    from backend.pipeline import pdf_exporter
+    from tests.test_agent_06_synthesizer import _report
+
+    r = _report()
+    s = pdf_exporter._styles()
+    assert pdf_exporter._executive_summary(r, s) == []
+    r.executive_summary = "Resumen de prueba."
+    assert len(pdf_exporter._executive_summary(r, s)) > 1
+    assert pdf_exporter.generate_pdf(r)[:4] == b"%PDF"

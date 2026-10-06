@@ -77,7 +77,8 @@ Backend mergeado a `develop` (capa de recuperación de evidencia / RAG). Autor: 
       (backend/agents/agent_04_arbiter.py + pipeline/consensus.py + pipeline/recitation.py)
 - [x] Agente 05 (Navegador de Ensayos): ClinicalTrials.gov + Orphanet
       (backend/agents/agent_05_trials.py + backend/pipeline/trial_matching.py)
-- [ ] Agente 06 (Sintetizador): reporte final — reemplaza a `pipeline/report_builder.py`
+- [x] Agente 06 (Sintetizador): `executive_summary` en prosa con guarda anti-invención
+      (backend/agents/agent_06_synthesizer.py — corre después de `build_export()`, no lo reemplaza)
 - [x] Priorización de hipótesis por nivel de evidencia EBM (I, II, III) (backend/pipeline/evidence.py)
 - [x] Control de costos: punto único de llamada al proveedor, telemetría de
       tokens por análisis, tarifas configurables, techo y modelo por tarea
@@ -133,7 +134,7 @@ Backend mergeado a `develop` (capa de recuperación de evidencia / RAG). Autor: 
 | 03 | Consultor Clínico | ✅ Implementado |
 | 04 | Árbitro Verificador | ✅ Implementado |
 | 05 | Navegador de Ensayos | ✅ Implementado |
-| 06 | Sintetizador | 📋 Pendiente |
+| 06 | Sintetizador | ✅ Implementado |
 
 > La **fuente de verdad** de la numeración y los roles es la tabla de
 > `.claude/architecture.md`. Este archivo la replica solo para consulta rápida:
@@ -229,6 +230,8 @@ Scripts disponibles:
   raras, estado de cada API y latencia); genera `navegacion.json` y `resumen.txt`.
   `--sin-red` usa respuestas grabadas y simula la caída de ClinicalTrials.gov,
   Orphanet y el LLM para mostrar cada fallback (`fallbacks.txt`)
+- `demo_agente06.py` — Agente 06: contexto enviado al LLM → `executive_summary`, y la guarda
+  anti-invención sobre PMID/NCT/gen inventados; guarda `output/demo_agente06/resumen.json`
 - `demo_costos.py` (control de costos, Sprint 4) — corre siempre en modo mock,
   sin red ni cuota: (1) `pico.build()` + `biomarker_extractor.extract()` con
   `NEXUS_MOCK_LLM=1` dentro de un registro de telemetría, para probar el
@@ -280,6 +283,7 @@ tesis-iresm/
 │   │   ├── agent_03_clinical.py    ← Consultor Clínico (Groq)
 │   │   ├── agent_04_arbiter.py     ← Árbitro Verificador (S4) — arbitrate(), no debate
 │   │   ├── agent_05_trials.py      ← Navegador de Ensayos (S4) — navigate(), no debate
+│   │   ├── agent_06_synthesizer.py ← Sintetizador (S4) — synthesize(), executive_summary
 │   │   └── __init__.py
 │   ├── auth/                       ← autenticación, sesión y autorización (S4)
 │   │   ├── security.py             ← hash/verify de contraseña (Argon2id)

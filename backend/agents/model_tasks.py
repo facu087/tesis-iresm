@@ -68,6 +68,7 @@ REASONING_TASKS: frozenset[str] = frozenset({
     "debate_recitacion",
     "arbitro_veredictos",
     "pico_sintesis",
+    "agente06_sintesis",
 })
 
 TASK_BUDGETS: dict[str, TaskBudget] = {
@@ -96,6 +97,7 @@ TASK_BUDGETS: dict[str, TaskBudget] = {
     # sobra en el peor caso, así que se conserva sin cambios; solo baja el
     # modelo.
     "agente05_evaluacion_compatibilidad": TaskBudget(GROQ_FAST, 4096),
+    "agente06_sintesis": TaskBudget(GROQ_MAIN, 4096),
 }
 
 

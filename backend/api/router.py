@@ -17,6 +17,7 @@ from ..agents.agent_02_genomics import GenomicsSpecialistAgent
 from ..agents.agent_03_clinical import ClinicalConsultantAgent
 from ..agents.agent_04_arbiter import ArbiterAgent
 from ..agents.agent_05_trials import TrialNavigatorAgent
+from ..agents.agent_06_synthesizer import SynthesizerAgent
 from ..agents.base_agent import BaseAgent
 from ..ingestion.biomarker_extractor import extract as extract_biomarkers
 from ..ingestion.extractor import extract
@@ -63,6 +64,21 @@ async def _navigate_trials_safe(
                 estado_orphanet=ApiStatus.NO_DISPONIBLE.value,
             )
         )
+
+
+async def _synthesize_safe(structured: StructuredReport) -> str | None:
+    """
+    Red de seguridad del router alrededor del Agente 06: un fallo no previsto
+    deja el reporte sin resumen ejecutivo en lugar de hacer fallar el análisis.
+    """
+    try:
+        return await SynthesizerAgent().synthesize(structured)
+    except Exception as exc:
+        print(
+            f"[NEXUS] Agente 06 — síntesis: fallback ({type(exc).__name__})",
+            file=sys.stderr,
+        )
+        return None
 
 
 async def _arbitrate_safe(
@@ -217,7 +233,7 @@ async def analyze(
         )
         navigation = await _navigate_trials_safe(nav_input)
 
-        return build_export(
+        structured = build_export(
             case=case_with_pico,
             report=final_report,
             trials=navigation.trials,
@@ -227,6 +243,13 @@ async def analyze(
             arbitration=arbitration,
             mock=is_mock_active(),
         )
+
+        # ── 9. Resumen ejecutivo (Agente 06) ────────────────────────────────
+        # Va al final porque narra el reporte ya construido; no cambia datos.
+        structured.executive_summary = await _synthesize_safe(structured)
+        processing_time = time.perf_counter() - start
+        structured.metadata.processing_time_seconds = round(processing_time, 2)
+        return structured
     finally:
         usage_telemetry.close_registry(telemetry_token, mock=is_mock_active())
 
