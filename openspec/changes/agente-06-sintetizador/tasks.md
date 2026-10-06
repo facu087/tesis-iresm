@@ -91,6 +91,12 @@
   hipótesis. Si es `null`, no mostrar nada (sin placeholder). Verificar con
   `npm run build` en `frontend/` y viendo la sección en la vista de reporte con el mock
   activo.
+  _Verificado (2026-10-06):_ `report/page.tsx` renderiza la sección "Resumen ejecutivo"
+  (pestaña de hipótesis, antes de la lista) solo si `executive_summary` tiene valor, sin
+  placeholder; `npm run build` en `frontend/` compila con el cambio del Agente 06 (todas
+  las rutas generadas). _Sin verificar:_ nadie vio la sección en el navegador; con el mock
+  activo hoy `executive_summary` es `None` (la guarda descarta el resumen grabado), así que
+  eso depende de T4 de `odd/tasks/agente06-pendientes.md`.
 
 - [x] 6.3 Mostrar el `executive_summary` en el PDF (`backend/pipeline/pdf_exporter.py`):
   si no es `None`, agregar un bloque de texto con título "Resumen ejecutivo" al inicio del
@@ -105,9 +111,14 @@
   Guarda `output/demo_agente06/resumen.json`. Verificar corriendo
   `python3 scripts/demo_agente06.py` (con Groq o en modo mock).
 
-- [ ] 7.2 Correr `pytest tests/` completo y verificar que no hay fallas nuevas respecto
+- [x] 7.2 Correr `pytest tests/` completo y verificar que no hay fallas nuevas respecto
   de `develop`. Los tests que usen `POST /api/analyze` deben usar `client_medico_verificado`
   de `tests/conftest.py`. Verificar que la suite pasa en verde.
+  _Verificado (2026-10-06):_ `pytest tests/ -q` → 1186 passed en ~62 s en la rama
+  `fix/s4-agente06-pendientes` (línea base en `develop` `cc5105b`: 1150 passed). Los tests
+  de `POST /api/analyze` (`test_api.py`, `test_router_telemetry.py`, `test_mock_pipeline.py`)
+  usan `client_medico_verificado`; `test_proteccion_analisis.py` usa además clientes sin
+  cuenta o sin verificar a propósito, para probar el rechazo.
 
 - [x] 7.3 Actualizar `.claude/CLAUDE.md`: Agente 06 marcado como hecho en Sprint 4 y en
   la tabla de numeración, `agent_06_synthesizer.py` en el árbol de carpetas,

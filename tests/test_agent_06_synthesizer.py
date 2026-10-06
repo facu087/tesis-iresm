@@ -206,3 +206,91 @@ def test_biomarker_extractor_importa_sin_ciclo():
         capture_output=True, text=True,
     )
     assert r.returncode == 0, r.stderr
+
+
+# ── Recorte del contexto: ensayos y verificación nunca se pierden ─────────────
+
+def _report_largo(n_hipotesis: int = 8, largo: int = 1500) -> StructuredReport:
+    """Reporte cuyo texto libre excede por mucho el límite del contexto."""
+    r = _report()
+    r.case_summary.narrative = "Narrativa clínica extensa. " * 200
+    r.hypotheses = [
+        RankedHypothesis(
+            rank=i, text=f"Hipótesis número {i} sobre neuropatía", priority="HIGH",
+            evidence_level="II", rationale=("Fundamento largo. " * 200)[:largo],
+            supporting_agents=["01"], status="respaldada",
+            arbiter_note=("Nota del árbitro. " * 200)[:largo],
+            sources=[Source(pmid=f"1000000{i}", title="T", verified=True,
+                            verification_status="verificada")],
+        )
+        for i in range(1, n_hipotesis + 1)
+    ]
+    r.clinical_trials = [
+        ClinicalTrial(nct_id=f"NCT0000000{i}", title=f"Ensayo {i}", status="RECRUITING",
+                      brief_summary="...")
+        for i in range(1, 6)
+    ]
+    return r
+
+
+def test_contexto_corto_queda_identico_al_de_antes():
+    esperado = (
+        "=== Caso ===\nVarón de 42 años con neuropatía axonal sensitivomotora. "
+        "EMG compatible.\n\n=== Hipótesis priorizadas ===\n"
+        "1. [prioridad HIGH / EBM II / respaldada] Amiloidosis hereditaria por TTR — "
+        "Neuropatía axonal progresiva. (PMIDs confirmados: 12345678; "
+        "1 referencia(s) no confirmada(s), no citar)\n\n=== Ensayos clínicos ===\n"
+        "- NCT01234567 (sin_evaluar): Tafamidis in ATTR\n\n"
+        "=== Verificación bibliográfica ===\nFuentes: 0, verificadas: 0, discordantes: 0, "
+        "inexistentes: 0. Hipótesis respaldadas: 0, pendientes: 0, especulativas: 0."
+    )
+    assert ag06.build_context(_report_con_fuente("inexistente")) == esperado
+
+
+def test_recorte_conserva_ensayos_y_verificacion_completos():
+    r = _report_largo()
+    ctx = ag06.build_context(r)
+    assert len(ctx) <= ag06._MAX_CONTEXT_CHARS
+    for t in r.clinical_trials:
+        assert f"- {t.nct_id} ({t.compatibility}): {t.title}" in ctx
+    assert "=== Verificación bibliográfica ===" in ctx
+    assert ctx.rstrip().endswith("especulativas: 0.")
+
+
+def test_recorte_conserva_cada_hipotesis_con_sus_pmids():
+    r = _report_largo()
+    ctx = ag06.build_context(r)
+    for h in r.hypotheses:
+        assert f"{h.rank}. [prioridad HIGH / EBM II / respaldada] {h.text} — " in ctx
+        assert f"(PMIDs confirmados: 1000000{h.rank})" in ctx
+
+
+def test_recorte_se_marca_y_es_determinista():
+    r = _report_largo()
+    ctx = ag06.build_context(r)
+    assert "[...]" in ctx
+    assert ctx == ag06.build_context(r)
+
+
+def test_recorte_acorta_lo_mas_largo_y_deja_lo_corto():
+    r = _report_largo()
+    r.hypotheses[0].rationale = "Fundamento breve."
+    ctx = ag06.build_context(r)
+    assert "— Fundamento breve. (PMIDs" in ctx
+
+
+def test_caso_patologico_no_pierde_bloques_aunque_exceda_el_limite():
+    r = _report_largo(n_hipotesis=60, largo=50)
+    for h in r.hypotheses:
+        h.text = "Enunciado extenso " * 12
+    ctx = ag06.build_context(r)
+    assert len(ctx) > ag06._MAX_CONTEXT_CHARS  # documentado: lo obligatorio no se recorta
+    assert "=== Ensayos clínicos ===" in ctx
+    assert ctx.rstrip().endswith("especulativas: 0.")
+    assert all(f"(PMIDs confirmados: 1000000" in ctx for _ in [0])
+    assert ctx.count("(PMIDs confirmados:") == 60
+
+
+def test_el_prompt_pide_no_introducir_siglas():
+    p = SynthesizerAgent.SYSTEM_PROMPT
+    assert "siglas" in p and "abreviaturas" in p and "palabras" in p

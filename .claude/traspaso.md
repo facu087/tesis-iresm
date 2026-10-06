@@ -50,8 +50,9 @@ Lecciones prácticas:
 
 ## 2. Estado al cierre
 
-`develop` está en `1f11917` (PR #35). La suite tenía 1113 tests después del PR #32 y 1144 con las correcciones del Agente 06; en corridas
-completas dos tests de `tests/test_agent_05_trials.py` fallaron una vez cada uno (ver 4.7).
+`develop` está en `cc5105b` (PR #38). La suite tenía 1113 tests después del PR #32; con el
+PR #38 pasan 1150 en ~57 s, y esta rama deja 1186. Los fallos intermitentes de
+`tests/test_agent_05_trials.py` quedaron resueltos (ver 4.7).
 
 ### Agentes
 | ID | Rol | Estado |
@@ -61,7 +62,7 @@ completas dos tests de `tests/test_agent_05_trials.py` fallaron una vez cada uno
 | 03 | Consultor Clínico | ✅ |
 | 04 | Árbitro Verificador | ✅ PR #19 |
 | 05 | Navegador de Ensayos | ✅ PR #13 |
-| 06 | Sintetizador | ✅ PR #35 (mergeado el 2026-10-06; correcciones en 4.1) |
+| 06 | Sintetizador | ✅ PR #35 (mergeado el 2026-10-06; correcciones en 4.1; pendientes en `fix/s4-agente06-pendientes`) |
 
 ### Lo que se mergeó el 2026-10-04
 | PR | Qué | Tarjeta |
@@ -81,6 +82,8 @@ Antes, el 2026-09-28, había entrado la landing explicativa (PR #21, tarjeta #82
 | #31 | Las críticas del debate llegan a su destinatario: el parser normaliza el destinatario y el prompt muestra un ID real de ejemplo |
 | #32 | Una crítica con destinatario ambiguo queda sin atribuir; el modo real ya no depende del archivo de respuestas grabadas (carga diferida) |
 | #35 | Agente 06 (Sintetizador), de Facundo (merge `1f11917`); ver 4.1 |
+| #37 | Facundo: arregla el import circular entre el Agente 06 y el extractor de biomarcadores (el import de `_NON_GENE_TERMS` pasó a ser diferido) |
+| #38 | Los tests nunca llaman al proveedor real (merge `cc5105b`); ver 4.9 |
 
 ---
 
@@ -146,8 +149,8 @@ código y `openspec/changes/agente-06-sintetizador/`:
   el PDF y en `/report`, tipo en `types.ts`, `scripts/demo_agente06.py` y
   `tests/test_agent_06_synthesizer.py`.
 
-Defectos de la revisión posterior, **arreglados en la rama `fix/s4-agente06-citas-y-pdf`**
-(un commit cada uno, con tests):
+Defectos de la revisión posterior, **arreglados y mergeados** (rama
+`fix/s4-agente06-citas-y-pdf`, un commit cada uno, con tests):
 - **El resumen podía presentar como respaldo una cita refutada.** `build_context()` le daba al
   LLM todos los PMIDs sin su estado y la guarda aceptaba cualquiera presente en el reporte,
   también uno `inexistente` o `discordante`. Ahora solo se puede citar un PMID cuya fuente
@@ -159,18 +162,29 @@ Defectos de la revisión posterior, **arreglados en la rama `fix/s4-agente06-cit
   `Paragraph` de ReportLab: `a<b y c>d` levantaba `ValueError` y `<font size=40>` se
   interpretaba como marcado. Ahora se escapa y se dibuja literal.
 
-**Observaciones abiertas** (no se tocaron; son decisiones de diseño para hablar con Facundo):
+**Observaciones de la revisión** y su estado en la rama `fix/s4-agente06-pendientes`
+(feature `odd/tasks/agente06-pendientes.md`):
 - **a.** La guarda de genes toma cualquier sigla de 2 a 8 caracteres en mayúsculas como
-  símbolo génico: una sigla ausente del reporte ("DM2", "HSAN") descarta todo el resumen. En
-  modo mock el resumen grabado se descarta siempre (la corrida mock cita DNMT1, que el
-  reporte mock no contiene), así que el Agente 06 nunca se ve en mock: `executive_summary`
-  queda `None`.
-- **b.** El contexto se trunca a 6000 caracteres **desde el final**, que es donde van los
-  ensayos y la verificación: en un reporte largo son lo primero que el modelo no ve.
+  símbolo génico: una sigla ausente del reporte ("DM2", "HSAN") descarta todo el resumen.
+  **Mitigada, no cerrada**: la guarda no se tocó (sigue igual de estricta), pero el prompt
+  ahora le dice al modelo que no introduzca siglas ni símbolos ausentes del reporte y que
+  los escriba con palabras. **Pendiente (T4)**: en modo mock el resumen grabado se descarta
+  siempre (cita DNMT1, que el reporte mock no contiene), así que el Agente 06 no se ve en
+  mock (`executive_summary` queda `None`). Arreglarlo exige grabar el resumen con el prompt
+  nuevo sobre el reporte mock: una llamada real a Groq, que depende de la cuota diaria y
+  puede quedar para otro día. Las grabaciones no se editan a mano.
+- **b.** El contexto se truncaba a 6000 caracteres desde el final (ensayos y verificación).
+  **Cerrada**: `build_context()` acorta solo los textos libres largos (narrativa,
+  fundamentos y notas del Árbitro), con el mayor tope común que entre en el límite, y deja
+  completos hipótesis (con sus PMIDs confirmados), ensayos y verificación. Si lo obligatorio
+  ya excede el límite, no se recorta nada obligatorio y el contexto lo supera.
+- **c.** Texto libre sin escapar en el PDF. **Cerrada**: `_t()` en `pdf_exporter.py` escapa
+  cada valor al interpolarlo en un `Paragraph` (ver 4.5).
 
-Pendientes de cierre: las tareas 6.2 y 7.2 de `openspec/changes/agente-06-sintetizador/tasks.md`
-siguen sin tildar aunque el frontend ya renderiza el resumen; tildarlas con su verificación y
-recién ahí archivar el cambio.
+Tareas de `openspec/changes/agente-06-sintetizador/tasks.md`: la 7.2 quedó tildada (suite
+completa en verde) y la 6.2 sigue abierta: el build del frontend compila, pero nadie vio la
+sección "Resumen ejecutivo" en el navegador, y en mock hoy no hay resumen (depende de T4).
+Archivar el cambio recién cuando la 6.2 se cierre.
 
 ### 4.2 Verificar contra Groq los arreglos del parseo — parcial
 Los PR #25 y #26 (fuente malformada y hipótesis malformada) se verificaron con tests. Las dos
@@ -218,14 +232,13 @@ usa una **muestra sintética**. Con el `costos.jsonl` real ya se puede recalcula
   `openspec/specs/` (12 en total).
 - Quedan 6 ramas locales `worktree-agent-*` sin revisar. Los worktrees y las demás ramas ya
   mergeadas se borraron; lo que tenían en `output/` se copió a `output/de-worktrees/`.
-- **Otros campos de texto libre llegan sin escapar a ReportLab** (`backend/pipeline/pdf_exporter.py`),
-  con el mismo defecto que tenía el resumen: `_case_summary` (`narrative`), `_hypothesis_block`
-  (`text`, `rationale`, `evidence_note`, `arbiter_note`, `contradictions[].from_agent_name` y
-  `critique_text`), `_source_line` (`title`, `journal`, `actual_title`, `publication_types`),
-  `_debate_summary` (cada divergencia), `_trial_block` (`title`, `compatibility_rationale`,
-  criterios, `related_hypotheses`, `conditions`, `locations`, `url`) y `_rare_diseases`
-  (`name`, `hypothesis`, `url`). Conviene un solo cambio que escape dentro de `_par()` los
-  campos de datos sin romper el marcado propio del módulo.
+- **Texto libre del PDF** (resuelto en `fix/s4-agente06-pendientes`): todo valor que llega a un
+  `Paragraph` de `backend/pipeline/pdf_exporter.py` pasa por `_t()`, que escapa `&`, `<` y
+  `>` y traduce los caracteres sin glifo antes de escapar; el marcado propio del módulo se
+  conserva. Cubre narrativa, hipótesis (texto, fundamento, nota de evidencia, veredicto,
+  agentes, objeciones), fuentes, divergencias, ensayos, enfermedades raras, versión y
+  descargo. Las celdas de tabla con texto plano (perfil del paciente, etc.) no interpretan
+  marcado y no hacen falta. Las URL se imprimen como texto, no como enlaces.
 - Tarjetas #73 y #75 (Facundo y Fede): mergeadas el 2026-09-16 y todavía en Sprint 4 sin
   evidencia.
 
@@ -263,6 +276,17 @@ tomado. Con un único event loop (uvicorn) no se manifiesta, pero cualquier cód
 Los reportes y la evidencia de Trello producidos **antes del 2026-10-06** que muestren el
 debate adversarial salieron de corridas donde las críticas no llegaban a los agentes. La que
 muestre el debate hay que regenerarla.
+
+### 4.9 Los tests no pueden llamar al proveedor real (PR #38)
+Desde el PR #35, los tests de análisis de `tests/test_api.py` llamaban a Groq de verdad: varios
+módulos hacen `load_dotenv()` al importarse y el `.env` real traía `GROQ_API_KEY`. Medido en
+`output/costos.jsonl`: **88 llamadas reales del Agente 06 el 2026-10-06, 38 fallidas por
+límite de velocidad, unos 47.000 tokens** de la cuota. La suite pasó de ~60 s a ~90 s y luego
+se colgó con la cuota agotada. La fixture autouse `_sin_clave_del_proveedor` de
+`tests/conftest.py` quita `GROQ_API_KEY` antes de cada test, y un test que sí necesita una
+clave pone una falsa; ahora una llamada sin aislar falla fuerte. Tras el arreglo pasan 1150
+tests en ~57 s. Regla práctica: si la suite tarda mucho más o se cuelga, hay una llamada de
+red o de proveedor sin aislar.
 
 ---
 
@@ -306,7 +330,7 @@ anterior **no están en la máquina Linux de Matías**.
 7. Costos: 80.458 tokens por caso, medidos; y cómo medir destapó defectos que el sistema
    escondía detrás de un fallback, entre ellos que las críticas del debate no llegaban a su
    destinatario.
-8. Qué sigue: el Sintetizador ya está mergeado; falta decidir las observaciones abiertas de 4.1 y que el resumen se vea en mock.
+8. Qué sigue: el Sintetizador ya está mergeado; falta que el resumen se vea en mock (T4 de 4.1, necesita una llamada real).
 
 ---
 

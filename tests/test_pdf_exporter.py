@@ -664,3 +664,89 @@ class TestResumenEjecutivoLiteral:
         texto = self._pdf_con_resumen("Ver <font size=40>grande</font> y </b> suelto.")
         assert "<font size=40>grande</font>" in texto
         assert "</b>" in texto
+
+
+# ── Todo texto libre se dibuja como texto literal ─────────────────────────────
+
+_HOSTIL = "a<b & c>d </b> <font size=40>x</font>"
+_HOSTIL_VISIBLE = "a<b & c>d </b> <font size=40>x</font>"
+
+
+def _reporte_hostil() -> StructuredReport:
+    """Reporte con marcado hostil en cada campo de texto libre que llega a un Paragraph."""
+    from backend.api.schemas import ContradictionOut
+
+    h = RankedHypothesis(
+        rank=1, text=f"HTEXT {_HOSTIL}", priority="HIGH", evidence_level="II",
+        rationale=f"HRAT {_HOSTIL}", supporting_agents=[f"AGSUP {_HOSTIL}"],
+        sources=[Source(
+            pmid="12345678", title=f"STITLE {_HOSTIL}", journal=f"SJOUR {_HOSTIL}", year=2022,
+            verified=True, verification_status="discordante",
+            actual_title=f"SACT {_HOSTIL}", publication_types=[f"SPUB {_HOSTIL}"],
+        )],
+        status="respaldada", evidence_note=f"HEVN {_HOSTIL}", arbiter_note=f"HARB {_HOSTIL}",
+        refuting_agents=[f"HREF {_HOSTIL}"],
+        contradictions=[ContradictionOut(
+            from_agent_name=f"CNAME {_HOSTIL}", severity="HIGH",
+            critique_text=f"CTEXT {_HOSTIL}",
+        )],
+    )
+    trial = ClinicalTrial(
+        nct_id="NCT04000001", title=f"TTITLE {_HOSTIL}", status="RECRUITING",
+        brief_summary="x", conditions=[f"TCOND {_HOSTIL}"], phase="PHASE3",
+        locations=[f"TLOC {_HOSTIL}"], min_age="18 <Years>", max_age="70 &Years",
+        url="https://ct.gov/study?a=1&b=2&c=<x>",
+        compatibility="alta", compatibility_rationale=f"TRAT {_HOSTIL}",
+        criteria_to_verify=[f"TCRIT {_HOSTIL}"], related_hypotheses=[f"TREL {_HOSTIL}"],
+    )
+    r = _make_report(
+        hypotheses=[h], trials=[trial],
+        bibliography=[Source(pmid="12345678", title=f"BTITLE {_HOSTIL}", journal="J", year=2020)],
+        divergences=[f"DIV {_HOSTIL}"],
+    )
+    r.case_summary.narrative = f"NARR {_HOSTIL}"
+    r.metadata.nexus_version = "0.3<0>&"
+    r.metadata.disclaimer = f"DISC {_HOSTIL}"
+    r.executive_summary = f"EXEC {_HOSTIL}"
+    r.trial_search = TrialSearchSummary()
+    r.rare_diseases = [RareDiseaseMatch(
+        orpha_code="1", name=f"RNAME {_HOSTIL}", url="https://orpha.net/?a=1&b=<2>",
+        hypothesis=f"RHYP {_HOSTIL}", matched_term="t",
+    )]
+    return r
+
+
+@pytest.mark.parametrize("marca", [
+    "HTEXT", "HRAT", "AGSUP", "STITLE", "SJOUR", "SACT", "SPUB", "HEVN", "HARB", "HREF",
+    "CNAME", "CTEXT", "TTITLE", "TCOND", "TLOC", "TRAT", "TCRIT", "TREL", "DIV", "NARR",
+    "DISC", "EXEC", "BTITLE", "RNAME", "RHYP",
+])
+def test_texto_libre_se_dibuja_literal(marca):
+    texto = " ".join(_texto_del_pdf(generate_pdf(_reporte_hostil())).split())
+    assert f"{marca} {_HOSTIL_VISIBLE}" in texto
+
+
+def test_urls_con_ampersand_y_angulares_no_rompen():
+    texto = " ".join(_texto_del_pdf(generate_pdf(_reporte_hostil())).split())
+    assert "URL: https://ct.gov/study?a=1&b=2&c=<x>" in texto
+    assert "https://orpha.net/?a=1&b=<2>" in texto
+
+
+def test_campos_cortos_con_marcado_no_rompen_y_se_ven_literales():
+    texto = " ".join(_texto_del_pdf(generate_pdf(_reporte_hostil())).split())
+    assert "Versión 0.3<0>&" in texto
+    assert "18 <Years>" in texto and "70 &Years" in texto
+
+
+def test_menor_o_igual_traducido_no_se_vuelve_marcado():
+    r = _make_report()
+    r.hypotheses[0].text = "Seguimiento ≤ 24 meses y ≥ 12"
+    texto = " ".join(_texto_del_pdf(generate_pdf(r)).split())
+    assert "Seguimiento <= 24 meses y >= 12" in texto
+
+
+def test_el_marcado_propio_del_exportador_sigue_funcionando():
+    texto = " ".join(_texto_del_pdf(generate_pdf(_reporte_hostil())).split())
+    assert "<b>" not in texto and "<font color" not in texto
+    assert "Narrativa clínica:" in texto and "NO CORRESPONDE" in texto
+    assert "Justificación:" in texto and "Veredicto del Árbitro:" in texto
