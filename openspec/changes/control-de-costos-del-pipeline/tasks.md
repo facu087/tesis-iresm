@@ -185,7 +185,8 @@
       encabezado, antes de la meta bar y de los demás avisos, en rojo pleno con
       texto blanco: más visible que la línea del consenso de IA, que va dentro del
       aviso del Árbitro. `metadata.mock` es `true` en el reporte que guarda el
-      frontend. Evidencia en `output/evidencia/83/` (local, no versionada). La
+      frontend. Evidencia adjunta a la tarjeta #81 de Trello el 2026-10-06 (copia local en
+      `output/evidencia/81/`, no versionada). La
       nota que sigue es el estado previo, conservado como registro.
       **Estado al 2026-09 — parcial — código hecho, verificación de build/visual incompleta.** El código
       está: `ReportMetadata.mock` (schemas.py) ← `build_export(mock=...)` ←

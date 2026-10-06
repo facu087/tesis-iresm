@@ -206,7 +206,8 @@ En `openspec/changes/control-de-costos-del-pipeline/tasks.md`:
   llevan los números medidos.
 - **6.4** Hecha el 2026-10-06: `npm run build` compila en el checkout principal y la captura
   del aviso de modo mock se tomó recorriendo el flujo real en un navegador (19 llamadas mock,
-  0 reales). Evidencia en `output/evidencia/83/` (local), **sin subir a Trello todavía**.
+  0 reales). Evidencia adjunta a la tarjeta #81 de Trello el 2026-10-06 (dos capturas y un `.txt`;
+  copia local en `output/evidencia/81/`).
 
 Con 6.2, 6.4 y 7.5 hechas, `control-de-costos-del-pipeline` no tiene tareas abiertas: se puede
 archivar con `/opsx:archive` cuando el CLI de OpenSpec esté instalado.
