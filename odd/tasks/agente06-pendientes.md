@@ -80,6 +80,18 @@ Estrategia `ask-on-risk`. Pronóstico: ~350 líneas (T1 ~120, T2 ~150, T3 ~80).
   sola línea (`base_agent.py:148`); `npm run build` en `frontend/` compila. Tarea 7.2 del
   OpenSpec tildada; 6.2 queda abierta con nota (nadie vio la sección en el navegador).
 
+- **T4** (ruta: inline). Intentada el 2026-10-06: Groq rechazó la llamada por límite de
+  cuota en los tres reintentos (`RateLimitError`); no se grabó nada y `executive_summary`
+  sigue en `None` en modo mock. El reporte del modo mock tiene 10 hipótesis y 10 ensayos, y
+  su contexto para el Agente 06 mide 5982 caracteres.
+
 ## Próximo paso
 
-T4 (requiere una llamada real a Groq: depende de la cuota).
+T4, con cuota (una llamada de unos 2.000 tokens). Método: correr la pasada base en modo
+mock para obtener el `StructuredReport`, desactivar el modo mock y llamar una vez a
+`SynthesizerAgent().synthesize()` con el grabador de `backend/mock/recorder.py` abierto. Si
+la guarda acepta el resumen, copiar la respuesta textual a `backend/mock/grabadas.json` en
+la tarea `agente06_sintesis` con su procedencia (reemplaza a la grabada sobre el reporte
+real) y ajustar `tests/test_mock_responses.py`. El guion usado quedó en
+`output/pendientes/grabar_ag06_mock.py` (local, no versionado). Si la guarda lo descarta,
+anotar por qué token antes de reintentar.
