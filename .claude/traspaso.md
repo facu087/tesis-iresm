@@ -1,7 +1,9 @@
-# Traspaso de sesión — 2026-10-04
+# Traspaso de sesión — 2026-10-06
 
-Reemplaza al traspaso del 2026-09-15. El Sprint 4 queda con un solo pendiente grande:
-el Agente 06, que espera una rama de Facundo.
+Reemplaza al traspaso del 2026-10-04. El Sprint 4 queda con un solo pendiente grande:
+el Agente 06, que espera una rama de Facundo. El 2026-10-06 se grabaron las respuestas
+del modo mock desde una corrida real y se encontró y arregló un defecto del debate (ver
+secciones 2 y 3).
 
 **Para retomar con Claude Code**: "Leé `.claude/traspaso.md` y seguí como orquestador
 desde la sección Pendiente."
@@ -47,7 +49,8 @@ Lecciones prácticas:
 
 ## 2. Estado al cierre
 
-`develop` está en `8560444`. La suite tiene 1009 tests en verde.
+`develop` está en `aaa8366`. La suite tiene 1113 tests (después del PR #32); en corridas
+completas dos tests de `tests/test_agent_05_trials.py` fallaron una vez cada uno (ver 4.7).
 
 ### Agentes
 | ID | Rol | Estado |
@@ -70,17 +73,49 @@ Lecciones prácticas:
 
 Antes, el 2026-09-28, había entrado la landing explicativa (PR #21, tarjeta #82, en QA).
 
+### Lo que se mergeó el 2026-10-06
+| PR | Qué |
+|----|-----|
+| #30 | Grabador de respuestas crudas (`backend/mock/recorder.py`), opción `--grabar` de `scripts/medir_costos.py` y las doce tareas del modo mock con respuestas grabadas (`backend/mock/grabadas.json`) |
+| #31 | Las críticas del debate llegan a su destinatario: el parser normaliza el destinatario y el prompt muestra un ID real de ejemplo |
+| #32 | Una crítica con destinatario ambiguo queda sin atribuir; el modo real ya no depende del archivo de respuestas grabadas (carga diferida) |
+
 ---
 
-## 3. Lo que se midió (corridas reales del 2026-10-04)
+## 3. Lo que se midió
+
+### Corridas reales del 2026-10-06 (cifra vigente)
 
 `scripts/medir_costos.py` corre una sola pasada del pipeline y compara `GROQ_MAIN` contra
 `GROQ_FAST` sobre las mismas entradas. `--mock` lo recorre sin cuota. Los artefactos quedan en
 `output/medicion_costos/` (ignorado por git).
 
-- **Un caso completo consume 77.516 tokens** en 27 llamadas y tarda unos 8 minutos.
-  **Entran 2 casos por día** en la cuota gratuita de 200.000 tokens.
-- Por agente: 01 → 20.605; 02 → 20.396; 03 → 21.279; 04 → 4.861; 05 → 7.179.
+- **Un caso completo consume 80.458 tokens** (43.240 de entrada y 37.218 de salida) en 28
+  llamadas (7 fallidas por límite de velocidad y reintentadas); la pasada base tarda 505 s y
+  ninguna respuesta se cortó por el techo. **Siguen entrando 2 casos por día** en la cuota
+  gratuita de 200.000 tokens. Cada ejecución de `scripts/medir_costos.py` gasta además unos
+  20.000 tokens en la comparación de modelos. Artefactos en
+  `output/medicion_costos/fix_criticas/` (ignorado por git).
+- Por agente: 01 → 21.889; 02 → 20.796; 03 → 21.334; 04 → 5.696; 05 → 7.668; PICO y
+  biomarcadores → 3.075.
+- **Defecto encontrado: las críticas del debate no llegaban a nadie.** En la Ronda 2 el
+  modelo declaraba el destinatario como "Agent 02", "Agent01" o "Agent03", y el debate enruta
+  por ID exacto ("01"/"02"/"03"). En la primera corrida real del día, 0 de 21 críticas
+  llegaron a su destinatario: las Rondas 3 y 4 revisaban sin críticas, y lo mismo pasaba en
+  todas las corridas anteriores. Arreglo en el PR #31 (normalización y ejemplo real en el
+  prompt) y refinamiento en el PR #32 (solo se atribuye si el destinatario es inequívoco y
+  corresponde a un agente que fue criticado; lo demás queda sin atribuir y no se reasigna).
+- **Confirmado contra Groq** (segunda corrida real, con el arreglo): 18 de 18 críticas
+  llegaron a su destinatario (7 al agente 01, 3 al 02, 8 al 03) y el modelo devolvió el ID de
+  dos dígitos en todas. `debate_revision` pasó de 11.186 a 16.917 tokens de entrada: las
+  revisiones ahora reciben las críticas.
+- **Las cifras anteriores quedan superadas, no erróneas**: los 77.516 tokens del 2026-10-04
+  (27 llamadas, por agente 01 → 20.605; 02 → 20.396; 03 → 21.279; 04 → 4.861; 05 → 7.179) y
+  los 78.158 de la primera corrida del 2026-10-06 se midieron con el debate corriendo **sin
+  críticas**. Los registros fechados las conservan como se midieron.
+
+### Corridas reales del 2026-10-04 (debate sin críticas)
+
 - **Los `gpt-oss` cuentan el razonamiento dentro de la salida.** Con techos de 512 y 1024,
   la agrupación del Árbitro y la planificación de términos del Agente 05 se cortaban y caían
   en el fallback. Volvieron a 4096. La agrupación usa unos 1.100 tokens de salida aunque
@@ -98,12 +133,15 @@ Antes, el 2026-09-28, había entrado la landing explicativa (PR #21, tarjeta #82
 ### 4.1 #62 Agente 06 (Sintetizador) — bloqueado
 Facundo escribió la propuesta OpenSpec el 2026-09-23 (`openspec/changes/agente-06-sintetizador`,
 commit `be1ce89`, rama `feature/s4-agente-06-sintetizador`) y **nunca la subió**: existe solo en
-su máquina. El 2026-10-04 se le pidió por comentario en la tarjeta que la pushee.
+su máquina. El 2026-10-04 se le pidió por comentario en la tarjeta que la pushee; al
+2026-10-06 la rama seguía sin estar en GitHub.
 
-**No escribir otra propuesta.** Cuando la rama esté en GitHub, revisar la suya con estos tres
+**No escribir otra propuesta.** Cuando la rama esté en GitHub, revisar la suya con estos cuatro
 puntos, que cambiaron en `develop` después de que la escribió:
 - El Sintetizador necesita su tarea en `backend/agents/model_tasks.py` (modelo y techo, **no
-  menos de 4096** por lo medido) y su respuesta grabada para el modo mock.
+  menos de 4096** por lo medido) y su respuesta para el modo mock. Desde el 2026-10-06 las
+  respuestas del modo mock ya no se escriben a mano: la del Sintetizador tiene que ser una
+  grabación en `backend/mock/grabadas.json`, o la propuesta tiene que decir cómo se produce.
 - Los tests que llamen a `POST /api/analyze` necesitan la fixture `client_medico_verificado`
   de `tests/conftest.py`.
 - La tarjeta dice "reemplaza a `report_builder.py`" y su diseño agrega un `executive_summary`
@@ -114,18 +152,26 @@ Su diseño, según el comentario: `synthesize()` corre una vez al final, agrega 
 prosa como campo opcional de `StructuredReport`, nunca decide datos, y descarta el resumen
 entero si cita un PMID, NCT o gen que no está en el reporte.
 
-### 4.2 Verificar contra Groq los arreglos del parseo
-Los PR #25 y #26 se verificaron con tests, no con una corrida real: la falla del Agente 03 es
-intermitente y ese día no quedaba cuota. La próxima corrida real sirve de verificación: mirar
-si aparece el aviso `[NEXUS] Respuesta del modelo saneada: …` y que el debate tenga tres agentes.
+### 4.2 Verificar contra Groq los arreglos del parseo — parcial
+Los PR #25 y #26 (fuente malformada y hipótesis malformada) se verificaron con tests. Las dos
+corridas reales del 2026-10-06 sirvieron para mirar el resultado:
+- **Verificado**: el debate tuvo los tres agentes (01, 02 y 03) con hipótesis, críticas,
+  revisiones y recitaciones.
+- **No verificado**: el aviso `[NEXUS] Respuesta del modelo saneada: …` no apareció en ninguna
+  de las dos corridas, es decir, el modelo no devolvió ninguna respuesta malformada y los
+  arreglos de parseo tolerante no se ejercitaron. Siguen verificados solo por tests; la falla
+  del Agente 03 es intermitente y hay que esperar a que ocurra en una corrida real.
 
 ### 4.3 Cierre del control de costos
-En `openspec/changes/control-de-costos-del-pipeline/tasks.md` quedan tres tareas:
-- **6.2** Regenerar las respuestas grabadas del modo mock desde una corrida real. Hoy están
-  escritas a mano.
-- **6.4** Captura de la marca de modo mock en el frontend.
-- **7.5** Los números medidos ya están en `.claude/CLAUDE.md` y `.claude/backlog.md`; falta
-  llevarlos a `.claude/stack.md`.
+En `openspec/changes/control-de-costos-del-pipeline/tasks.md`:
+- **6.2** Hecha el 2026-10-06: las doce tareas del modo mock usan respuestas de una corrida
+  real. Salvedad: las que citan posiciones, PMIDs o NCT pertenecen a esa corrida; en mock se
+  aplican por posición a hipótesis distintas y dependen de que PubMed y ClinicalTrials.gov
+  devuelvan lo mismo.
+- **7.5** Hecha el 2026-10-06: `.claude/CLAUDE.md`, `.claude/backlog.md` y `.claude/stack.md`
+  llevan los números medidos.
+- **6.4** **Pendiente**: captura de la marca de modo mock en el frontend (el código está y
+  pasa `tests/test_pdf_exporter.py` y `npx tsc --noEmit`).
 
 La comparación de costo contra Claude, GPT-4o y Gemini que muestra `scripts/demo_costos.py`
 usa una **muestra sintética**. Con el `costos.jsonl` real ya se puede recalcular con
@@ -143,7 +189,8 @@ usa una **muestra sintética**. Con el `costos.jsonl` real ya se puede recalcula
 ### 4.5 Orden y limpieza
 - `agente-02-genomica` es el único cambio OpenSpec cerrado que falta archivar: figura con 0 de
   26 tareas aunque está mergeado desde el 2026-09-16. Hay que tildar sus tareas antes de
-  correr `/opsx:archive`. Los otros cuatro se archivaron el 2026-10-04 y sus specs están en
+  correr `/opsx:archive`. El CLI `openspec` **no está instalado en esta máquina**:
+  `npm install -g @fission-ai/openspec@latest` antes de archivar. Los otros cuatro se archivaron el 2026-10-04 y sus specs están en
   `openspec/specs/` (12 en total).
 - Quedan 6 ramas locales `worktree-agent-*` sin revisar. Los worktrees y las demás ramas ya
   mergeadas se borraron; lo que tenían en `output/` se copió a `output/de-worktrees/`.
@@ -156,6 +203,27 @@ usa una **muestra sintética**. Con el `costos.jsonl` real ya se puede recalcula
   #78 portada del PDF.
 - Sin asignar: #79 (comentario en el `.env` que desactiva la verificación) y #80 (un agente
   como sostén y objetor de la misma hipótesis).
+
+### 4.7 Observaciones de la revisión nativa y tests intermitentes
+La revisión nativa de los PR #30 y #31 se aprobó con seis observaciones no bloqueantes; la 1 y
+la 2 se arreglaron en el PR #32. Siguen abiertas:
+- **3.** `close_recorder()` en `backend/mock/recorder.py` solo captura `OSError`.
+- **4.** El camino real de `--grabar` no tiene test automatizado.
+- **5.** Un test de `tests/test_recorder.py` corre el script completo en un subproceso y, en
+  modo mock, las consultas externas igual salen a la red.
+- **6.** `scripts/medir_costos.py` informa que la grabación se escribió aunque la escritura
+  haya fallado.
+
+Tests intermitentes: en corridas de la suite completa fallaron una vez cada uno
+`tests/test_agent_05_trials.py::TestPrivacidad::test_trazabilidad_de_los_ensayos` y
+`tests/test_agent_05_trials.py::TestOrphanet::test_orphanet_caido_no_frena_los_ensayos`, en
+corridas distintas; el archivo pasa corriendo solo. La causa no se conoce y hay una
+investigación en curso por separado.
+
+### 4.8 Evidencia de Trello a regenerar
+Los reportes y la evidencia de Trello producidos **antes del 2026-10-06** que muestren el
+debate adversarial salieron de corridas donde las críticas no llegaban a los agentes. La que
+muestre el debate hay que regenerarla.
 
 ---
 
@@ -177,11 +245,11 @@ cd frontend && npm run dev                                   # :3000
 3. Registrar un médico en `/registro`, entrar como admin en `/ingresar` y aprobarlo en
    `/admin/pendientes`.
 
-Una corrida real tarda unos 8 minutos y gasta más de un tercio de la cuota diaria: no hacer
+Una corrida real tarda unos 8 minutos y gasta cerca de 40% de la cuota diaria (80.458 de 200.000 tokens): no hacer
 pruebas con Groq el mismo día de la demo.
 
 **Respaldo por si Groq falla en vivo**: arrancar el backend con `NEXUS_MOCK_LLM=1`. El pipeline
-corre completo con respuestas grabadas del LLM (PubMed, ClinicalTrials.gov y Orphanet se
+corre completo con respuestas grabadas de una corrida real del LLM (PubMed, ClinicalTrials.gov y Orphanet se
 siguen consultando de verdad) y el reporte queda marcado como mock en el JSON, el PDF y la
 pantalla. Los archivos de respaldo de `output/demo/` que nombraba el traspaso
 anterior **no están en la máquina Linux de Matías**.
@@ -196,8 +264,9 @@ anterior **no están en la máquina Linux de Matías**.
 5. Reporte: hipótesis de consenso con el nivel EBM topeado, veredictos del Árbitro, ensayos
    con compatibilidad y la bibliografía con título citado vs. real.
 6. Exportar el PDF.
-7. Costos: 77.516 tokens por caso, medidos; y cómo medir destapó tres defectos que el sistema
-   escondía detrás de un fallback.
+7. Costos: 80.458 tokens por caso, medidos; y cómo medir destapó defectos que el sistema
+   escondía detrás de un fallback, entre ellos que las críticas del debate no llegaban a su
+   destinatario.
 8. Qué sigue: el Sintetizador.
 
 ---

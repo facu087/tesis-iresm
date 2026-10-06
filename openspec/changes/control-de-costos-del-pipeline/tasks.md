@@ -241,13 +241,25 @@
       estimado, no medido).
 - [x] 7.2 Correr el caso de prueba y registrar los **números medidos**: tokens por agente, total por caso y cuántos casos entran en la cuota diaria. Es el insumo del capítulo de viabilidad de la tesis.
       **Medido el 2026-10-04** (segunda corrida, tres agentes completos): 27 llamadas,
-      **77.516 tokens por caso** (41.392 de entrada y 36.124 de salida), 467 s. Por
+      **77.516 tokens por caso** (cifra superada, ver la nota del 2026-10-06) (41.392 de entrada y 36.124 de salida), 467 s. Por
       agente: 01 → 20.605; 02 → 20.396; 03 → 21.279; 04 → 4.861; 05 → 7.179; PICO y
       biomarcadores → 3.196. **Entran 2 casos por día** en la cuota de 200.000
       tokens. Hubo 6 reintentos por límite de velocidad, todos recuperados. La primera
       corrida dio 50.599 tokens, pero con el Agente 03 caído en la Ronda 1 y el
       Árbitro sin agrupar: no es representativa. Artefactos en
       `output/medicion_costos/` (ignorado por git).
+      **Nota del 2026-10-06 — cifra vigente: 80.458 tokens por caso** (43.240 de
+      entrada y 37.218 de salida), 28 llamadas (7 fallidas por límite de velocidad
+      y reintentadas), 505 s en la pasada base, 0 respuestas cortadas por el techo;
+      sigue siendo 2 casos por día de la cuota de 200.000 tokens. La cifra de
+      77.516 (y la de 78.158 de la primera corrida del 2026-10-06) queda
+      **superada**: se midió con el debate corriendo sin críticas, porque el
+      destinatario que declaraba el modelo ("Agent 02") no coincidía con el ID del
+      agente ("02") y ninguna crítica llegaba a su destino. Con el arreglo (PR #31 y
+      #32) llegaron 18 de 18; `debate_revision` pasó de 11.186 a 16.917 tokens de
+      entrada. Cada ejecución de `scripts/medir_costos.py` gasta además unos
+      20.000 tokens en la comparación de modelos. Artefactos en
+      `output/medicion_costos/fix_criticas/`.
       **Pendiente para el orquestador** — restricción de cuota de esta sesión
       (requiere una corrida real contra Groq). `demo_costos.py` deja el mecanismo
       listo: correrlo con `NEXUS_MOCK_LLM` desactivado sobre una corrida real
@@ -269,8 +281,12 @@
       suite (los 136 bloqueados que reporta el plugin son de `tests/test_api.py`,
       `tests/test_rag*.py` y `tests/test_embeddings.py`, preexistentes a este
       cambio).
-- [ ] 7.5 Actualizar `.claude/CLAUDE.md` (sección del modelo de IA, la regla de que nadie instancia Groq por su cuenta, modo mock y variables nuevas), `.claude/stack.md` y `.claude/backlog.md` con los números medidos. Actualizar `.env.example`.
-      `.env.example` hecho (`NEXUS_MOCK_LLM`, junto con 6.3). El resto: en curso.
+- [x] 7.5 Actualizar `.claude/CLAUDE.md` (sección del modelo de IA, la regla de que nadie instancia Groq por su cuenta, modo mock y variables nuevas), `.claude/stack.md` y `.claude/backlog.md` con los números medidos. Actualizar `.env.example`.
+      `.env.example` hecho (`NEXUS_MOCK_LLM`, junto con 6.3).
+      **Hecho el 2026-10-06**: `.claude/CLAUDE.md`, `.claude/backlog.md` y
+      `.claude/stack.md` llevan la cifra vigente de 80.458 tokens por caso, con
+      la nota de que las anteriores quedaron superadas; `.claude/traspaso.md` se
+      actualizó como traspaso de la sesión.
 - [x] 7.6 Adjuntar la evidencia a la tarjeta de Trello y moverla a QA.
       **Hecho el 2026-10-04**: tarjetas #81 y #84 en QA, con la medición real, el
       `costos.jsonl` y la salida de `scripts/demo_costos.py` adjuntos.

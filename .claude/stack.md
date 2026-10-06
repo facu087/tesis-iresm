@@ -22,6 +22,16 @@ Las decisiones tecnológicas se guiaron por tres criterios:
 (`openai/gpt-oss-120b`) para no depender de APIs pagas durante el desarrollo.
 La columna de producción es la arquitectura de destino.
 
+**Lo que esa decisión cuesta en cuota (medido el 2026-10-06).** Un caso
+completo consume **80.458 tokens** sobre Groq (28 llamadas, 505 s), así que la
+cuota gratuita de 200.000 tokens por día alcanza para **2 casos por día**.
+Las tres tareas de salida validada por código (agrupación del Árbitro,
+planificación de términos y evaluación de compatibilidad del Agente 05) usan
+`gpt-oss-20b`; todo lo demás, `gpt-oss-120b`. Los `gpt-oss` cuentan el
+razonamiento dentro de la salida: con techos de 512 y 1024 se cortaban la
+agrupación y la planificación de términos, y volvieron a 4096. Detalle y estado de las cifras anteriores en "Costos
+estimados del prototipo".
+
 Cambiar el **modelo** de una tarea = cambiar una línea en
 `backend/agents/model_tasks.py` (`TASK_BUDGETS`, un mapa `tarea → (modelo,
 techo de tokens)`, Sprint 4). Cambiar el **proveedor** = agregar despacho por
@@ -217,9 +227,21 @@ consumo real de tokens por agente en `output/costos.jsonl`
 (`backend/telemetry/pricing.py`, Groq en cero, arquitectura de destino
 comentada) que permite recalcular el costo de un registro ya guardado con
 otra tabla, sin correr nada. Los números medidos sobre una corrida real —
-tokens por caso, costo equivalente con Claude Opus/GPT-4o/Gemini Pro, cuántos
-casos entran en la cuota diaria de Groq (200.000 tokens/día)— están
-**pendientes de medición**: la sesión que instaló la telemetría tenía
-prohibido gastar cuota de Groq para no repetir el agotamiento del
-2026-09-21 (ver `.claude/backlog.md`). `scripts/demo_costos.py` deja el
-mecanismo listo para correrlo apenas haya cuota disponible.
+tokens por caso, cuántos casos entran en la cuota diaria de Groq (200.000
+tokens/día)— se midieron con `scripts/medir_costos.py`.
+
+**Medición vigente (2026-10-06): 80.458 tokens por caso** (43.240 de entrada
+y 37.218 de salida), 28 llamadas, 505 s en la pasada base, 0 respuestas
+cortadas por el techo. Con la cuota gratuita de Groq entran **2 casos por
+día**, que es el límite práctico del prototipo con este proveedor: una demo en
+vivo gasta más de un tercio de la cuota diaria. Cada ejecución de
+`scripts/medir_costos.py` suma unos 20.000 tokens por la comparación de
+modelos. Los 77.516 tokens del 2026-10-04 y los 78.158 de la primera corrida
+del 2026-10-06 quedan superados: se midieron con el debate sin críticas
+(ninguna llegaba a su destinatario); con el arreglo, el consumo subió porque
+las revisiones ahora reciben las críticas.
+
+El costo equivalente con Claude Opus, GPT-4o o Gemini Pro sigue siendo una
+estimación sobre la muestra sintética de `scripts/demo_costos.py`: con el
+`costos.jsonl` real se puede recalcular con `usage.recalculate()` y una tabla
+de tarifas, pero ese cálculo no se hizo todavía.

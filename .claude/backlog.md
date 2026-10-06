@@ -287,7 +287,7 @@ Suite de tests: **82 tests, 100% passing** (`pytest tests/`)
 > debate con datos reales (7.3), confirmar que ningún techo nuevo trunca una
 > respuesta real (4.2), medir si el modelo rápido degrada alguna de las tres
 > tareas movidas (5.4), y regenerar las respuestas grabadas del modo mock
-> desde una corrida real (6.2, hoy son fixtures razonadas a mano). También
+> desde una corrida real (6.2; **hecho el 2026-10-06**, ver más abajo). También
 > falta la captura de pantalla del banner de modo mock en el frontend (6.4) —
 > el código está y pasa `tests/test_pdf_exporter.py` y `npx tsc --noEmit`, pero
 > `npm run build` con Turbopack falla en el worktree de esta sesión por un
@@ -309,16 +309,35 @@ Suite de tests: **82 tests, 100% passing** (`pytest tests/`)
 > `output/demo_costos/` (gitignoreado).
 >
 > **Medición del 2026-10-04** (tarjeta #84, `scripts/medir_costos.py`, dos corridas
-> reales). Un caso completo consume **77.516 tokens** en 27 llamadas: entran 2 casos
+> reales). Un caso completo consumía **77.516 tokens** (cifra superada, ver la actualización del 2026-10-06 más abajo) en 27 llamadas: entraban 2 casos
 > por día. La primera corrida encontró un defecto del propio cambio: los techos de
 > `arbitro_agrupacion` (512) y `agente05_planificacion_terminos` (1024) cortaban la
 > respuesta y el Árbitro no agrupaba, porque los `gpt-oss` cuentan el razonamiento
 > dentro de la salida. Volvieron a 4096 y la segunda corrida no tuvo cortes. Las
 > tres tareas en `GROQ_FAST` dieron el mismo resultado que en `GROQ_MAIN` sobre las
 > mismas entradas (misma partición, 10 de 10 etiquetas de compatibilidad).
-> Pendiente: regenerar las respuestas grabadas del modo mock (tasks.md 6.2) y el
-> Agente 03, que en la primera corrida se cayó en la Ronda 1 por un campo de
-> `Source` con tipo inválido (hallazgo G).
+> El Agente 03, que en la primera corrida se cayó en la Ronda 1 por un campo de
+> `Source` con tipo inválido (hallazgo G), se arregló en los PR #25 y #26.
+>
+> **Actualización del 2026-10-06 — cifra vigente: 80.458 tokens por caso**
+> (43.240 de entrada y 37.218 de salida), 28 llamadas (7 fallidas por límite de
+> velocidad y reintentadas), 505 s en la pasada base, 0 respuestas cortadas por
+> el techo: siguen entrando 2 casos por día de la cuota de 200.000 tokens. Los
+> 77.516 del 2026-10-04 (y los 78.158 de la primera corrida del 2026-10-06)
+> quedan **superados**: se midieron con el debate corriendo sin críticas. El
+> modelo declaraba el destinatario como "Agent 02" y el debate enruta por ID
+> exacto ("02"), así que 0 de 21 críticas llegaban a su destino, en esa y en
+> todas las corridas anteriores. Con el arreglo (PR #31 y #32) llegaron 18 de 18.
+> Cada ejecución de `scripts/medir_costos.py` gasta además unos 20.000 tokens en
+> la comparación de modelos.
+>
+> **6.2 hecha**: las doce tareas del modo mock usan respuestas textuales de esa
+> corrida real (`backend/mock/grabadas.json`, grabador en
+> `backend/mock/recorder.py`, opción `--grabar` de `scripts/medir_costos.py`; PR
+> #30, #31 y #32). Los arreglos de parseo de los PR #25 y #26 siguen verificados
+> solo por tests: el aviso `[NEXUS] Respuesta del modelo saneada` no apareció en
+> ninguna de las dos corridas reales. Pendiente del cambio: 6.4 (captura de la
+> marca de modo mock en el frontend).
 
 > Nota (22) — **Registro de médicos** (cambio OpenSpec `registro-medicos-matricula`,
 > `openspec/changes/archive/2026-10-04-registro-medicos-matricula/`). `POST /api/analyze` no pedía

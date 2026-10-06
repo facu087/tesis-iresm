@@ -83,8 +83,13 @@ Backend mergeado a `develop` (capa de recuperación de evidencia / RAG). Autor: 
       tokens por análisis, tarifas configurables, techo y modelo por tarea
       (`backend/agents/model_tasks.py`), modo mock del pipeline
       (`NEXUS_MOCK_LLM`). Ver "Modelo de IA actual" más abajo. Medido sobre
-      una corrida real el 2026-10-04 (`scripts/medir_costos.py`): 77.516 tokens
-      por caso, 2 casos por día de cuota. Los techos de agrupación y
+      una corrida real el 2026-10-06 (`scripts/medir_costos.py`): **80.458
+      tokens por caso** (43.240 de entrada y 37.218 de salida), 28 llamadas,
+      2 casos por día de cuota. Reemplaza a las cifras anteriores (77.516 del
+      2026-10-04 y 78.158 de la primera corrida del 2026-10-06), que se
+      midieron con el debate corriendo **sin críticas**: el destinatario que
+      declaraba el modelo no coincidía con el ID del agente y ninguna crítica
+      llegaba (arreglo en el PR #31). Los techos de agrupación y
       planificación de términos volvieron a 4096: con 512 y 1024 se cortaban,
       porque los `gpt-oss` cuentan el razonamiento dentro de la salida.
 - [x] Registro de médicos con matrícula, revisión admin y protección de `POST
@@ -232,6 +237,12 @@ Scripts disponibles:
   agente y la comparación de costo Groq vs. arquitectura de destino via
   `usage.recalculate()`. Genera `mecanismo_mock.json`, `muestra_sintetica.json`
   y `comparacion_costos.txt`
+- `medir_costos.py` (no es un demo: gasta cuota real) — una pasada del pipeline
+  más la comparación `GROQ_MAIN` vs. `GROQ_FAST`; guarda en
+  `output/medicion_costos/`. `--mock` lo recorre sin cuota. `--grabar` abre el
+  grabador de `backend/mock/recorder.py` durante la pasada base y escribe
+  `grabacion.json` (no graba en modo mock). Cada ejecución real gasta unos
+  20.000 tokens extra en la comparación
 - `demo_registro_medicos.py` — registro de médicos, revisión admin y pipeline
   protegido: dos altas → intento de análisis rechazado (pendiente, 403) → alta
   del primer admin por CLI → aprobación con auditoría → análisis permitido
@@ -293,6 +304,17 @@ tesis-iresm/
 │   │   ├── cuenta.py           ← CuentaMedico, RolCuenta, EstadoCuenta (S4)
 │   │   ├── auditoria.py        ← DecisionAuditoria, DecisionTipo (S4)
 │   │   ├── sesion.py           ← Sesion — fila server-side de la cookie (S4)
+│   │   └── __init__.py
+│   ├── mock/                   ← modo mock del pipeline (S4)
+│   │   ├── mode.py             ← activación de `NEXUS_MOCK_LLM`
+│   │   ├── responses.py        ← respuestas por tarea, carga diferida de grabadas.json
+│   │   ├── grabadas.json       ← respuestas textuales de la corrida real del 2026-10-06
+│   │   ├── recorder.py         ← grabador de respuestas crudas (solo lo abre un script)
+│   │   └── __init__.py
+│   ├── telemetry/              ← control de costos (S4)
+│   │   ├── usage.py            ← registro de consumo por análisis (contextvars)
+│   │   ├── pricing.py          ← tabla de tarifas por modelo
+│   │   ├── medicion.py         ← lógica de la medición de costos
 │   │   └── __init__.py
 │   ├── db.py                   ← engine SQLite + create_db_and_tables() (S4)
 │   ├── cli.py                  ← `python -m backend.cli crear-admin` (S4)
@@ -512,10 +534,16 @@ correr nada — es como se responde "¿cuánto costaría esto con Claude Opus?".
 
 `scripts/demo_costos.py` muestra el mecanismo (en modo mock, sin gastar
 cuota) y una comparación de costo Groq vs. arquitectura de destino sobre una
-muestra. Los números de una corrida real (tokens por caso, cuántos casos
-entran en la cuota diaria) están **pendientes de medición** — requieren una
-corrida contra Groq real, que no se hizo en la sesión que instaló esta
-telemetría por la misma restricción de cuota que la motivó.
+muestra sintética. Los números de una corrida real **ya están medidos**
+(`scripts/medir_costos.py`, 2026-10-06): 80.458 tokens por caso en 28 llamadas
+(7 fallidas por límite de velocidad y reintentadas), 505 s en la pasada base,
+0 respuestas cortadas por el techo, 2 casos por día de la cuota de 200.000
+tokens. Cada ejecución del script gasta además unos 20.000 tokens en la
+comparación de modelos. Las cifras anteriores (77.516 y 78.158) quedan
+superadas: se midieron sin que las críticas del debate llegaran a los agentes.
+El costo equivalente con Claude, GPT-4o o Gemini sigue estimado sobre la
+muestra sintética; con el `costos.jsonl` real se puede recalcular con
+`usage.recalculate()`.
 
 ### Modo mock del pipeline
 
@@ -528,9 +556,21 @@ condición para que sirva para desarrollar sobre el pipeline. Sin
 (nunca cae en silencio a datos grabados). El reporte de modo mock queda
 marcado (`StructuredReport.metadata.mock`) y la marca se muestra en el PDF y
 en el frontend con la misma visibilidad que la advertencia del consenso de
-IA. Las respuestas grabadas actuales son fixtures razonadas a mano (esta
-sesión no podía gastar cuota para grabarlas de una corrida real): regenerarlas
-desde una corrida real queda pendiente.
+IA.
+
+Las doce tareas de `TASK_BUDGETS` usan respuestas **textuales de la corrida
+real del 2026-10-06**, guardadas en `backend/mock/grabadas.json` (versionado) y
+cargadas de forma diferida por `backend/mock/responses.py` en el primer uso en
+modo mock: el modo real nunca lee ese archivo, y si falta o está malformado se
+levanta `RespuestasGrabadasInvalidas`. Salieron de `backend/mock/recorder.py`,
+un grabador de respuestas crudas basado en `contextvars` que **solo abre un
+script** (nunca una variable de entorno ni `POST /api/analyze`) y guarda
+únicamente la respuesta del modelo, nunca el prompt. Se usa con
+`scripts/medir_costos.py --grabar`, que lo abre durante la pasada base y escribe
+`output/medicion_costos/grabacion.json` (gitignoreado). Salvedad: las
+grabadas que citan posiciones, PMIDs o NCT pertenecen a esa corrida; en modo
+mock se aplican por posición a hipótesis distintas y dependen de que PubMed y
+ClinicalTrials.gov sigan devolviendo lo mismo.
 
 ---
 
