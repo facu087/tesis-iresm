@@ -169,6 +169,14 @@ export default function ReportPage() {
       {/* ── Content ─────────────────────────────────────────────────────── */}
       <main className="flex-1 bg-slate-50">
         <div className="mx-auto max-w-5xl px-6 py-8">
+          {tab === "hipotesis" && report.executive_summary && (
+            <section className="mb-6 rounded-lg border border-slate-200 bg-white p-5">
+              <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+                Resumen ejecutivo
+              </h2>
+              <p className="text-sm leading-relaxed text-slate-700">{report.executive_summary}</p>
+            </section>
+          )}
           {tab === "hipotesis"    && <HipotesisTab    hypotheses={report.hypotheses} />}
           {tab === "caso"         && <CasoTab         summary={report.case_summary} />}
           {tab === "debate"       && <DebateTab        debate={report.debate_summary} />}

@@ -164,3 +164,8 @@ class StructuredReport(BaseModel):
     # `trial_search`: None significa "reporte anterior al Árbitro", y es lo que
     # le dice al frontend y al PDF que las hipótesis vienen sin consolidar.
     arbitration: ArbitrationOut | None = None
+
+    # Agente 06 — Sintetizador. None significa "reporte generado antes del
+    # Sintetizador o la guarda anti-invención descartó el resumen". Los clientes
+    # que no consuman este campo siguen funcionando sin cambios.
+    executive_summary: str | None = None

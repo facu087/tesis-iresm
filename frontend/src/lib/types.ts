@@ -226,6 +226,7 @@ export interface StructuredReport {
   /* Agente 04. Nulo o ausente = reporte anterior al Árbitro: las hipótesis
      vienen del debate sin consolidar y la vista no muestra el consenso. */
   arbitration?: ArbitrationSummary | null;
+  executive_summary?: string | null;
 }
 
 /** Error estructurado que devuelve FastAPI */

@@ -67,7 +67,7 @@ load_dotenv()
 from backend.agents import model_tasks
 from backend.agents.agent_04_arbiter import ArbiterAgent
 from backend.agents.agent_05_trials import TrialNavigatorAgent
-from backend.api.router import _arbitrate_safe, _navigate_trials_safe
+from backend.api.router import _arbitrate_safe, _navigate_trials_safe, _synthesize_safe
 from backend.ingestion.biomarker_extractor import extract as extract_biomarkers
 from backend.ingestion.normalizer import normalize
 from backend.mock import recorder
@@ -79,6 +79,7 @@ from backend.models.trial import ClinicalTrial, TrialNavigationInput, TrialNavig
 from backend.pipeline import consensus as consensus_module
 from backend.pipeline import debate, orchestrator, pico
 from backend.pipeline.consensus import build_arbitration_input
+from backend.pipeline.report_builder import build_export
 from backend.pipeline.trial_matching import build_navigation_input
 from backend.pipeline.verification import SourceVerification, verify_report_sources
 from backend.telemetry import medicion
@@ -166,6 +167,7 @@ class ResultadoBase:
     arbitration: ArbitrationResult | None = None
     nav_input: TrialNavigationInput | None = None
     navigation: TrialNavigationResult | None = None
+    executive_summary: str | None = None
     tiempos: dict[str, float] = field(default_factory=dict)
 
 
@@ -210,6 +212,13 @@ async def pasada_base(res: ResultadoBase) -> None:
     consenso = [c.hypothesis for c in res.arbitration.consensus]
     res.nav_input = build_navigation_input(case_pico, consenso or final_report.hypotheses)
     res.navigation = await _paso(res, "agente_05", _navigate_trials_safe(res.nav_input))
+
+    structured = build_export(
+        case=case_pico, report=final_report, trials=res.navigation.trials,
+        processing_time=sum(res.tiempos.values()), verifications=verifications,
+        navigation=res.navigation, arbitration=res.arbitration, mock=is_mock_active(),
+    )
+    res.executive_summary = await _paso(res, "agente_06", _synthesize_safe(structured))
 
 
 # ── Comparación controlada (5.4) ──────────────────────────────────────────────
