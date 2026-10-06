@@ -1,9 +1,9 @@
 """
 Tests de las respuestas del modo mock (control de costos, Sprint 4 — tarea 6.2).
 
-Las respuestas de `backend/mock/responses.py` salen, salvo las que se listan en
-`HAND_WRITTEN_TASKS`, de una corrida real contra Groq (`backend/mock/grabadas.json`,
-texto crudo y sin retocar). Acá se verifica:
+Las respuestas de `backend/mock/responses.py` salen todas de una corrida real
+contra Groq (`backend/mock/grabadas.json`, texto crudo y sin retocar). Acá se
+verifica:
 
   - el contrato de `MOCK_RESPONSES` (una respuesta por tarea de `TASK_BUDGETS`);
   - que lo grabado es fiel al archivo de datos y trae su procedencia;
@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -35,11 +36,8 @@ from backend.pipeline import pico
 
 _ARCHIVO = Path(mock_responses.__file__).with_name("grabadas.json")
 
-# Tareas cuya respuesta sale de la grabación, y la única que sigue escrita a
-# mano (ver el docstring de `responses.py`: sus críticas reales nunca llegan a
-# su destinatario).
-_ESPERADAS_GRABADAS = set(model_tasks.TASK_BUDGETS) - {"debate_critica"}
-_ESPERADAS_A_MANO = {"debate_critica"}
+# Todas las tareas del presupuesto salen de la grabación: ninguna está escrita a mano.
+_ESPERADAS_GRABADAS = set(model_tasks.TASK_BUDGETS)
 
 
 @pytest.fixture(autouse=True)
@@ -58,10 +56,14 @@ class TestContrato:
     def test_get_mock_response_mantiene_el_fallback_para_tareas_desconocidas(self):
         assert mock_responses.get_mock_response("tarea_que_no_existe") == "{}"
 
-    def test_el_reparto_entre_grabadas_y_escritas_a_mano_es_el_documentado(self):
+    def test_las_doce_tareas_salen_de_la_grabacion_y_ninguna_esta_escrita_a_mano(self):
+        assert len(model_tasks.TASK_BUDGETS) == 12
         assert set(mock_responses.RECORDED_RESPONSES) == _ESPERADAS_GRABADAS
-        assert set(mock_responses.HAND_WRITTEN_TASKS) == _ESPERADAS_A_MANO
-        assert not set(mock_responses.RECORDED_RESPONSES) & set(mock_responses.HAND_WRITTEN_TASKS)
+        assert not hasattr(mock_responses, "HAND_WRITTEN_TASKS")
+        assert mock_responses.MOCK_RESPONSES == {
+            tarea: entrada["response"]
+            for tarea, entrada in mock_responses.RECORDED_RESPONSES.items()
+        }
 
 
 # ── Fidelidad de lo grabado ───────────────────────────────────────────────────
@@ -123,26 +125,20 @@ class TestParseoRealPorSitioDeLlamada:
         assert len(hipotesis) >= 1
         assert all(h.text.strip() for h in hipotesis)
 
-    def test_critica_a_mano_llega_a_su_destinatario(self):
-        """Por eso no se usa la grabada: `debate_critica` tiene que enrutarse por ID."""
+    def test_la_critica_grabada_parsea_con_ids_canonicos(self):
+        """El modelo real nombra "Agent 02"; el parser real lo lleva a "02"."""
+        criticas = ArbiterAgent()._parse_critiques(mock_responses.get_mock_response("debate_critica"))
+        assert len(criticas) == 5
+        assert all(re.fullmatch(r"\d{2}", c.target_agent_id) for c in criticas)
+        assert sorted(c.target_agent_id for c in criticas) == ["02", "02", "03", "03", "03"]
+
+    def test_la_critica_grabada_llega_a_un_agente_del_debate(self):
         from backend.pipeline.debate import _critiques_for
 
         criticas = ArbiterAgent()._parse_critiques(mock_responses.get_mock_response("debate_critica"))
-        assert len(_critiques_for("01", criticas)) >= 1
-
-    def test_las_criticas_reales_no_se_enrutan_por_id(self):
-        """
-        Documenta el hallazgo que justifica dejar `debate_critica` escrita a mano:
-        el modelo real nombra a su destinatario ("Agent 02", "Agent01") y
-        `_critiques_for()` compara contra el ID ("02"), así que ninguna llega.
-        """
-        from backend.pipeline.debate import _critiques_for
-
-        nombres = ("Agent 02", "Agent01", "Agent03")
-        reales = [
-            type("C", (), {"target_agent_id": n})() for n in nombres  # sin red ni modelo
-        ]
-        assert not any(_critiques_for(i, reales) for i in ("01", "02", "03"))  # type: ignore[arg-type]
+        assert len(_critiques_for("02", criticas)) == 2
+        assert len(_critiques_for("03", criticas)) == 3
+        assert _critiques_for("01", criticas) == []  # nadie critica al autor de la grabación
 
     def test_recitacion_parsea_con_fuentes(self):
         recitadas = ArbiterAgent()._parse_recitation(

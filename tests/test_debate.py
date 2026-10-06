@@ -6,6 +6,7 @@ Tests unitarios: no llaman APIs externas.
 """
 
 import asyncio
+import json
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -128,6 +129,52 @@ class TestBaseAgentDebateMethods:
         assert critiques[0].target_agent_id == "03"
         assert critiques[0].severity == "HIGH"
         assert critiques[0].alternative == "hipótesis alternativa Y"
+
+    @pytest.mark.parametrize("declarado, esperado", [
+        ("Agent 02", "02"),     # formas observadas en la corrida real del 2026-10-06
+        ("Agent01", "01"),
+        ("Agent03", "03"),
+        ("Agente 3", "03"),
+        ("ID:02", "02"),
+        (" 03 ", "03"),
+        (3, "03"),
+    ])
+    def test_critique_normaliza_el_id_del_destinatario(self, declarado, esperado):
+        agent = self._make_agent()
+        mock_json = json.dumps({"critiques": [{
+            "target_agent_id": declarado, "target_hypothesis": "H",
+            "critique_text": "C", "severity": "HIGH",
+        }]})
+        with patch.object(agent, "_call_llm", return_value=mock_json):
+            critiques = agent.critique("ctx", _output("01", "A01", []), [_output("03", "A03", ["H"])])
+        assert critiques[0].target_agent_id == esperado
+
+    def test_critique_con_destinatario_normalizado_llega_al_agente(self):
+        agent = self._make_agent()
+        mock_json = json.dumps({"critiques": [{
+            "target_agent_id": "Agent 03", "target_hypothesis": "H",
+            "critique_text": "C", "severity": "HIGH",
+        }]})
+        with patch.object(agent, "_call_llm", return_value=mock_json):
+            critiques = agent.critique("ctx", _output("01", "A01", []), [_output("03", "A03", ["H"])])
+        assert len(_critiques_for("03", critiques)) == 1
+
+    @pytest.mark.parametrize("declarado", ["Consultor Clínico", "", None])
+    def test_critique_sin_id_reconocible_no_se_atribuye_a_nadie(self, declarado):
+        agent = self._make_agent()
+        mock_json = json.dumps({"critiques": [{
+            "target_agent_id": declarado, "target_hypothesis": "H",
+            "critique_text": "C", "severity": "HIGH",
+        }]})
+        with patch.object(agent, "_call_llm", return_value=mock_json):
+            critiques = agent.critique("ctx", _output("01", "A01", []), [_output("03", "A03", ["H"])])
+        assert not any(_critiques_for(i, critiques) for i in ("01", "02", "03"))
+
+    def test_critique_pide_el_id_de_dos_digitos_en_el_prompt(self):
+        agent = self._make_agent()
+        with patch.object(agent, "_call_llm", return_value='{"critiques": []}') as llamada:
+            agent.critique("ctx", _output("01", "A01", []), [_output("03", "A03", ["H"])])
+        assert '"target_agent_id": "03"' in llamada.call_args.args[0]
 
     def test_critique_severity_invalida_se_normaliza(self):
         agent = self._make_agent()

@@ -486,6 +486,10 @@ class BaseAgent(ABC):
         own_text = _format_output(own_output, label="TUS HIPÓTESIS (Ronda 1)")
         others_text = _format_outputs(other_outputs, label="HIPÓTESIS DE OTROS AGENTES")
 
+        # El ejemplo usa un ID real de los criticados: con un marcador genérico
+        # el modelo respondía con el nombre ("Agent 02") en vez del ID.
+        id_ejemplo = other_outputs[0].agent_id if other_outputs else "02"
+
         prompt = (
             f"Sos {self.AGENT_NAME}. Participás en un debate adversarial de análisis clínico.\n\n"
             f"CONTEXTO CLÍNICO:\n{context}\n\n"
@@ -493,9 +497,11 @@ class BaseAgent(ABC):
             f"{others_text}\n\n"
             "Analizá críticamente las hipótesis de los otros agentes desde tu perspectiva.\n"
             "Identificá inconsistencias, sobre-estimaciones o falta de evidencia.\n\n"
+            "En target_agent_id va solo el ID de dos dígitos del agente criticado, "
+            "tal como figura entre paréntesis en su encabezado; nunca su nombre.\n\n"
             "Respondé ÚNICAMENTE con JSON válido:\n"
             '{\n  "critiques": [\n    {\n'
-            '      "target_agent_id": "ID del agente",\n'
+            f'      "target_agent_id": "{id_ejemplo}",\n'
             '      "target_hypothesis": "texto exacto de la hipótesis criticada",\n'
             '      "critique_text": "crítica específica y fundamentada",\n'
             '      "severity": "HIGH" | "MEDIUM" | "LOW",\n'
@@ -637,13 +643,29 @@ class BaseAgent(ABC):
             critiques.append(Critique(
                 from_agent_id=self.AGENT_ID,
                 from_agent_name=self.AGENT_NAME,
-                target_agent_id=str(c.get("target_agent_id", "")),
+                target_agent_id=_normalize_agent_id(c.get("target_agent_id")),
                 target_hypothesis=c.get("target_hypothesis", ""),
                 critique_text=c.get("critique_text", ""),
                 severity=severity,
                 alternative=c.get("alternative") or None,
             ))
         return critiques
+
+
+def _normalize_agent_id(value: object) -> str:
+    """
+    Lleva el destinatario que declara el modelo al ID canónico ("01", "02"…).
+
+    El modelo no devuelve el ID pelado: en la corrida real del 2026-10-06 las
+    21 críticas llegaron como "Agent 02", "Agent01" o "Agent03", y como el
+    debate enruta por igualdad contra el ID, ninguna alcanzó a su destinatario.
+    Sin un número reconocible devuelve "": la crítica queda sin atribuir, no se
+    le asigna a otro agente.
+    """
+    if value is None or isinstance(value, bool):
+        return ""
+    numero = re.search(r"\d+", str(value))
+    return numero.group().zfill(2) if numero else ""
 
 
 # ── Helpers de formateo para el debate ────────────────────────────────────────

@@ -63,6 +63,22 @@ Runner: `.venv/bin/python -m pytest`.
   - Checks: `.venv/bin/python -m pytest tests/ -q`;
     `.venv/bin/python scripts/medir_costos.py --mock`.
 
+- [x] **T4 — Destinatario de las críticas** · ruta: inline (commit `a2227ae`).
+  - El parser normaliza el destinatario ("Agent 02" → "02") y el prompt muestra un ID real de ejemplo.
+  - RED observado sin el arreglo: 9 failed / 23 passed en `tests/test_debate.py`.
+  - GREEN: 32 passed; suite completa 1080 passed.
+- [x] **T5 — `debate_critica` grabada** · ruta: delegada.
+  - Criterios: primera entrada por `seq` de la corrida real (seq 6, agente 01), copiada
+    verbatim a `backend/mock/grabadas.json`; las 12 tareas son grabaciones; se elimina
+    `HAND_WRITTEN_TASKS` (nada más lo usaba).
+  - La grabación rinde 5 críticas con destinatarios "02", "02", "03", "03", "03" tras normalizar.
+  - RED: `tests/test_mock_responses.py` y `tests/test_mock_pipeline.py` -> `7 failed, 66 passed`.
+  - GREEN: los mismos archivos -> 73 passed; `.venv/bin/python -m pytest tests/ -q` -> 1082 passed.
+  - Observación: en mock los tres agentes reciben la misma respuesta, incluido el autor
+    (01, que no se critica a sí mismo en la grabación). El agente 02 recibe críticas con
+    `from_agent_id` "02" y destinatario "02": ni `_critiques_for()` ni el resto del pipeline
+    filtran las autocríticas. Solo ocurre en mock; producción no se tocó.
+
 ## Entrega
 
 Estrategia `ask-on-risk`. Pronóstico: ~350 líneas autoría (T1 ~200, T3 ~150).
@@ -102,7 +118,7 @@ Datos en `backend/mock/grabadas.json` (versionado); `responses.py` los carga al 
 | `agente02_hipotesis` | grabada (agente 02, seq 3) |
 | `agente01_hipotesis` | grabada (agente 01, seq 4) |
 | `agente03_hipotesis` | grabada (agente 03, seq 5) |
-| `debate_critica` | **escrita a mano**: las críticas reales (seq 6-8) nombran al destinatario "Agent 02" / "Agent01" / "Agent03" y `debate._critiques_for()` compara `target_agent_id` contra el ID ("01"), así que ninguna llegaría a su destinatario (descarte silencioso). |
+| `debate_critica` | grabada (agente 01, seq 6); ver T4 y T5: se escribió a mano hasta que el parser normalizó el destinatario. |
 | `debate_revision` | grabada (agente 01, seq 9) |
 | `arbitro_agrupacion` | grabada (agente 04, seq 15) |
 | `debate_recitacion` | grabada (agente 01, seq 16) |
@@ -136,6 +152,30 @@ Revisión nativa del commit `4e8e984`: evaluada como riesgo medio y debida
 `managed_assets_outdated`; el usuario eligió correr `gentle-ai sync` al final de la sesión.
 El espejo de Engram de este documento está pendiente (el guardado falló: varias sesiones activas).
 
+Test intermitente preexistente: `tests/test_agent_05_trials.py::TestPrivacidad::test_trazabilidad_de_los_ensayos`
+falló una vez en una corrida completa y pasó solo y en la corrida siguiente (no se investigó).
+
+Confirmación de T4 contra Groq (segunda corrida real, 2026-10-06, la lanzó el
+padre con `--grabar --salida output/medicion_costos/fix_criticas`):
+- Código de salida 0; pasada base 505 s; 28 llamadas (7 fallidas por límite de
+  velocidad, reintentadas); 80.458 tokens (43.240 entrada / 37.218 salida);
+  0 respuestas cortadas; 21 respuestas grabadas.
+- Las 18 críticas declararon el destinatario como ID de dos dígitos ("01",
+  "02", "03"): el ejemplo del prompt alcanzó, la normalización no tuvo que
+  corregir ninguna.
+- Enrutadas con el parseo real: 7 llegan al Agente 01, 3 al 02 y 8 al 03; 0 sin
+  atribuir y 0 dirigidas al propio autor. En la primera corrida habían llegado
+  0 de 21.
+- `debate_revision` pasó de 11.186 a 16.917 tokens de entrada con menos
+  llamadas (9 contra 11): las revisiones ahora reciben las críticas.
+- El aviso `[NEXUS] Respuesta del modelo saneada` tampoco apareció: los PR #25
+  y #26 siguen verificados solo por tests.
+- T4 se resolvió inline (un archivo de producción y su test), no delegada.
+- Revisión nativa: no corrió para ningún commit de la rama
+  (`managed_assets_outdated`; `gentle-ai sync` pendiente, decisión del usuario).
+
 ## Próximo paso
 
-PR a `develop`; quedan las tareas 6.4 y 7.5.
+PR a `develop` (decisión del usuario). Quedan las tareas 6.4 y 7.5 del control
+de costos. Los 77.516 tokens por caso de `.claude/CLAUDE.md` y `.claude/backlog.md`
+se midieron con el debate sin críticas: con críticas son 80.458.
