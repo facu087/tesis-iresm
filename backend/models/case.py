@@ -42,7 +42,11 @@ class PICOSynthesis(BaseModel):
 
 
 class ClinicalCase(BaseModel):
-    raw_text: str                               # Texto clínico original (ya anonimizado)
+    # Texto clínico ya normalizado y anonimizado. El comentario anterior decía
+    # "ya anonimizado" cuando no existía ninguna anonimización: era un supuesto
+    # sobre quien cargaba el archivo, no un control. Desde el Sprint 5 el router
+    # pasa el texto por ingestion/anonimizador.py antes de construir el caso.
+    raw_text: str
     pico: PICOSynthesis | None = None           # Se completa tras el análisis PICO
     biomarkers: BiomarkerProfile | None = None  # Se completa tras la extracción de biomarcadores
     genomic_context: GenomicContext | None = None  # Se completa en la Ronda 1 (Agente 02)

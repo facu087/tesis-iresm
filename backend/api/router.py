@@ -19,6 +19,7 @@ from ..agents.agent_04_arbiter import ArbiterAgent
 from ..agents.agent_05_trials import TrialNavigatorAgent
 from ..agents.agent_06_synthesizer import SynthesizerAgent
 from ..agents.base_agent import BaseAgent
+from ..ingestion.anonimizador import anonimizar
 from ..ingestion.biomarker_extractor import extract as extract_biomarkers
 from ..ingestion.extractor import extract
 from ..ingestion.normalizer import normalize
@@ -198,6 +199,15 @@ async def analyze(
 
         # ── 2. Normalización ────────────────────────────────────────────────
         normalized = await asyncio.to_thread(normalize, clinical_text)
+
+        # ── 2.b Anonimización ───────────────────────────────────────────────
+        # Última parada antes de que el texto salga del sistema: de acá en
+        # adelante va a Groq (PICO, biomarcadores y los seis agentes), PubMed,
+        # ClinicalTrials.gov, Orphanet y PharmGKB. El informe lleva conteos por
+        # categoría, nunca los valores encontrados.
+        normalized, informe_anonimizacion = await asyncio.to_thread(anonimizar, normalized)
+        print(f"[NEXUS] {informe_anonimizacion.resumen()}", file=sys.stderr)
+
         case = ClinicalCase(raw_text=normalized)
 
         # ── 3. Síntesis PICO y extracción de biomarcadores (paralelo) ───────
