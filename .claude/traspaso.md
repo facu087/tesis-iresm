@@ -209,8 +209,9 @@ En `openspec/changes/control-de-costos-del-pipeline/tasks.md`:
   0 reales). Evidencia adjunta a la tarjeta #81 de Trello el 2026-10-06 (dos capturas y un `.txt`;
   copia local en `output/evidencia/81/`).
 
-Con 6.2, 6.4 y 7.5 hechas, `control-de-costos-del-pipeline` no tiene tareas abiertas: se puede
-archivar con `/opsx:archive` cuando el CLI de OpenSpec esté instalado.
+Con 6.2, 6.4 y 7.5 hechas, `control-de-costos-del-pipeline` quedó sin tareas abiertas y se
+archivó el 2026-10-06 junto con `landing-demostrativa`. Sus specs están en `openspec/specs/`
+(`modo-mock-pipeline`, `presupuesto-por-tarea` y `telemetria-de-costos`).
 
 La comparación de costo contra Claude, GPT-4o y Gemini que muestra `scripts/demo_costos.py`
 usa una **muestra sintética**. Con el `costos.jsonl` real ya se puede recalcular con
@@ -226,11 +227,21 @@ usa una **muestra sintética**. Con el `costos.jsonl` real ya se puede recalcula
   decidirse si la fuente correcta para el Agente 02 es ClinVar (#71).
 
 ### 4.5 Orden y limpieza
-- `agente-02-genomica` es el único cambio OpenSpec cerrado que falta archivar: figura con 0 de
-  26 tareas aunque está mergeado desde el 2026-09-16. Hay que tildar sus tareas antes de
-  correr `/opsx:archive`. El CLI `openspec` **no está instalado en esta máquina**:
-  `npm install -g @fission-ai/openspec@latest` antes de archivar. Los otros cuatro se archivaron el 2026-10-04 y sus specs están en
-  `openspec/specs/` (12 en total).
+- `agente-02-genomica` **no se puede archivar todavía**: figura con 0 de 26 tareas y, verificado
+  contra `develop` el 2026-10-06, solo 8 están hechas (6 confirmadas y 2 con el código ya
+  evolucionado por ClinVar), 3 no tienen evidencia y 15 están incompletas. El commit `4d57f76`
+  (tareas 7.1-7.3, `scripts/demo_agente02.py`, textos de `demo_orquestador.py` y 69 líneas de
+  tests) quedó solo en `origin/feature/s4-agente-02-genomica`: el PR #12 se mergeó sin él.
+  Defectos de código detectados:
+  - La guarda anti-invención lee `case_genetic_findings` de la hipótesis ya parseada, pero
+    `Hypothesis` no tiene ese campo: esa rama no corre nunca y solo funciona la detección por
+    notación de variante en modo orientación.
+  - `backend/external/pharmgkb.py` usa `pharmgkb_limiter` pero no `pharmgkb_breaker`, y levanta
+    `ExternalApiError` en vez de `ApiUnavailableError` / `RateLimitError`.
+  - El `SYSTEM_PROMPT` del Agente 02 nombra `TTR p.Val30Met` en su ejemplo JSON, contra lo que
+    pide la spec.
+- El CLI `openspec` está instalado en esta máquina. `control-de-costos-del-pipeline` y
+  `landing-demostrativa` se archivaron el 2026-10-06; `cliente-clinvar` lo archiva el PR #43.
 - Quedan 6 ramas locales `worktree-agent-*` sin revisar. Los worktrees y las demás ramas ya
   mergeadas se borraron; lo que tenían en `output/` se copió a `output/de-worktrees/`.
 - **Texto libre del PDF** (resuelto en `fix/s4-agente06-pendientes`): todo valor que llega a un
