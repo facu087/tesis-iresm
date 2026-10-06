@@ -270,3 +270,29 @@ class TestDrugGeneInteraction:
         )
         assert "patisiran" in d.summary()
         assert "TTR" in d.summary()
+
+
+class TestCircuitBreaker:
+    @pytest.mark.asyncio
+    async def test_tres_fallos_abren_el_circuito_y_no_hay_mas_solicitudes(self, cliente):
+        from backend.external.rate_limiter import ApiUnavailableError, pharmgkb_breaker
+
+        fake = _cliente_que_responde(_RespuestaFalsa(503, texto="Service Unavailable"))
+        cliente._client = fake
+        for _ in range(3):
+            with pytest.raises(ExternalApiError):
+                await cliente.get_gene_annotations("TTR")
+        assert not pharmgkb_breaker.is_available
+
+        with pytest.raises(ApiUnavailableError):
+            await cliente.get_gene_annotations("TTR")
+        assert len(fake.llamadas) == 3
+
+    @pytest.mark.asyncio
+    async def test_404_no_cuenta_como_fallo(self, cliente):
+        from backend.external.rate_limiter import pharmgkb_breaker
+
+        cliente._client = _cliente_que_responde(_RespuestaFalsa(404, texto="No results matching criteria."))
+        for _ in range(4):
+            assert await cliente.get_gene_annotations("GEN_SIN_DATOS") == []
+        assert pharmgkb_breaker.is_available

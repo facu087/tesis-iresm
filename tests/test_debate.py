@@ -480,3 +480,48 @@ class TestDebateConAgenteCaido:
             self._mock_ambos(M01, M03)
             with pytest.raises(RuntimeError, match="numeración de agentes"):
                 asyncio.run(run_debate(case, r1))
+
+
+# ── Tests: debate con los tres agentes de la Ronda 1 ─────────────────────────
+
+class TestDebateConTresAgentes:
+    def _agente(self, agent_id: str, nombre: str) -> MagicMock:
+        a = MagicMock()
+        a.AGENT_ID = agent_id
+        a.AGENT_NAME = nombre
+        a.critique.return_value = []
+        a.revise.return_value = _output(agent_id, nombre, [f"revisada {agent_id}"])
+        return a
+
+    def _correr(self, case: ClinicalCase):
+        r1 = Report(case_summary="s", agent_outputs=[
+            _output("01", "Analista de Literatura", ["h01"]),
+            _output("02", "Especialista Genómica", ["h02"]),
+            _output("03", "Consultor Clínico", ["h03"]),
+        ])
+        agentes = {i: self._agente(i, n) for i, n in [
+            ("01", "Analista de Literatura"), ("02", "Especialista Genómica"), ("03", "Consultor Clínico"),
+        ]}
+        with patch("backend.pipeline.debate.LiteratureAnalystAgent", return_value=agentes["01"]), \
+             patch("backend.pipeline.debate.GenomicsSpecialistAgent", return_value=agentes["02"]), \
+             patch("backend.pipeline.debate.ClinicalConsultantAgent", return_value=agentes["03"]), \
+             patch("backend.pipeline.genomic_context.PharmGKBClient") as pharm, \
+             patch("backend.pipeline.genomic_context.ClinVarClient") as clinvar:
+            report = asyncio.run(run_debate(case, r1))
+        return report, agentes, pharm, clinvar
+
+    def test_ronda2_hace_una_critica_por_agente_con_los_otros_dos_outputs(self):
+        _, agentes, _, _ = self._correr(ClinicalCase(raw_text="texto", pico=_make_pico()))
+        for agent_id, agente in agentes.items():
+            assert agente.critique.call_count == 1
+            otros = agente.critique.call_args.args[2]
+            assert sorted(o.agent_id for o in otros) == sorted({"01", "02", "03"} - {agent_id})
+
+    def test_hipotesis_finales_incluyen_al_agente_02(self):
+        report, _, _, _ = self._correr(ClinicalCase(raw_text="texto", pico=_make_pico()))
+        assert "revisada 02" in [h.text for h in report.hypotheses]
+
+    def test_sin_perfil_genomico_previo_no_consulta_apis_externas(self):
+        _, _, pharm, clinvar = self._correr(ClinicalCase(raw_text="texto", pico=_make_pico()))
+        pharm.assert_not_called()
+        clinvar.assert_not_called()

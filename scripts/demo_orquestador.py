@@ -1,7 +1,7 @@
 """
 Demo de verificación — Orquestador: distribución paralela (Ronda 1).
 
-El orquestador corre los Agentes 01 (Literatura) y 03 (Clínico) EN PARALELO
+El orquestador corre los Agentes 01 (Literatura), 02 (Genómica) y 03 (Clínico) EN PARALELO
 sobre el mismo contexto clínico (asyncio.gather + to_thread), y consolida sus
 hipótesis en un único Report con resumen de fuentes por nivel de evidencia.
 
@@ -11,7 +11,7 @@ Características que demuestra:
     • Resiliencia: si un agente falla, el pipeline continúa con el resto.
 
 Para enfocar el demo en el orquestador, la síntesis PICO se arma a mano (sin
-llamar al LLM): así las únicas 2 llamadas a Groq son las de los dos agentes.
+llamar al LLM): así las únicas 3 llamadas a Groq son las de los tres agentes.
 
 Guarda como artefacto tangible para Trello:
     output/demo_orquestador/reporte_ronda1.json
@@ -77,9 +77,10 @@ def main() -> None:
     print("  CONTEXTO: síntesis PICO del caso (neuropatía axonal, 42 años).")
     print("  AGENTES A EJECUTAR EN PARALELO:")
     print("     • Agente 01 — Analista de Literatura")
+    print("     • Agente 02 — Especialista Genómica")
     print("     • Agente 03 — Consultor Clínico")
     print(_SEP)
-    print("  Ejecutando Ronda 1 (asyncio.gather — 2 llamadas concurrentes a Groq)…")
+    print("  Ejecutando Ronda 1 (asyncio.gather — 3 llamadas concurrentes a Groq)…")
     print(_SEP)
 
     try:
@@ -93,8 +94,8 @@ def main() -> None:
         print(_SEP)
         return
 
-    print(f"  ✓ Ronda 1 completada en {elapsed:.1f} s (ambos agentes en paralelo).")
-    print(f"  Agentes que respondieron: {len(report.agent_outputs)} de 2")
+    print(f"  ✓ Ronda 1 completada en {elapsed:.1f} s (los tres agentes en paralelo).")
+    print(f"  Agentes que respondieron: {len(report.agent_outputs)} de 3")
     print(f"  Total de hipótesis consolidadas: {len(report.hypotheses)}")
     print(_SEP)
 
