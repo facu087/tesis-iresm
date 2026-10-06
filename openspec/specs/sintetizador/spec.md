@@ -31,11 +31,18 @@ descarta ni añade ensayos clínicos.
 ### Requirement: Guarda anti-invención
 
 El Sintetizador SHALL descartar el resumen completo si contiene cualquier PMID, número
-NCT o símbolo génico que no esté presente en el `StructuredReport` recibido.
+NCT o símbolo génico que no esté presente en el `StructuredReport` recibido. Un PMID
+SHALL considerarse presente solo si todas sus apariciones en el reporte están confirmadas
+por la verificación bibliográfica: un PMID inexistente, discordante o sin verificar MUST
+tratarse igual que uno inventado.
 
 #### Scenario: Resumen con PMID inventado
 - **WHEN** el LLM incluye en el resumen un PMID que no aparece en ninguna fuente del reporte
 - **THEN** `executive_summary` queda `None` y se registra el PMID infractor
+
+#### Scenario: Resumen con PMID presente pero no confirmado
+- **WHEN** el LLM cita un PMID que figura en una fuente del reporte con estado discordante o inexistente
+- **THEN** `executive_summary` queda `None`
 
 #### Scenario: Resumen con NCT inventado
 - **WHEN** el LLM incluye un número NCT ausente en los ensayos del reporte
