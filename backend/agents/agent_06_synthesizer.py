@@ -84,11 +84,26 @@ def _report_text(report: StructuredReport) -> str:
     return "\n".join(p for p in parts if p)
 
 
-def build_context(report: StructuredReport) -> str:
-    """Serializa el reporte a texto plano para el prompt del Sintetizador."""
-    citables = _confirmed_pmids(report)
-    lines = [f"=== Caso ===\n{report.case_summary.narrative}\n", "=== Hipótesis priorizadas ==="]
-    for h in report.hypotheses:
+_MARCA_RECORTE = " [...]"
+
+
+def _recortar(texto: str, tope: int) -> str:
+    """Texto con a lo sumo `tope` caracteres; si se acorta, termina en la marca visible."""
+    if len(texto) <= tope:
+        return texto
+    return f"{texto[:max(tope - len(_MARCA_RECORTE), 0)].rstrip()}{_MARCA_RECORTE}".lstrip()
+
+
+def _armar(
+    report: StructuredReport,
+    citables: set[str],
+    narrativa: str,
+    fundamentos: list[str],
+    notas: list[str],
+) -> str:
+    """Arma el texto del contexto con los textos libres ya recortados (o no)."""
+    lines = [f"=== Caso ===\n{narrativa}\n", "=== Hipótesis priorizadas ==="]
+    for h, fundamento, nota in zip(report.hypotheses, fundamentos, notas):
         confirmados = sorted({s.pmid for s in h.sources if s.pmid in citables})
         dudosas = sum(1 for s in h.sources if s.pmid not in citables)
         pmids = ", ".join(confirmados) or "ninguno"
@@ -96,10 +111,10 @@ def build_context(report: StructuredReport) -> str:
             pmids += f"; {dudosas} referencia(s) no confirmada(s), no citar"
         lines.append(
             f"{h.rank}. [prioridad {h.priority} / EBM {h.evidence_level} / {h.status}] "
-            f"{h.text} — {h.rationale} (PMIDs confirmados: {pmids})"
+            f"{h.text} — {fundamento} (PMIDs confirmados: {pmids})"
         )
         if h.arbiter_note:
-            lines.append(f"   Árbitro: {h.arbiter_note}")
+            lines.append(f"   Árbitro: {nota}")
 
     if report.clinical_trials:
         lines.append("\n=== Ensayos clínicos ===")
@@ -114,8 +129,60 @@ def build_context(report: StructuredReport) -> str:
         f"Hipótesis respaldadas: {v.hipotesis_respaldadas}, "
         f"pendientes: {v.hipotesis_pendientes}, especulativas: {v.hipotesis_especulativas}."
     )
-    text = "\n".join(lines)
-    return text if len(text) <= _MAX_CONTEXT_CHARS else text[:_MAX_CONTEXT_CHARS] + "\n[...]"
+    return "\n".join(lines)
+
+
+def build_context(report: StructuredReport) -> str:
+    """
+    Serializa el reporte a texto plano para el prompt del Sintetizador.
+
+    Si el texto completo entra en `_MAX_CONTEXT_CHARS` se devuelve tal cual. Si
+    no, se acortan SOLO los textos libres largos: la narrativa del caso y, por
+    hipótesis, el fundamento y la nota del Árbitro. Quedan siempre completos y
+    en su lugar los ensayos, la verificación bibliográfica y, de cada hipótesis,
+    su rango, prioridad, nivel EBM, estado, enunciado y los PMIDs confirmados
+    (de los que depende la guarda anti-invención).
+
+    Regla de recorte (determinista): con lo que sobra del límite una vez
+    descontado lo obligatorio, se busca el mayor tope común `L` tal que, al
+    cortar cada texto libre a `L` caracteres, el total entre. Los textos más
+    cortos que `L` se conservan enteros, así que el recorte cae sobre los más
+    largos. Cada texto cortado termina en " [...]" (la marca cuenta dentro de `L`).
+
+    Caso patológico: si lo obligatorio más la marca de cada texto libre ya
+    supera el límite, todos los textos libres quedan reducidos a la marca y el
+    contexto excede `_MAX_CONTEXT_CHARS`: se prefiere un contexto largo pero
+    completo en ensayos y verificación a uno que omita bloques.
+    """
+    citables = _confirmed_pmids(report)
+    hs = report.hypotheses
+    libres = [report.case_summary.narrative or ""]
+    libres += [h.rationale or "" for h in hs]
+    libres += [h.arbiter_note or "" for h in hs]
+
+    def armar(tope: int | None) -> str:
+        cortar = (lambda t: t) if tope is None else (lambda t: _recortar(t, tope))
+        n = len(hs)
+        return _armar(
+            report, citables, cortar(libres[0]),
+            [cortar(t) for t in libres[1:1 + n]], [cortar(t) for t in libres[1 + n:]],
+        )
+
+    completo = armar(None)
+    if len(completo) <= _MAX_CONTEXT_CHARS:
+        return completo
+
+    piso = len(_MARCA_RECORTE)
+    if len(armar(piso)) > _MAX_CONTEXT_CHARS:
+        return armar(piso)  # caso patológico: ver docstring
+    bajo, alto = piso, max(len(t) for t in libres)  # armar(bajo) entra; armar(alto) no
+    while alto - bajo > 1:
+        medio = (bajo + alto) // 2
+        if len(armar(medio)) <= _MAX_CONTEXT_CHARS:
+            bajo = medio
+        else:
+            alto = medio
+    return armar(bajo)
 
 
 def check_invention(text: str, report: StructuredReport) -> str | None:
@@ -153,7 +220,9 @@ class SynthesizerAgent(BaseAgent):
         "de no más de 5 oraciones, dirigido al médico responsable, que resuma las "
         "hipótesis principales, su nivel de evidencia y estado de verificación, y "
         "los ensayos clínicos relevantes. No introduzcas datos, PMIDs, números NCT "
-        "ni genes que no estén en el reporte. Solo podés citar los PMIDs listados "
+        "ni genes que no estén en el reporte. Tampoco introduzcas siglas, abreviaturas "
+        "ni símbolos de genes que no aparezcan tal cual en el reporte que recibís: "
+        "escribí esos conceptos con palabras. Solo podés citar los PMIDs listados "
         "como confirmados; nunca cites una referencia marcada como no confirmada. No uses lenguaje diagnóstico "
         "definitivo: son hipótesis de investigación ('sugiere', 'es compatible con'). "
         "Devolvé solo el párrafo, sin títulos, listas ni markdown."
