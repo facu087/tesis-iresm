@@ -73,10 +73,13 @@
   `scripts/medir_costos.py` (la lista que controla qué tareas se graban con `--grabar`).
   Verificar que `python3 scripts/medir_costos.py --mock --dry-run` no falla.
 
-- [ ] 5.2 Correr `python3 scripts/medir_costos.py --grabar` una vez contra Groq real para
+- [x] 5.2 Correr `python3 scripts/medir_costos.py --grabar` una vez contra Groq real para
   capturar la respuesta del Sintetizador. Agregar la clave `agente06_sintesis` resultante
   a `backend/mock/grabadas.json`. Verificar que `python3 scripts/medir_costos.py --mock`
   completa sin error y que el campo `executive_summary` del reporte no es `None`.
+  _Resultado:_ grabado (seq 22, sin truncar) y aceptado por la guarda en la corrida real.
+  En modo mock la guarda lo descarta porque el reporte mock no contiene SPTLC1/DNMT1
+  (las grabadas guardan una respuesta por tarea): `executive_summary` queda `None` en mock.
 
 ## 6. Frontend y PDF
 

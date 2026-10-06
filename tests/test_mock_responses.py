@@ -56,8 +56,8 @@ class TestContrato:
     def test_get_mock_response_mantiene_el_fallback_para_tareas_desconocidas(self):
         assert mock_responses.get_mock_response("tarea_que_no_existe") == "{}"
 
-    def test_las_doce_tareas_salen_de_la_grabacion_y_ninguna_esta_escrita_a_mano(self):
-        assert len(model_tasks.TASK_BUDGETS) == 12
+    def test_las_trece_tareas_salen_de_la_grabacion_y_ninguna_esta_escrita_a_mano(self):
+        assert len(model_tasks.TASK_BUDGETS) == 13
         assert set(mock_responses.RECORDED_RESPONSES) == _ESPERADAS_GRABADAS
         assert not hasattr(mock_responses, "HAND_WRITTEN_TASKS")
         assert mock_responses.MOCK_RESPONSES == {

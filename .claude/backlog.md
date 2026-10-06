@@ -531,6 +531,8 @@ el alcance de la tarea en la que aparecieron. Con archivo y línea, para retomar
 > se descarta el resumen entero si cita un PMID, NCT o símbolo génico ausente del reporte.
 > Tarea de presupuesto `agente06_sintesis` (GROQ_MAIN, 4096). Se muestra arriba de las
 > hipótesis en el frontend y como "RESUMEN EJECUTIVO" en el PDF.
-> **Pendiente:** la clave `agente06_sintesis` de `backend/mock/grabadas.json` se graba con
-> `python3 scripts/medir_costos.py --grabar` (corrida real); hasta entonces el modo mock
-> deja `executive_summary` en `None` y `tests/test_mock_responses.py` falla por la tarea sin grabar.
+> **Respuesta mock:** grabada de la corrida real del 2026-10-06 (`agente06_sintesis` en
+> `backend/mock/grabadas.json`); en esa corrida la guarda aceptó el resumen. En modo mock la
+> guarda lo **descarta** (cita SPTLC1/DNMT1, que no llegan al reporte mock porque las grabadas
+> guardan solo la primera respuesta de cada tarea): `executive_summary` queda `None`. Es la
+> guarda funcionando, no un fallo; no se afloja para el modo mock.

@@ -119,3 +119,7 @@ def test_modo_mock_no_llama_al_proveedor(monkeypatch):
 def test_no_importa_groq_directamente():
     fuente = Path(ag06.__file__).read_text(encoding="utf-8")
     assert "import groq" not in fuente and "from groq" not in fuente
+
+
+def test_vocabulario_genomico_no_es_gen():
+    assert check_invention("Secuenciar el genoma para buscar CNV y VUS.", _report()) is None

@@ -35,6 +35,8 @@ _GENE_RE = re.compile(r"\b([A-Z][A-Z0-9]{1,7})\b")
 _REPORT_TERMS = frozenset({
     "I", "II", "III", "IV", "EBM", "PMID", "PMIDS", "NCT", "HIGH", "MEDIUM", "LOW",
     "NEXUS", "PICO", "ADN", "ARN", "DNA", "RNA", "IA",
+    # Vocabulario genómico que no nombra un gen.
+    "CNV", "SNV", "SNP", "VUS", "WES", "WGS", "NGS", "MLPA", "ACMG", "HGVS", "PCR",
 })
 
 _MAX_TRIALS_IN_CONTEXT = 5
