@@ -275,10 +275,17 @@ ese test y el siguiente que lo disputa recibe un `RuntimeError` que el Agente 05
 caída de la API. La fixture `_limitadores_aislados` de `tests/conftest.py` deja limitadores y
 breakers como nuevos antes de cada test; `tests/test_aislamiento_limitadores.py` lo cubre.
 
-Queda abierto el defecto de fondo en producción: el limitador sigue durmiendo con el lock
-tomado. Con un único event loop (uvicorn) no se manifiesta, pero cualquier código que use
-`asyncio.run` más de una vez sobre esos limitadores puede degradar en silencio (estado
-`parcial`, ensayos faltantes). El arreglo sería reservar el turno y dormir fuera del lock.
+El defecto de fondo se arregló el 2026-10-06 (rama `fix/s4-limitador-sin-lock`):
+`RateLimiter.acquire()` reserva el turno de forma síncrona y duerme después, sin
+`asyncio.Lock`, así que usar los limitadores globales desde más de un `asyncio.run` ya no
+levanta `RuntimeError`. Lo cubren dos tests nuevos de `tests/test_rate_limiter.py`. La fixture
+`_limitadores_aislados` sigue haciendo falta para no arrastrar turnos consumidos entre tests.
+Los `ApiCircuitBreaker` conservan su lock: no tienen ningún `await` adentro, así que nunca hay
+contención.
+
+En Windows fallan 4 tests que no dependen de esto: tres de `tests/test_ingesta.py` por falta
+de Tesseract y `test_hermetico_sin_red_analisis_completo_en_modo_mock` por la codificación de
+la salida de un subproceso (`UnicodeDecodeError`). Fallan igual en `develop`.
 
 ### 4.8 Evidencia de Trello a regenerar
 Los reportes y la evidencia de Trello producidos **antes del 2026-10-06** que muestren el
