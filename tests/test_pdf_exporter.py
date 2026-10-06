@@ -565,6 +565,78 @@ class TestPdfConArbitraje:
         assert "Objetada por" in texto
         assert "Sin biopsia no se sostiene" in texto
 
+    @staticmethod
+    def _lineas(reporte: StructuredReport) -> list[str]:
+        """Líneas del PDF, para afirmar sobre un rótulo y lo que lo acompaña."""
+        return _texto_del_pdf(generate_pdf(reporte)).splitlines()
+
+    @staticmethod
+    def _reporte_con_reservas(refutan: list[str]) -> StructuredReport:
+        """
+        El Consultor Clínico aportó una hipótesis al grupo y además objetó otra
+        del mismo grupo. Sin textos de contradicción ni segunda hipótesis, para
+        poder contar cuántas veces aparece su nombre.
+        """
+        reporte = _make_report()
+        reporte.hypotheses = reporte.hypotheses[:1]
+        h = reporte.hypotheses[0]
+        h.supporting_agents = ["Analista de Literatura", "Consultor Clínico"]
+        h.refuting_agents = refutan
+        h.agents_with_reservations = ["Consultor Clínico"]
+        return reporte
+
+    def test_agente_con_reservas_tiene_su_propia_linea(self):
+        lineas = self._lineas(self._reporte_con_reservas(["Consultor Clínico"]))
+        con_reservas = [l for l in lineas if "Sostenida con reservas por" in l]
+        assert len(con_reservas) == 1
+        assert "Consultor Clínico" in con_reservas[0]
+
+    def test_agente_con_reservas_no_se_repite(self):
+        """Ni entre quienes sostienen ni bajo "Objetada por": aparece una vez."""
+        lineas = self._lineas(self._reporte_con_reservas(["Consultor Clínico"]))
+        texto = "\n".join(lineas)
+        assert texto.count("Consultor Clínico") == 1
+        assert "Analista de Literatura" in texto
+        # Era el único que objetaba: la línea de objeción no tiene a quién listar.
+        assert "Objetada por" not in texto
+
+    def test_objetada_por_lista_solo_a_quien_no_la_sostiene(self):
+        lineas = self._lineas(self._reporte_con_reservas(
+            ["Consultor Clínico", "Especialista Genómica"]
+        ))
+        objetada = [l for l in lineas if "Objetada por" in l]
+        assert len(objetada) == 1
+        assert "Especialista Genómica" in objetada[0]
+        assert "Consultor Clínico" not in objetada[0]
+
+    def test_las_reservas_van_antes_de_las_objeciones(self):
+        lineas = self._lineas(self._reporte_con_reservas(
+            ["Consultor Clínico", "Especialista Genómica"]
+        ))
+        reservas = next(i for i, l in enumerate(lineas) if "Sostenida con reservas por" in l)
+        objetada = next(i for i, l in enumerate(lineas) if "Objetada por" in l)
+        assert reservas < objetada
+
+    def test_todos_con_reservas_deja_el_guion_en_la_celda_de_agentes(self):
+        """Si nadie la sostiene sin reservas, la celda conserva su guion."""
+        reporte = self._reporte_con_reservas(["Consultor Clínico"])
+        reporte.hypotheses[0].supporting_agents = ["Consultor Clínico"]
+        lineas = self._lineas(reporte)
+        fila = next(l for l in lineas if l.startswith("#1"))
+        assert "Consultor Clínico" not in fila
+        assert "\n".join(lineas).count("Consultor Clínico") == 1
+
+    def test_sin_solapamiento_no_hay_linea_de_reservas(self):
+        """No regresión: sin agentes en ambas listas el PDF queda como antes."""
+        lineas = self._lineas(self._reporte_con_arbitraje())
+        texto = "\n".join(lineas)
+        assert "Sostenida con reservas por" not in texto
+        objetada = [l for l in lineas if "Objetada por" in l]
+        assert len(objetada) == 1
+        assert "Consultor Clínico" in objetada[0]
+        fila = next(l for l in lineas if l.startswith("#1"))
+        assert "Analista de Literatura" in fila
+
     def test_la_marca_de_recitada_aparece(self):
         texto = _texto_del_pdf(generate_pdf(self._reporte_con_arbitraje()))
         assert "Recitada" in texto
@@ -686,6 +758,7 @@ def _reporte_hostil() -> StructuredReport:
         )],
         status="respaldada", evidence_note=f"HEVN {_HOSTIL}", arbiter_note=f"HARB {_HOSTIL}",
         refuting_agents=[f"HREF {_HOSTIL}"],
+        agents_with_reservations=[f"HRES {_HOSTIL}"],
         contradictions=[ContradictionOut(
             from_agent_name=f"CNAME {_HOSTIL}", severity="HIGH",
             critique_text=f"CTEXT {_HOSTIL}",
@@ -718,7 +791,7 @@ def _reporte_hostil() -> StructuredReport:
 
 @pytest.mark.parametrize("marca", [
     "HTEXT", "HRAT", "AGSUP", "STITLE", "SJOUR", "SACT", "SPUB", "HEVN", "HARB", "HREF",
-    "CNAME", "CTEXT", "TTITLE", "TCOND", "TLOC", "TRAT", "TCRIT", "TREL", "DIV", "NARR",
+    "HRES", "CNAME", "CTEXT", "TTITLE", "TCOND", "TLOC", "TRAT", "TCRIT", "TREL", "DIV", "NARR",
     "DISC", "EXEC", "BTITLE", "RNAME", "RHYP",
 ])
 def test_texto_libre_se_dibuja_literal(marca):

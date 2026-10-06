@@ -54,6 +54,9 @@ export interface RankedHypothesis {
      Árbitro llega sin ellos y la vista lo renderiza como antes. */
   /** Agentes que objetaron la hipótesis y no incorporaron la crítica. */
   refuting_agents?: string[];
+  /** Dato derivado: agentes que están en `supporting_agents` y también en
+      `refuting_agents`. La vista los muestra una sola vez, con reservas. */
+  agents_with_reservations?: string[];
   contradictions?: Contradiction[];
   /** Veredicto del Árbitro, en lenguaje llano. */
   arbiter_note?: string;
