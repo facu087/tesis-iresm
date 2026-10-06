@@ -195,3 +195,14 @@ def test_contexto_lista_los_confirmados_y_el_prompt_lo_exige():
 def test_contexto_con_pmid_de_estados_mixtos_no_lo_ofrece():
     ctx = ag06.build_context(_report_con_fuente("discordante", en_bibliografia="verificada"))
     assert PMID_MALO not in ctx
+
+
+def test_biomarker_extractor_importa_sin_ciclo():
+    import subprocess
+    import sys
+
+    r = subprocess.run(
+        [sys.executable, "-c", "import backend.ingestion.biomarker_extractor"],
+        capture_output=True, text=True,
+    )
+    assert r.returncode == 0, r.stderr

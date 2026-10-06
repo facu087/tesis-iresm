@@ -24,7 +24,6 @@ import logging
 import re
 
 from ..api.schemas import StructuredReport
-from ..ingestion.biomarker_extractor import _NON_GENE_TERMS
 from ..models.report import AgentOutput
 from ..pipeline.verification import SourceStatus
 from .base_agent import GROQ_MAIN, BaseAgent
@@ -49,6 +48,10 @@ _MAX_CONTEXT_CHARS = 6000
 
 def _genes_in(text: str) -> set[str]:
     """Siglas con forma de símbolo génico, sin las siglas clínicas conocidas."""
+    # Import diferido: biomarker_extractor importa agents.model_tasks, que carga
+    # este paquete; importarlo arriba arma un ciclo si el extractor se carga primero.
+    from ..ingestion.biomarker_extractor import _NON_GENE_TERMS
+
     return {m.group(1) for m in _GENE_RE.finditer(text)} - _NON_GENE_TERMS - _REPORT_TERMS
 
 
