@@ -6,11 +6,42 @@ Rol: Generar hipótesis de investigación desde la perspectiva genómica/molecul
 
 from __future__ import annotations
 
+import re
 import sys
 
 from .base_agent import BaseAgent, GROQ_MAIN
 from ..models.genomics import GenomicContext
+from ..models.hypothesis import Hypothesis, Priority
 from ..models.report import AgentOutput
+
+_VARIANT_IN_TEXT = re.compile(r"\b(?:p\.|c\.)[A-Za-z0-9>_*+\-]{3,}")
+_GENE_TOKEN = re.compile(r"\b[A-Z][A-Z0-9]{1,7}\b")
+_WARNING = "ADVERTENCIA: hallazgo no reportado en el caso. "
+
+
+def _normalize(finding: str) -> str:
+    """Minúsculas, sin espacios ni prefijos c./p./g., para comparar hallazgos."""
+    return re.sub(r"\s+|\b[cpg]\.", "", finding.lower())
+
+
+def _declared_findings(raw: str) -> dict[str, list[str]]:
+    """
+    `case_genetic_findings` de cada hipótesis, leído del JSON crudo del LLM y
+    indexado por el texto de la hipótesis: el modelo `Hypothesis` no tiene ese
+    campo, así que después de `parse_hypotheses()` ya no está.
+    """
+    try:
+        declared = BaseAgent.extract_json(raw).get("hypotheses", [])
+    except (ValueError, AttributeError):
+        return {}
+    findings: dict[str, list[str]] = {}
+    for h in declared if isinstance(declared, list) else []:
+        if not isinstance(h, dict) or not isinstance(h.get("text"), str):
+            continue
+        raw_findings = h.get("case_genetic_findings") or []
+        if isinstance(raw_findings, list):
+            findings[h["text"].strip()] = [f for f in raw_findings if isinstance(f, str) and f.strip()]
+    return findings
 
 SYSTEM_PROMPT = """Eres un especialista en genética médica y genómica clínica.
 Tu rol es analizar casos clínicos desde la perspectiva genómica y molecular para
@@ -91,7 +122,7 @@ class GenomicsSpecialistAgent(BaseAgent):
         )
         hypotheses = self.parse_hypotheses(raw)
         hypotheses = hypotheses[:4]
-        hypotheses = self._apply_invention_guard(hypotheses)
+        hypotheses = self._apply_invention_guard(hypotheses, raw)
         return self._build_output(hypotheses, raw)
 
     def critique(self, clinical_context: str, own_output: AgentOutput, other_outputs: list[AgentOutput]) -> list:
@@ -104,7 +135,7 @@ class GenomicsSpecialistAgent(BaseAgent):
         enriched = self._build_context(clinical_context)
         output = super().revise(enriched, own_output, critiques)
         hypotheses = output.hypotheses[:4]
-        hypotheses = self._apply_invention_guard(hypotheses)
+        hypotheses = self._apply_invention_guard(hypotheses, output.raw_response)
         return AgentOutput(
             agent_id=output.agent_id,
             agent_name=output.agent_name,
@@ -141,46 +172,42 @@ class GenomicsSpecialistAgent(BaseAgent):
         """Agrega el bloque genómico al contexto clínico."""
         return f"{clinical_context}\n\n{self._genomic_context.to_prompt_block()}"
 
-    def _apply_invention_guard(self, hypotheses):
+    def _is_reported(self, finding: str) -> bool:
         """
-        Degrada a LOW las hipótesis que citan hallazgos genéticos no reportados.
-
-        Un hallazgo es "no reportado" cuando aparece en case_genetic_findings del
-        JSON del agente pero no está en los datos reales del caso. En modo
-        orientación (sin variantes ni hallazgos positivos) cualquier notación de
-        variante (p.X o c.X) en el texto de la hipótesis activa la guarda.
+        True si el hallazgo declarado por el LLM está en el caso: coincide con
+        un hallazgo o variante reportados, o contiene una variante reportada y
+        todos los genes que nombra están en el caso.
         """
         ctx = self._genomic_context
-        known = {f.lower() for f in ctx.variants + ctx.genetic_findings}
-        in_orientation_mode = not ctx.has_genomic_findings
+        norm = _normalize(finding)
+        known = [_normalize(k) for k in ctx.variants + ctx.genetic_findings]
+        if any(norm == k or norm in k for k in known):
+            return True
+        genes = set(_GENE_TOKEN.findall(finding))
+        variants = [_normalize(v) for v in ctx.variants]
+        return any(v and v in norm for v in variants) and genes <= set(ctx.genes)
 
+    def _apply_invention_guard(self, hypotheses: list[Hypothesis], raw: str) -> list[Hypothesis]:
+        """
+        Degrada a LOW, sin descartar, las hipótesis que citan hallazgos
+        genéticos no reportados en el caso.
+
+        Dos controles: (1) cada `case_genetic_findings` declarado en el JSON
+        crudo tiene que estar en el caso; (2) en modo orientación (sin variantes
+        ni hallazgos positivos) ninguna notación de variante puede aparecer en
+        el enunciado.
+        """
+        declared = _declared_findings(raw)
+        orientation = not self._genomic_context.has_genomic_findings
         marked = 0
         for h in hypotheses:
-            invented = False
-
-            if in_orientation_mode:
-                # En modo orientación no debería haber notación de variante concreta
-                import re
-                if re.search(r'\b(?:p\.|c\.)[A-Za-z0-9>_*+\-]{3,}', h.text or ""):
-                    invented = True
-
-            # Hallazgos que el LLM dice que están en el caso pero no están
-            raw_findings = getattr(h, "case_genetic_findings", None) or []
-            if raw_findings:
-                for finding in raw_findings:
-                    if finding.lower() not in known:
-                        invented = True
-                        break
-
+            invented = orientation and bool(_VARIANT_IN_TEXT.search(h.text or ""))
+            findings = declared.get((h.text or "").strip(), [])
+            invented = invented or any(not self._is_reported(f) for f in findings)
             if invented:
-                from ..models.hypothesis import Priority
-                object.__setattr__(h, "priority", Priority.LOW)
-                rationale = h.rationale or ""
-                if not rationale.startswith("ADVERTENCIA"):
-                    object.__setattr__(
-                        h, "rationale",
-                        "ADVERTENCIA: hallazgo no reportado en el caso. " + rationale,
-                    )
+                h.priority = Priority.LOW
+                if not (h.rationale or "").startswith("ADVERTENCIA"):
+                    h.rationale = _WARNING + (h.rationale or "")
                 marked += 1
 
         if marked:
@@ -189,5 +216,4 @@ class GenomicsSpecialistAgent(BaseAgent):
                 f"(hallazgos no reportados en el caso).",
                 file=sys.stderr,
             )
-
         return hypotheses

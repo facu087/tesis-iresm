@@ -41,7 +41,7 @@ from typing import Any, Optional
 
 import httpx
 
-from .rate_limiter import ExternalApiError, pharmgkb_limiter
+from .rate_limiter import ExternalApiError, pharmgkb_breaker, pharmgkb_limiter
 
 _API_NAME = "PharmGKB/ClinPGx"
 _BASE_URL = "https://api.clinpgx.org/v1/data"
@@ -179,6 +179,15 @@ class PharmGKBClient:
                               Un 404 NO es un fallo: significa "sin resultados".
         """
         assert self._client is not None, "Usar dentro de un bloque async with"
+
+        # Circuit breaker compartido: tras 3 fallos seguidos las consultas fallan
+        # con ApiUnavailableError sin tocar la red, hasta el tiempo de recuperación.
+        async with pharmgkb_breaker:
+            return await self._request_once(path, params)
+
+    async def _request_once(self, path: str, params: dict[str, str]) -> list[dict[str, Any]]:
+        """Una solicitud a la API, sin circuit breaker (ver `_request`)."""
+        assert self._client is not None
 
         # Limitador compartido de rate_limiter.py, no uno propio: así el límite
         # se respeta aunque haya varios PharmGKBClient en vuelo a la vez.

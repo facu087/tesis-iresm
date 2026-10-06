@@ -99,6 +99,24 @@ class ClinicalCase(BaseModel):
     raw_text: str                               # texto clínico original (ya anonimizado)
     pico: PICOSynthesis | None = None           # se completa tras el análisis PICO
     biomarkers: BiomarkerProfile | None = None  # se completa tras la extracción
+    genomic_context: GenomicContext | None = None  # perfil genómico (Ronda 1, Agente 02)
+```
+
+### GenomicContext — `backend/models/genomics.py`
+Perfil genómico del caso que recibe el Agente 02. Lo arma de forma determinista
+`pipeline/genomic_context.build()` (sin red ni LLM) y lo enriquece `enrich()` con
+PharmGKB (por gen, máx. 3) y ClinVar (por variante, máx. 5) en paralelo.
+
+```python
+class GenomicContext(BaseModel):
+    variants: list[str]                      # notaciones del caso (p.Val30Met, c.148G>A)
+    genetic_findings: list[str]              # hallazgos genéticos positivos
+    genes: list[str]                         # símbolos saneados (sin siglas de enfermedad)
+    discarded_symbols: list[str]             # CMT, FAP, ATTR… descartados por no ser genes
+    negative_genetic_studies: list[str]      # "Panel CMT de 40 genes negativo"
+    annotations: list[PharmacogenomicAnnotation]  # PharmGKB
+    clinvar: list[VariantClassification]     # ClinVar: encontrada/sin_resultados/ambigua/no_disponible
+    sources: list[GenomicSource]             # estado de cada fuente consultada
 ```
 
 ### PICOSynthesis — `backend/models/case.py`

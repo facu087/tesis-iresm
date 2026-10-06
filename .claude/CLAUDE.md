@@ -225,6 +225,9 @@ Scripts disponibles:
 - `demo_priorizacion_evidencia.py` — priorización EBM: nivel declarado vs. efectivo, estado
   y orden del reporte; genera `priorizacion.txt`, `reporte.json` y `reporte.pdf`
   (`--pubmed` verifica PMIDs reales)
+- `demo_agente02.py` — Agente 02: caso base (sin hallazgos, `CMT` descartado) y caso TTR
+  `p.Val30Met`: perfil genómico, bloque enviado al LLM e hipótesis con la guarda anti-invención;
+  guarda los JSON en `output/demo_agente02/`
 - `demo_agente04.py` — Agente 04: entrada (hipótesis del debate con su autor y las
   críticas) → salida (partición del agrupamiento, contradicciones, veredictos, Ronda 5
   y solapamiento entre lo que el RAG recuperó y lo que los agentes citaron); genera
@@ -285,6 +288,7 @@ tesis-iresm/
 │   ├── agents/
 │   │   ├── base_agent.py           ← clase base ABC con interfaz común
 │   │   ├── agent_01_literature.py  ← Analista de Literatura (Groq)
+│   │   ├── agent_02_genomics.py    ← Especialista Genómica (S4) + guarda anti-invención
 │   │   ├── agent_03_clinical.py    ← Consultor Clínico (Groq)
 │   │   ├── agent_04_arbiter.py     ← Árbitro Verificador (S4) — arbitrate(), no debate
 │   │   ├── agent_05_trials.py      ← Navegador de Ensayos (S4) — navigate(), no debate
@@ -308,6 +312,7 @@ tesis-iresm/
 │   │   ├── report.py           ← AgentOutput, Report
 │   │   ├── case.py             ← ClinicalCase, PICOSynthesis
 │   │   ├── biomarkers.py       ← BiomarkerProfile
+│   │   ├── genomics.py         ← GenomicContext, ClinVar y PharmGKB del Agente 02 (S4)
 │   │   ├── arbitration.py      ← consenso, contradicciones y resumen del Agente 04 (S4)
 │   │   ├── trial.py            ← ClinicalTrial + contrato del Agente 05 (S4)
 │   │   ├── cuenta.py           ← CuentaMedico, RolCuenta, EstadoCuenta (S4)
@@ -329,6 +334,7 @@ tesis-iresm/
 │   ├── cli.py                  ← `python -m backend.cli crear-admin` (S4)
 │   ├── pipeline/
 │   │   ├── pico.py             ← build() síntesis PICO + format_for_agents()
+│   │   ├── genomic_context.py  ← build() determinista + enrich() PharmGKB/ClinVar (S4)
 │   │   ├── orchestrator.py     ← distribución paralela asyncio (Ronda 1)
 │   │   ├── debate.py           ← motor de debate adversarial (Rondas 2–4)
 │   │   ├── verification.py     ← verificación de PMIDs citados contra PubMed (S4)

@@ -501,7 +501,7 @@ el alcance de la tarea en la que aparecieron. Con archivo y línea, para retomar
 | C | Ningún modelo de embeddings maneja la **negación**: con "negative CMT panel" en la query, los tres modelos evaluados traen Charcot-Marie-Tooth arriba. El hallazgo negativo llega al agente por `negative_findings`, así que el razonamiento puede corregirlo, pero el recuperador no filtra por él. Limitación conocida, vale documentarla en la tesis. | `backend/rag/chroma_store.py` (docstring) |
 | D | `master` está **62 commits detrás** de `develop`: Sprints 2, 3 y 4 sin liberar. Decisión del equipo: se promueve cuando haya una versión del sistema, no por etapa. | — |
 | E | **OpenSpec**: **adoptado** (v1.11.0, rama `chore/s4-openspec`). Alcance: los 4 agentes que faltan (02, 04, 05, 06) y las reglas de clasificación EBM — sin backfillear los Sprints 1–3. Uso en `.claude/CLAUDE.md` § "Spec-driven con OpenSpec". | `openspec/config.yaml` |
-| F | El extractor de biomarcadores devuelve **`genes=['CMT']`** en el caso base: `CMT`, `FAP` y `ATTR` están en `_KNOWN_GENES`, pero son enfermedades o paneles, no genes. Además `tests/test_biomarkers.py` no es un test de pytest (es un script con `main()`, pytest recolecta 0 tests) y exige que `CMT` salga como gen. Por esto la tarjeta #68 no pasó a QA. | `backend/ingestion/biomarker_extractor.py:65-67`, `tests/test_biomarkers.py:63-66` |
+| F | ✅ **RESUELTO.** El extractor devolvía `genes=['CMT']` en el caso base (`CMT`, `FAP` y `ATTR` en `_KNOWN_GENES`). Hoy están en `_NON_GENE_TERMS` y el regex de genes se corrigió en la tarjeta #73 (PR #18): sobre "Panel CMT de 40 genes negativo. Sospecha de FAP o ATTR." la extracción da `genes=[]` (verificado el 2026-10-06). `tests/test_biomarkers.py` ya es un test de pytest (33 tests). | `backend/ingestion/biomarker_extractor.py` |
 | G | ✅ **RESUELTO** (Agente 04). `BaseAgent.parse_hypotheses()` armaba `Source(**s)` con lo que manda el LLM, así que acepta `verified`, `verification_status` o `publication_types` autodeclarados. La clasificación EBM y `_annotate_source()` ya los ignoran/limpian, pero conviene sanearlos en el parseo (lo toca el Agente 04). | `backend/agents/base_agent.py:92` |
 | H | Lint del frontend con 1 error y 1 warning **previos** a la priorización EBM: `setState` síncrono en un effect (`report/page.tsx`, `useEffect` de carga del reporte) y un `eslint-disable` sin uso (`analyzing/page.tsx:120`). `next build` no corre lint, así que no bloquea el build. Sigue igual después del Agente 05: el error es del effect que lee `sessionStorage`, ajeno a la tab de ensayos. | `frontend/src/app/report/page.tsx`, `frontend/src/app/analyzing/page.tsx:120` |
 | I | **Los genes de enfermedades raras no están en la ORPHAcodes API**: expone 32 rutas y ninguna de genes (es una API de nomenclatura). `get_genes()` levanta `OrphanetGenesNoDisponibles` en vez de mentir con `[]`. Están en Orphadata, otro host y otro producto: `GET https://api.orphadata.com/rd-associated-genes/orphacodes/{code}` (200, CC-BY-4.0, sin apiKey; 404 = esa enfermedad no tiene asociación génica). Integrarlo va en **tarjeta aparte**: el Agente 05 no depende de ellos. | `backend/external/orphanet.py:255` (`get_genes`), docstring del módulo |
@@ -555,3 +555,13 @@ el alcance de la tarea en la que aparecieron. Con archivo y línea, para retomar
 > **Hallazgo (2026-10-06):** con `GROQ_API_KEY` en `.env`, la suite de tests hace 54 llamadas
 > reales a Groq (medido con `scripts/pytest_sin_red.py`; sin la key, 0). Gasta cuota: correr la
 > suite sin la key o con la red bloqueada hasta que se arregle.
+
+> **Nota (21) — Revisión del Agente 02 contra su OpenSpec (2026-10-06).** Al revisar el cambio
+> `agente-02-genomica` (0 de 26 tareas tildadas aunque el código estaba en `develop` desde el
+> PR #12) apareció un bug: la guarda anti-invención buscaba `case_genetic_findings` en la
+> `Hypothesis` ya parseada, que no tiene ese campo, así que **cuando el caso traía hallazgos
+> genéticos nunca degradaba nada** (un LLM que afirmaba "MFN2 p.Arg94Gln" en un caso TTR quedaba
+> en HIGH). Ahora lo lee del JSON crudo. Además: circuit breaker en PharmGKB, tests del debate
+> con 3 agentes y de atribución, `demo_agente02.py` traído a `develop` y la medición del
+> pipeline con datos reales de la corrida del 2026-10-06 (debate de Rondas 2–4: 352 s de 495 s;
+> 26 llamadas, 4 reintentadas por 429; 82.968 tokens). La medición anterior eran estimaciones.

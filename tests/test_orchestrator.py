@@ -194,3 +194,44 @@ class TestRunRound1:
 
             with pytest.raises(RuntimeError, match="Todos los agentes fallaron"):
                 asyncio.run(run_round_1(case))
+
+
+# ── Ronda 1 con los tres agentes (Agente 02 integrado) ───────────────────────
+
+class TestRonda1ConTresAgentes:
+    def _correr(self, falla_02: bool = False):
+        from backend.models.genomics import GenomicContext
+
+        case = ClinicalCase(raw_text="texto", pico=_make_pico())
+        perfil = GenomicContext(genes=["TTR"])
+        with patch("backend.pipeline.orchestrator.LiteratureAnalystAgent") as M01, \
+             patch("backend.pipeline.orchestrator.GenomicsSpecialistAgent") as M02, \
+             patch("backend.pipeline.orchestrator.ClinicalConsultantAgent") as M03, \
+             patch("backend.pipeline.orchestrator._enrich_context_with_rag",
+                   AsyncMock(return_value=("contexto", []))), \
+             patch("backend.pipeline.orchestrator.gc_module.enrich", AsyncMock(return_value=perfil)):
+            for mock, agent_id, nombre, prioridad in [
+                (M01, "01", "Analista de Literatura", Priority.HIGH),
+                (M02, "02", "Especialista Genómica", Priority.MEDIUM),
+                (M03, "03", "Consultor Clínico", Priority.LOW),
+            ]:
+                mock.return_value.AGENT_ID = agent_id
+                mock.return_value.AGENT_NAME = nombre
+                mock.return_value.run.return_value = _make_agent_output(agent_id, nombre, prioridad)
+            if falla_02:
+                M02.return_value.run.side_effect = RuntimeError("Agente 02 caído")
+            report = asyncio.run(run_round_1(case))
+        return case, report, perfil, M02
+
+    def test_tres_agentes_tres_outputs(self):
+        _, report, _, _ = self._correr()
+        assert sorted(o.agent_id for o in report.agent_outputs) == ["01", "02", "03"]
+
+    def test_agente_02_caido_quedan_01_y_03(self):
+        _, report, _, _ = self._correr(falla_02=True)
+        assert sorted(o.agent_id for o in report.agent_outputs) == ["01", "03"]
+
+    def test_perfil_genomico_queda_en_el_caso_y_llega_al_agente_02(self):
+        case, _, perfil, M02 = self._correr()
+        assert case.genomic_context is perfil
+        assert M02.call_args.kwargs["genomic_context"] is perfil

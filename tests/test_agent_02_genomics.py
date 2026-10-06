@@ -198,3 +198,66 @@ class TestAtribucion:
             out = agente.run("contexto")
         assert out.agent_id == "02"
         assert out.agent_name == "Especialista Genómica"
+
+
+# ── Guarda en modo con hallazgos (lee case_genetic_findings del JSON crudo) ────
+
+class TestGuardaConHallazgos:
+    """
+    El modelo `Hypothesis` no tiene `case_genetic_findings`: la guarda lo lee del
+    JSON crudo. Antes lo buscaba en la hipótesis parseada y en este modo nunca
+    degradaba nada.
+    """
+
+    def _run(self, hallazgo: str) -> Priority:
+        agente = GenomicsSpecialistAgent(_ctx_con_ttr())
+        with patch.object(agente, "_call_llm", return_value=_json_con_hallazgo(hallazgo)):
+            return agente.run("contexto").hypotheses[0].priority
+
+    def test_hallazgo_de_otro_gen_inventado_se_degrada(self):
+        assert self._run("MFN2 p.Arg94Gln") == Priority.LOW
+
+    def test_variante_real_atribuida_a_otro_gen_se_degrada(self):
+        assert self._run("MFN2 p.Val30Met") == Priority.LOW
+
+    @pytest.mark.parametrize("hallazgo", [
+        "TTR p.Val30Met", "p.Val30Met", "Val30Met", "variante ttr p.val30met",
+    ])
+    def test_hallazgo_reportado_con_otra_escritura_no_se_degrada(self, hallazgo):
+        assert self._run(hallazgo) != Priority.LOW
+
+    def test_revise_degrada_con_hallazgos_en_el_caso(self):
+        agente = GenomicsSpecialistAgent(_ctx_con_ttr())
+        own = AgentOutput(agent_id="02", agent_name="Especialista Genómica",
+                          hypotheses=[], raw_response="{}")
+        with patch.object(agente, "_call_llm", return_value=_json_con_hallazgo("MFN2 p.Arg94Gln")):
+            out = agente.revise("contexto", own, [])
+        assert out.hypotheses[0].priority == Priority.LOW
+        assert out.hypotheses[0].rationale.startswith("ADVERTENCIA")
+
+    def test_no_descarta_la_hipotesis(self):
+        agente = GenomicsSpecialistAgent(_ctx_con_ttr())
+        with patch.object(agente, "_call_llm", return_value=_json_con_hallazgo("MFN2 p.Arg94Gln")):
+            out = agente.run("contexto")
+        assert len(out.hypotheses) == 1
+
+
+class TestAtribucionEnElReporte:
+    def test_hipotesis_del_agente_02_en_la_ronda_4_lista_al_especialista(self):
+        from backend.models.case import ClinicalCase
+        from backend.models.report import DebateRound
+        from backend.pipeline.report_builder import build_export
+
+        agente = GenomicsSpecialistAgent(_ctx_con_ttr())
+        with patch.object(agente, "_call_llm", return_value=_json_valido(1)):
+            out = agente.run("contexto")
+        report = Report(
+            case_summary="Varón de 42 años con neuropatía axonal sensitivomotora.",
+            hypotheses=out.hypotheses,
+            debate_rounds=[DebateRound(round_number=4, agent_outputs=[out])],
+        )
+        exportado = build_export(
+            case=ClinicalCase(raw_text="Varón de 42 años con neuropatía axonal."),
+            report=report, trials=[], processing_time=1.0,
+        )
+        assert "Especialista Genómica" in exportado.hypotheses[0].supporting_agents
