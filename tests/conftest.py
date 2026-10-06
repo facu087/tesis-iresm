@@ -16,6 +16,7 @@ request y request las filas creadas en el test.
 
 from __future__ import annotations
 
+import asyncio
 import os
 
 import pytest
@@ -25,6 +26,7 @@ from sqlmodel import Session, create_engine
 
 from backend import db as db_module
 from backend.auth.security import hash_password
+from backend.external import rate_limiter
 from backend.models.cuenta import CuentaMedico, EstadoCuenta, RolCuenta
 
 _ORIGEN_PERMITIDO = "http://localhost:3000"
@@ -46,6 +48,37 @@ def _base_de_datos_temporal(monkeypatch):
     db_module.create_db_and_tables(bind=engine_temporal)
     yield engine_temporal
     db_module.set_engine(original)
+
+
+@pytest.fixture(autouse=True)
+def _limitadores_aislados():
+    """
+    Deja los limitadores y breakers globales como recién creados antes de CADA test.
+
+    Son objetos de módulo y cada test asíncrono corre en su propio event loop:
+    un `asyncio.Lock` que tuvo contención en un test queda ligado a ese loop, y
+    el siguiente que vuelva a disputarlo recibe un `RuntimeError` que los
+    clientes externos toman por una caída de la API. Tampoco se arrastran los
+    turnos consumidos, que hacían depender el resultado de la velocidad de los
+    tests anteriores (ver `tests/test_aislamiento_limitadores.py`).
+    """
+    for limitador in (
+        rate_limiter.pubmed_limiter,
+        rate_limiter.orphanet_limiter,
+        rate_limiter.pharmgkb_limiter,
+        rate_limiter.clinical_trials_limiter,
+    ):
+        limitador._timestamps.clear()
+        limitador._lock = asyncio.Lock()
+    for breaker in (
+        rate_limiter.pubmed_breaker,
+        rate_limiter.orphanet_breaker,
+        rate_limiter.pharmgkb_breaker,
+        rate_limiter.clinical_trials_breaker,
+    ):
+        breaker.reset()
+        breaker._lock = asyncio.Lock()
+    yield
 
 
 @pytest.fixture()

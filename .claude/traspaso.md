@@ -214,11 +214,18 @@ la 2 se arreglaron en el PR #32. Siguen abiertas:
 - **6.** `scripts/medir_costos.py` informa que la grabación se escribió aunque la escritura
   haya fallado.
 
-Tests intermitentes: en corridas de la suite completa fallaron una vez cada uno
-`tests/test_agent_05_trials.py::TestPrivacidad::test_trazabilidad_de_los_ensayos` y
-`tests/test_agent_05_trials.py::TestOrphanet::test_orphanet_caido_no_frena_los_ensayos`, en
-corridas distintas; el archivo pasa corriendo solo. La causa no se conoce y hay una
-investigación en curso por separado.
+Tests intermitentes (resueltos el 2026-10-06): en corridas de la suite completa fallaban, de a
+uno y en corridas distintas, tests de `tests/test_agent_05_trials.py`. La causa era que los
+limitadores de `backend/external/rate_limiter.py` son objetos de módulo: `acquire()` duerme con
+el `asyncio.Lock` tomado cuando la ráfaga está agotada, el lock queda ligado al event loop de
+ese test y el siguiente que lo disputa recibe un `RuntimeError` que el Agente 05 trata como
+caída de la API. La fixture `_limitadores_aislados` de `tests/conftest.py` deja limitadores y
+breakers como nuevos antes de cada test; `tests/test_aislamiento_limitadores.py` lo cubre.
+
+Queda abierto el defecto de fondo en producción: el limitador sigue durmiendo con el lock
+tomado. Con un único event loop (uvicorn) no se manifiesta, pero cualquier código que use
+`asyncio.run` más de una vez sobre esos limitadores puede degradar en silencio (estado
+`parcial`, ensayos faltantes). El arreglo sería reservar el turno y dormir fuera del lock.
 
 ### 4.8 Evidencia de Trello a regenerar
 Los reportes y la evidencia de Trello producidos **antes del 2026-10-06** que muestren el
