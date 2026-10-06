@@ -108,6 +108,21 @@ def _limpiar(texto: str) -> str:
     return texto.translate(_SUSTITUCIONES)
 
 
+def _t(valor: object) -> str:
+    """
+    Texto libre listo para interpolar dentro del marcado de un `Paragraph`.
+
+    Todo valor que viene del modelo, de PubMed/ClinicalTrials.gov/Orphanet o de un
+    cliente de `POST /api/report/pdf` pasa por acá: se escapan `&`, `<` y `>` para
+    que ReportLab lo dibuje como texto y no lo interprete como marcado (ni falle
+    con `Parse error`). Se escapa el VALOR, no el string ya armado, para que el
+    marcado propio del módulo (`<b>`, `<font>`, `<br/>`) siga funcionando. La
+    traducción de caracteres sin glifo va antes, porque `≤` y `≥` se vuelven `<=`
+    y `>=`, que sin escapar después serían marcado.
+    """
+    return escape(_limpiar(str(valor)))
+
+
 def _par(texto: str, estilo) -> Paragraph:
     """Paragraph con el texto ya saneado para las fuentes del PDF."""
     return Paragraph(_limpiar(texto), estilo)
@@ -120,13 +135,13 @@ def _source_line(src, indice: str = "") -> str:
     Cuando el PMID existe pero corresponde a otro artículo, se agrega el título
     real: es la prueba de que la cita no respalda lo que el agente afirma.
     """
-    partes = [f"{indice}{src.title}"]
+    partes = [f"{indice}{_t(src.title)}"]
     if src.journal:
-        partes.append(src.journal)
+        partes.append(_t(src.journal))
     if src.year:
         partes.append(str(src.year))
     if src.pmid:
-        partes.append(f"PMID: {src.pmid}")
+        partes.append(f"PMID: {_t(src.pmid)}")
     linea = " · ".join(partes)
 
     etiqueta = _VERDICT_LABELS.get(src.verification_status or "")
@@ -136,12 +151,12 @@ def _source_line(src, indice: str = "") -> str:
 
     # Tipos de publicación de PubMed: son los que fijan el tope de evidencia.
     if src.verified and src.publication_types:
-        linea += f" <font color='{_hex(_GRAY)}'>(tipo: {', '.join(src.publication_types)})</font>"
+        linea += f" <font color='{_hex(_GRAY)}'>(tipo: {_t(', '.join(src.publication_types))})</font>"
 
     if src.actual_title:
         linea += (
             f"<br/><font color='{_hex(_RED)}'>En PubMed este PMID es:</font> "
-            f"<i>{src.actual_title}</i>"
+            f"<i>{_t(src.actual_title)}</i>"
         )
     return linea
 
@@ -206,7 +221,7 @@ def _cover(report: StructuredReport, s: dict) -> list:
 
     date_str = report.metadata.generated_at.strftime("%d/%m/%Y %H:%M UTC")
     elems.append(_par(f"Generado el {date_str}", s["subtitle"]))
-    elems.append(_par(f"Versión {report.metadata.nexus_version}", s["subtitle"]))
+    elems.append(_par(f"Versión {_t(report.metadata.nexus_version)}", s["subtitle"]))
     elems.append(Spacer(1, 1 * cm))
 
     v = report.verification
@@ -329,7 +344,7 @@ def _cover(report: StructuredReport, s: dict) -> list:
             elems.append(_par(aviso_arbitro, s["disclaimer"]))
         elems.append(Spacer(1, 0.5 * cm))
 
-    elems.append(_par(report.metadata.disclaimer, s["disclaimer"]))
+    elems.append(_par(_t(report.metadata.disclaimer), s["disclaimer"]))
     elems.append(PageBreak())
     return elems
 
@@ -368,7 +383,7 @@ def _case_summary(report: StructuredReport, s: dict) -> list:
         elems.append(Spacer(1, 0.3 * cm))
 
     elems.append(_par("<b>Narrativa clínica:</b>", s["body"]))
-    elems.append(_par(cs.narrative, s["body"]))
+    elems.append(_par(_t(cs.narrative), s["body"]))
     return elems
 
 
@@ -383,11 +398,12 @@ def _executive_summary(report: StructuredReport, s: dict) -> list:
     Resumen del Agente 06; vacío si no hay (reporte previo o descartado).
 
     Es prosa libre del LLM (y en POST /api/report/pdf viene del cliente): se
-    escapa para que ReportLab la dibuje como texto y no la interprete como marcado.
+    escapa con `_t()` para que ReportLab la dibuje como texto y no la interprete
+    como marcado.
     """
     if not report.executive_summary:
         return []
-    return [*_section("RESUMEN EJECUTIVO", s), _par(escape(report.executive_summary), s["body"])]
+    return [*_section("RESUMEN EJECUTIVO", s), _par(_t(report.executive_summary), s["body"])]
 
 
 def _hypotheses(report: StructuredReport, s: dict) -> list:
@@ -422,12 +438,12 @@ def _hypothesis_block(h: RankedHypothesis, s: dict) -> list:
     pr_color = _PRIORITY_COLORS.get(h.priority, _NEXUS_BLUE)
 
     st_color = _STATUS_COLORS.get(h.status, _GRAY)
-    st_label = _STATUS_LABELS.get(h.status, h.status.upper())
+    st_label = _STATUS_LABELS.get(h.status, _t(h.status.upper()))
 
     topeada = bool(h.declared_evidence_level) and h.declared_evidence_level != h.evidence_level
-    evidencia = f"Evidencia {h.evidence_level}"
+    evidencia = f"Evidencia {_t(h.evidence_level)}"
     if topeada:
-        evidencia += f" (declarado {h.declared_evidence_level})"
+        evidencia += f" (declarado {_t(h.declared_evidence_level)})"
 
     # Fila de badges: rango | estado | evidencia | prioridad | agentes
     badge_row = [[
@@ -441,11 +457,11 @@ def _hypothesis_block(h: RankedHypothesis, s: dict) -> list:
             s["cell"],
         ),
         _par(
-            f"<font color='#{pr_color.hexval()[2:]}'>{h.priority}</font>",
+            f"<font color='#{pr_color.hexval()[2:]}'>{_t(h.priority)}</font>",
             s["cell"],
         ),
         _par(
-            ", ".join(h.supporting_agents) if h.supporting_agents else "—",
+            _t(", ".join(h.supporting_agents)) if h.supporting_agents else "—",
             s["small"],
         ),
     ]]
@@ -458,12 +474,12 @@ def _hypothesis_block(h: RankedHypothesis, s: dict) -> list:
         ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
     ]))
     elems.append(badge_t)
-    elems.append(_par(h.text, s["body"]))
-    elems.append(_par(f"<i>Justificación:</i> {h.rationale}", s["small"]))
+    elems.append(_par(_t(h.text), s["body"]))
+    elems.append(_par(f"<i>Justificación:</i> {_t(h.rationale)}", s["small"]))
     if h.evidence_note:
         color = _ORANGE if topeada else _GRAY
         elems.append(_par(
-            f"<font color='{_hex(color)}'><i>Nivel de evidencia:</i> {h.evidence_note}</font>",
+            f"<font color='{_hex(color)}'><i>Nivel de evidencia:</i> {_t(h.evidence_note)}</font>",
             s["small"],
         ))
 
@@ -471,7 +487,7 @@ def _hypothesis_block(h: RankedHypothesis, s: dict) -> list:
     if h.arbiter_note:
         elems.append(_par(
             f"<font color='{_hex(_NEXUS_BLUE)}'><i>Veredicto del Árbitro:</i> "
-            f"{h.arbiter_note}</font>",
+            f"{_t(h.arbiter_note)}</font>",
             s["small"],
         ))
 
@@ -493,13 +509,13 @@ def _hypothesis_block(h: RankedHypothesis, s: dict) -> list:
     if h.refuting_agents:
         elems.append(_par(
             f"<font color='{_hex(_RED)}'><i>Objetada por:</i> "
-            f"{', '.join(h.refuting_agents)}</font>",
+            f"{_t(', '.join(h.refuting_agents))}</font>",
             s["small"],
         ))
     for contra in h.contradictions[:2]:
         elems.append(_par(
-            f"<font color='{_hex(_RED)}'>· {contra.from_agent_name} "
-            f"[{contra.severity}]: {contra.critique_text}</font>",
+            f"<font color='{_hex(_RED)}'>· {_t(contra.from_agent_name)} "
+            f"[{_t(contra.severity)}]: {_t(contra.critique_text)}</font>",
             s["small"],
         ))
 
@@ -546,7 +562,7 @@ def _debate_summary(report: StructuredReport, s: dict) -> list:
         elems.append(Spacer(1, 0.2 * cm))
         elems.append(_par("<b>Divergencias detectadas:</b>", s["body"]))
         for div in ds.divergences:
-            elems.append(_par(f"• {div}", s["small"]))
+            elems.append(_par(f"• {_t(div)}", s["small"]))
 
     return elems
 
@@ -579,7 +595,7 @@ def _trial_block(
     """Bloque de un ensayo. Sin `busqueda` imprime igual que antes del Agente 05."""
     elems: list = []
     phase_str = f" | {trial.phase}" if trial.phase else ""
-    elems.append(_par(f"<b>{trial.nct_id}{phase_str}</b> — {trial.title}", s["body"]))
+    elems.append(_par(f"<b>{_t(trial.nct_id)}{_t(phase_str)}</b> — {_t(trial.title)}", s["body"]))
 
     if busqueda is not None:
         etiquetas: list[str] = []
@@ -595,26 +611,26 @@ def _trial_block(
         elems.append(_par(" · ".join(etiquetas), s["small"]))
 
         if trial.compatibility_rationale:
-            elems.append(_par(f"<i>Fundamento:</i> {trial.compatibility_rationale}", s["small"]))
+            elems.append(_par(f"<i>Fundamento:</i> {_t(trial.compatibility_rationale)}", s["small"]))
         if trial.criteria_to_verify:
             elems.append(_par("<i>Criterios a verificar:</i>", s["small"]))
             for criterio in trial.criteria_to_verify:
-                elems.append(_par(f"· {criterio}", s["small"]))
+                elems.append(_par(f"· {_t(criterio)}", s["small"]))
         if trial.related_hypotheses:
             elems.append(_par(
-                f"<i>Hipótesis relacionadas:</i> {'; '.join(trial.related_hypotheses)}",
+                f"<i>Hipótesis relacionadas:</i> {_t('; '.join(trial.related_hypotheses))}",
                 s["small"],
             ))
 
     details = []
     if trial.conditions:
-        details.append(f"Condiciones: {', '.join(trial.conditions[:3])}")
+        details.append(f"Condiciones: {_t(', '.join(trial.conditions[:3]))}")
     if trial.locations:
-        details.append(f"Países: {', '.join(trial.locations[:4])}")
+        details.append(f"Países: {_t(', '.join(trial.locations[:4]))}")
     if trial.min_age or trial.max_age:
-        details.append(f"Rango etario: {trial.min_age or '?'} – {trial.max_age or '?'}")
+        details.append(f"Rango etario: {_t(trial.min_age or '?')} – {_t(trial.max_age or '?')}")
     if trial.url:
-        details.append(f"URL: {trial.url}")
+        details.append(f"URL: {_t(trial.url)}")
     for detail in details:
         elems.append(_par(detail, s["small"]))
     elems.append(Spacer(1, 0.2 * cm))
@@ -640,9 +656,9 @@ def _rare_diseases(report: StructuredReport, s: dict) -> list:
     ))
     for marca in report.rare_diseases:
         elems.append(_par(
-            f"· <b>ORPHA:{marca.orpha_code}</b> — {marca.name} · {marca.url}", s["small"]
+            f"· <b>ORPHA:{_t(marca.orpha_code)}</b> — {_t(marca.name)} · {_t(marca.url)}", s["small"]
         ))
-        elems.append(_par(f"  Hipótesis: {marca.hypothesis}", s["small"]))
+        elems.append(_par(f"  Hipótesis: {_t(marca.hypothesis)}", s["small"]))
     return elems
 
 
