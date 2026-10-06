@@ -20,15 +20,28 @@ from .api.admin_router import router as admin_router
 from .api.cuentas_router import router as cuentas_router
 from .api.router import router
 from .db import create_db_and_tables
+from .mantenimiento import limpieza
 from .mock.mode import ENV_VAR as _MOCK_ENV_VAR
 from .mock.mode import is_mock_active
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Crea el esquema de la base de cuentas si no existe (design.md — D1)."""
+    """
+    Crea el esquema de la base de cuentas si no existe (design.md — D1) y deja
+    corriendo la limpieza periódica de sesiones vencidas (tarjeta #56).
+
+    `iniciar_tarea()` devuelve `None` si la limpieza está apagada por
+    configuración o si no pudo arrancar: el backend levanta igual. El
+    `finally` cancela la tarea en el apagado, así que no queda un bucle
+    huérfano entre reinicios del `--reload` de uvicorn.
+    """
     create_db_and_tables()
-    yield
+    tarea_limpieza = limpieza.iniciar_tarea()
+    try:
+        yield
+    finally:
+        await limpieza.detener_tarea(tarea_limpieza)
 
 
 if is_mock_active():
