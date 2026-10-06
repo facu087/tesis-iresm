@@ -170,8 +170,12 @@ En `openspec/changes/control-de-costos-del-pipeline/tasks.md`:
   devuelvan lo mismo.
 - **7.5** Hecha el 2026-10-06: `.claude/CLAUDE.md`, `.claude/backlog.md` y `.claude/stack.md`
   llevan los números medidos.
-- **6.4** **Pendiente**: captura de la marca de modo mock en el frontend (el código está y
-  pasa `tests/test_pdf_exporter.py` y `npx tsc --noEmit`).
+- **6.4** Hecha el 2026-10-06: `npm run build` compila en el checkout principal y la captura
+  del aviso de modo mock se tomó recorriendo el flujo real en un navegador (19 llamadas mock,
+  0 reales). Evidencia en `output/evidencia/83/` (local), **sin subir a Trello todavía**.
+
+Con 6.2, 6.4 y 7.5 hechas, `control-de-costos-del-pipeline` no tiene tareas abiertas: se puede
+archivar con `/opsx:archive` cuando el CLI de OpenSpec esté instalado.
 
 La comparación de costo contra Claude, GPT-4o y Gemini que muestra `scripts/demo_costos.py`
 usa una **muestra sintética**. Con el `costos.jsonl` real ya se puede recalcular con

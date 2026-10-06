@@ -288,7 +288,8 @@ Suite de tests: **82 tests, 100% passing** (`pytest tests/`)
 > respuesta real (4.2), medir si el modelo rápido degrada alguna de las tres
 > tareas movidas (5.4), y regenerar las respuestas grabadas del modo mock
 > desde una corrida real (6.2; **hecho el 2026-10-06**, ver más abajo). También
-> falta la captura de pantalla del banner de modo mock en el frontend (6.4) —
+> falta la captura de pantalla del banner de modo mock en el frontend (6.4;
+> **hecha el 2026-10-06**, ver más abajo) —
 > el código está y pasa `tests/test_pdf_exporter.py` y `npx tsc --noEmit`, pero
 > `npm run build` con Turbopack falla en el worktree de esta sesión por un
 > límite del entorno (symlink de `node_modules` fuera de la raíz del
@@ -336,8 +337,9 @@ Suite de tests: **82 tests, 100% passing** (`pytest tests/`)
 > `backend/mock/recorder.py`, opción `--grabar` de `scripts/medir_costos.py`; PR
 > #30, #31 y #32). Los arreglos de parseo de los PR #25 y #26 siguen verificados
 > solo por tests: el aviso `[NEXUS] Respuesta del modelo saneada` no apareció en
-> ninguna de las dos corridas reales. Pendiente del cambio: 6.4 (captura de la
-> marca de modo mock en el frontend).
+> ninguna de las dos corridas reales. La 6.4 (captura de la marca de modo mock
+> en el frontend) también quedó hecha el 2026-10-06, con `npm run build` en
+> verde: el cambio no tiene tareas abiertas y falta archivarlo.
 
 > Nota (22) — **Registro de médicos** (cambio OpenSpec `registro-medicos-matricula`,
 > `openspec/changes/archive/2026-10-04-registro-medicos-matricula/`). `POST /api/analyze` no pedía
