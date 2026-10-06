@@ -4,10 +4,10 @@ Respuestas del modo mock, por tarea (control de costos, Sprint 4 — D7).
 Cada respuesta atraviesa el mismo parseo y las mismas validaciones que una
 respuesta real (D7: "el modo mock ejercita el flujo real").
 
-**Origen de las respuestas (tasks.md, tarea 6.2).** Salvo la que se indica más
-abajo, salen de una corrida real contra Groq hecha el 2026-10-06 con
-`scripts/medir_costos.py --grabar` (modelo `openai/gpt-oss-120b`, y
-`openai/gpt-oss-20b` para agrupación y Agente 05, como fija `TASK_BUDGETS`).
+**Origen de las respuestas (tasks.md, tarea 6.2).** Todas salen de una corrida real
+contra Groq hecha el 2026-10-06 con `scripts/medir_costos.py --grabar` (modelo
+`openai/gpt-oss-120b`, y `openai/gpt-oss-20b` para agrupación y Agente 05, como
+fija `TASK_BUDGETS`).
 Están en `backend/mock/grabadas.json` **tal como las devolvió el modelo**: sin
 retocar, con su sangría, su orden de claves y sus rarezas. Esa fidelidad es lo
 que hace que el modo mock se parezca a lo que el modelo devuelve de verdad. El
@@ -27,13 +27,13 @@ modo mock no toca la red para el LLM, pero conserva las consultas externas.
 Una respuesta grabada solo se usa si atraviesa el parseo real sin descartarse
 ni caer en el fallback (`tests/test_mock_responses.py`).
 
-**Única respuesta escrita a mano: `debate_critica`.** Las tres críticas reales
-nombran a su destinatario como "Agent 02", "Agent01" o "Agent03", y
-`debate._critiques_for()` compara `target_agent_id` contra el ID del agente
-("01", "02", "03"): ninguna crítica real llega a su destinatario, así que se
-descartarían en silencio en la ronda siguiente. La respuesta escrita a mano
-apunta al ID correcto y mantiene ejercitado el camino crítica → revisión. Es un
-hallazgo sobre producción, no sobre el mock: queda registrado en
+**Las doce tareas son grabaciones.** `debate_critica` tardó en serlo: las
+críticas reales nombran a su destinatario como "Agent 02", "Agent01" o
+"Agent03", y `debate._critiques_for()` compara `target_agent_id` contra el ID del
+agente ("01", "02", "03"), así que ninguna llegaba a su destinatario y por eso se
+había escrito una a mano. Desde que `BaseAgent._parse_critiques()` normaliza el
+destinatario a su ID canónico (commit `a2227ae`) esa razón desapareció y la
+crítica sale también de la corrida real. Detalle en
 `odd/tasks/grabacion-respuestas-mock.md`.
 """
 
@@ -58,40 +58,14 @@ def _cargar_grabadas() -> dict[str, dict[str, Any]]:
     return datos["tasks"]
 
 
-def _critique_response() -> str:
-    """
-    Crítica escrita a mano, dirigida al ID real del agente ("01").
-
-    No hay forma de enrutar las críticas grabadas (ver el docstring del módulo).
-    """
-    return json.dumps({
-        "critiques": [{
-            "target_agent_id": "01",
-            "target_hypothesis": "Neuropatía axonal sensitivomotora de causa a esclarecer.",
-            "critique_text": (
-                "Respuesta del modo mock escrita a mano: no evalúa evidencia real, "
-                "solo ejercita el parseo y el enrutamiento de críticas."
-            ),
-            "severity": "LOW",
-            "alternative": None,
-        }],
-    }, ensure_ascii=False)
-
-
 # Procedencia de cada respuesta grabada (agente, modelo, seq y fecha), para
 # auditar de dónde sale cada texto sin abrir el archivo de datos.
 RECORDED_RESPONSES: dict[str, dict[str, Any]] = _cargar_grabadas()
 
-# Tareas con una respuesta escrita a mano, y por qué (docstring del módulo).
-HAND_WRITTEN_TASKS: dict[str, str] = {
-    "debate_critica": _critique_response(),
-}
-
 # Una entrada por cada tarea de `agents.model_tasks.TASK_BUDGETS`: es lo que
 # hace que ninguna llamada del pipeline se quede sin respuesta.
 MOCK_RESPONSES: dict[str, str] = {
-    **{tarea: entrada["response"] for tarea, entrada in RECORDED_RESPONSES.items()},
-    **HAND_WRITTEN_TASKS,
+    tarea: entrada["response"] for tarea, entrada in RECORDED_RESPONSES.items()
 }
 
 # JSON válido y vacío: una tarea sin respuesta falla en el parseo de quien

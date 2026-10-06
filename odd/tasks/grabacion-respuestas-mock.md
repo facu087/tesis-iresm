@@ -63,6 +63,22 @@ Runner: `.venv/bin/python -m pytest`.
   - Checks: `.venv/bin/python -m pytest tests/ -q`;
     `.venv/bin/python scripts/medir_costos.py --mock`.
 
+- [x] **T4 — Destinatario de las críticas** · ruta: delegada (commit `a2227ae`).
+  - El parser normaliza el destinatario ("Agent 02" → "02") y el prompt muestra un ID real de ejemplo.
+  - RED observado sin el arreglo: 9 failed / 23 passed en `tests/test_debate.py`.
+  - GREEN: 32 passed; suite completa 1080 passed.
+- [x] **T5 — `debate_critica` grabada** · ruta: delegada.
+  - Criterios: primera entrada por `seq` de la corrida real (seq 6, agente 01), copiada
+    verbatim a `backend/mock/grabadas.json`; las 12 tareas son grabaciones; se elimina
+    `HAND_WRITTEN_TASKS` (nada más lo usaba).
+  - La grabación rinde 5 críticas con destinatarios "02", "02", "03", "03", "03" tras normalizar.
+  - RED: `tests/test_mock_responses.py` y `tests/test_mock_pipeline.py` -> `7 failed, 66 passed`.
+  - GREEN: los mismos archivos -> 73 passed; `.venv/bin/python -m pytest tests/ -q` -> 1082 passed.
+  - Observación: en mock los tres agentes reciben la misma respuesta, incluido el autor
+    (01, que no se critica a sí mismo en la grabación). El agente 02 recibe críticas con
+    `from_agent_id` "02" y destinatario "02": ni `_critiques_for()` ni el resto del pipeline
+    filtran las autocríticas. Solo ocurre en mock; producción no se tocó.
+
 ## Entrega
 
 Estrategia `ask-on-risk`. Pronóstico: ~350 líneas autoría (T1 ~200, T3 ~150).
@@ -102,7 +118,7 @@ Datos en `backend/mock/grabadas.json` (versionado); `responses.py` los carga al 
 | `agente02_hipotesis` | grabada (agente 02, seq 3) |
 | `agente01_hipotesis` | grabada (agente 01, seq 4) |
 | `agente03_hipotesis` | grabada (agente 03, seq 5) |
-| `debate_critica` | **escrita a mano**: las críticas reales (seq 6-8) nombran al destinatario "Agent 02" / "Agent01" / "Agent03" y `debate._critiques_for()` compara `target_agent_id` contra el ID ("01"), así que ninguna llegaría a su destinatario (descarte silencioso). |
+| `debate_critica` | grabada (agente 01, seq 6); ver T4 y T5: se escribió a mano hasta que el parser normalizó el destinatario. |
 | `debate_revision` | grabada (agente 01, seq 9) |
 | `arbitro_agrupacion` | grabada (agente 04, seq 15) |
 | `debate_recitacion` | grabada (agente 01, seq 16) |
@@ -136,6 +152,9 @@ Revisión nativa del commit `4e8e984`: evaluada como riesgo medio y debida
 `managed_assets_outdated`; el usuario eligió correr `gentle-ai sync` al final de la sesión.
 El espejo de Engram de este documento está pendiente (el guardado falló: varias sesiones activas).
 
+Test intermitente preexistente: `tests/test_agent_05_trials.py::TestPrivacidad::test_trazabilidad_de_los_ensayos`
+falló una vez en una corrida completa y pasó solo y en la corrida siguiente (no se investigó).
+
 ## Próximo paso
 
-PR a `develop`; quedan las tareas 6.4 y 7.5.
+Confirmar con la segunda corrida real (en curso) y luego PR a `develop`; quedan las tareas 6.4 y 7.5.

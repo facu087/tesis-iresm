@@ -108,7 +108,8 @@ class TestElModoMockEjercitaElParseoReal:
     def test_critica_parsea(self):
         agente = ArbiterAgent()  # cualquier BaseAgent sirve, _parse_critiques no usa self
         criticas = agente._parse_critiques(mock_responses.get_mock_response("debate_critica"))
-        assert len(criticas) == 1
+        # La grabación real trae cinco críticas: dos a "Agent 02" y tres a "Agent 03".
+        assert [c.target_agent_id for c in criticas] == ["02", "02", "03", "03", "03"]
 
     def test_pico_parsea(self):
         sintesis = pico._parse_pico(mock_responses.get_mock_response("pico_sintesis"))

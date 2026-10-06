@@ -167,7 +167,7 @@
       `_parse_critiques()`, `pico._parse_pico()`, y corre `pico.build()` /
       `biomarker_extractor.extract()` completos con el modo activo).
 - [x] 6.2 Generar las respuestas grabadas desde una corrida real del caso de prueba, para que se parezcan a lo que el modelo devuelve de verdad.
-      Hecho con la corrida real del 2026-10-06 (`backend/mock/grabadas.json`, texto crudo). 11 de 12 tareas grabadas; `debate_critica` sigue escrita a mano: las críticas reales nombran al destinatario ("Agent 02") y `_critiques_for()` compara contra el ID ("02"), así que no llegarían a nadie.
+      Hecho con la corrida real del 2026-10-06 (`backend/mock/grabadas.json`, texto crudo). Las 12 tareas son grabaciones: `debate_critica` también, desde que `BaseAgent._parse_critiques()` normaliza el destinatario ("Agent 02" → "02") y la crítica llega a su agente por `_critiques_for()`.
 - [x] 6.3 Activación explícita por variable de entorno, **apagada por defecto** y nunca por inferencia: si falta `GROQ_API_KEY` y el modo mock no está activo, el análisis falla con un error claro. Verificar con dos tests, uno por cada caso.
       Hecho: `NEXUS_MOCK_LLM` (`backend/mock/mode.py`, `is_mock_active()`), apagada
       por defecto. Sin ella y sin `GROQ_API_KEY`, `call_provider()` lanza
