@@ -53,11 +53,11 @@ Runner: `.venv/bin/python -m pytest`.
   - Checks: `.venv/bin/python -m pytest tests/ -q`;
     `.venv/bin/python scripts/medir_costos.py --mock`;
     `rg -n "Groq\(api_key" backend/` devuelve una sola línea.
-- [ ] **T2 — Corrida real con grabación** · ruta: inline (una ejecución).
+- [x] **T2 — Corrida real con grabación** · ruta: inline (una ejecución).
   - Criterios: `output/medicion_costos/` con medición y grabación; debate con
     tres agentes; anotar si aparece `[NEXUS] Respuesta del modelo saneada`.
   - Checks: lectura de `resumen.txt` y de la grabación.
-- [ ] **T3 — Regenerar `backend/mock/responses.py`** · ruta: delegada.
+- [x] **T3 — Regenerar `backend/mock/responses.py`** · ruta: delegada.
   - Criterios: cada tarea de `TASK_BUDGETS` usa una respuesta salida de la
     grabación, o queda documentado por qué se conserva la escrita a mano.
   - Checks: `.venv/bin/python -m pytest tests/ -q`;
@@ -81,6 +81,61 @@ T1 hecha (ruta delegada: escritor único; disparador de escritura sobre 2+ archi
 - Forma de `grabacion.json`: `{generated_at, entries: [{seq, task, agent_id,
   agent_name, model, truncated, response}]}`.
 
+T2 hecha (ruta inline; la lanzó el padre). Corrida real del 2026-10-06:
+- Exit code 0; pasada base de 437 s.
+- 29 llamadas, 8 fallaron por límite de tasa y se reintentaron con éxito.
+- 78.158 tokens (39.480 de entrada / 38.678 de salida): sigue siendo 2 casos por cuota diaria.
+- 0 respuestas cortadas por el techo de tokens; 21 respuestas grabadas.
+- Los tres agentes del debate (01, 02, 03) produjeron hipótesis, críticas, revisiones y recitaciones.
+- El aviso `[NEXUS] Respuesta del modelo saneada` NO apareció: no hubo ninguna respuesta
+  malformada, así que los arreglos de parseo tolerante de los PR #25 y #26 no se
+  ejercitaron en esta corrida; siguen verificados solo por tests.
+
+T3 hecha (ruta delegada: escritor único; escribe datos, módulo, tests y documentos).
+Regla de elección: la primera grabación por orden de llamada (`seq` más bajo) de cada tarea.
+Datos en `backend/mock/grabadas.json` (versionado); `responses.py` los carga al importar.
+
+| Tarea | Origen |
+|-------|--------|
+| `biomarcadores_extraccion` | grabada (seq 1) |
+| `pico_sintesis` | grabada (seq 2) |
+| `agente02_hipotesis` | grabada (agente 02, seq 3) |
+| `agente01_hipotesis` | grabada (agente 01, seq 4) |
+| `agente03_hipotesis` | grabada (agente 03, seq 5) |
+| `debate_critica` | **escrita a mano**: las críticas reales (seq 6-8) nombran al destinatario "Agent 02" / "Agent01" / "Agent03" y `debate._critiques_for()` compara `target_agent_id` contra el ID ("01"), así que ninguna llegaría a su destinatario (descarte silencioso). |
+| `debate_revision` | grabada (agente 01, seq 9) |
+| `arbitro_agrupacion` | grabada (agente 04, seq 15) |
+| `debate_recitacion` | grabada (agente 01, seq 16) |
+| `arbitro_veredictos` | grabada (agente 04, seq 19) |
+| `agente05_planificacion_terminos` | grabada (agente 05, seq 20) |
+| `agente05_evaluacion_compatibilidad` | grabada (agente 05, seq 21) |
+
+- Hallazgo sobre producción (no tocado, fuera de alcance): en la corrida real ninguna crítica
+  llegó a su destinatario por el desajuste de `target_agent_id`; `consensus.py:233` usa el
+  mismo campo para detectar contradicciones. Conviene una tarjeta aparte.
+- Caveat de las grabadas por posición (agrupación, veredictos, recitación, candidatas): en mock
+  los tres agentes reciben la misma respuesta, así que se aplican por posición a hipótesis
+  distintas de las de la corrida real. Lo que cita NCT o PMID depende de que ClinicalTrials.gov
+  y PubMed devuelvan hoy lo mismo (las consultas externas se conservan en mock, como antes).
+- RED: `tests/test_mock_responses.py` -> `28 failed, 13 passed` (faltaban `grabadas.json`,
+  `RECORDED_RESPONSES` y `HAND_WRITTEN_TASKS`).
+- GREEN: `.venv/bin/python -m pytest tests/test_mock_responses.py -q` -> 41 passed.
+- Se ajustó una aserción de `tests/test_mock_pipeline.py` que dependía del texto escrito a mano
+  ("metformina" en fármacos, aportada por la fixture, no por la regex): ahora verifica los
+  anticuerpos que aportó la respuesta grabada. Ningún parser ni validación de producción cambió.
+- Corrida mock completa con las grabadas (`pasada_base`, red real para RAG y ClinicalTrials):
+  Árbitro `ok`, 14 hipótesis -> 10 grupos, 10 veredictos aplicados, recitación ejecutada
+  (10 recitadas, 3 mejoradas, 0 PMID rechazados), Agente 05 `ok`/`ok`, 0 evaluaciones descartadas.
+- `.venv/bin/python -m pytest tests/ -q` -> 1068 passed.
+- `.venv/bin/python scripts/medir_costos.py --mock` -> rc 0.
+- `NEXUS_MOCK_LLM=1 .venv/bin/python scripts/demo_costos.py` -> rc 0.
+- `rg -n "Groq\(api_key" backend/` -> una sola línea (`base_agent.py:147`).
+
+Revisión nativa del commit `4e8e984`: evaluada como riesgo medio y debida
+(`slice_budget_reached`, 601 líneas), pero NO corrió: STATUS se detuvo con
+`managed_assets_outdated`; el usuario eligió correr `gentle-ai sync` al final de la sesión.
+El espejo de Engram de este documento está pendiente (el guardado falló: varias sesiones activas).
+
 ## Próximo paso
 
-T2 (corrida real con `--grabar`, la lanza el padre).
+PR a `develop`; quedan las tareas 6.4 y 7.5.

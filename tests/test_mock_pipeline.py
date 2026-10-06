@@ -136,9 +136,9 @@ class TestElModoMockEjercitaElParseoReal:
     def test_biomarker_extract_con_mock_activo_combina_regex_y_llm(self, monkeypatch):
         monkeypatch.setenv(ENV_VAR, "1")
         perfil = biomarker_extractor.extract(CASO_CLINICO)
-        # La capa regex sigue funcionando sola: "metformina" no es lo que se
-        # busca acá, pero el merge con la respuesta grabada no debe romper.
-        assert "metformina" in [d.lower() for d in perfil.drugs]
+        # El merge con la respuesta grabada (anticuerpos que aportó el modelo en
+        # la corrida real del 2026-10-06) no debe romper la capa regex.
+        assert {"anti-hu", "anti-yo", "anti-ri"} <= {a.lower() for a in perfil.antibodies}
 
 
 # ── Determinismo (task 6.5) ───────────────────────────────────────────────────
