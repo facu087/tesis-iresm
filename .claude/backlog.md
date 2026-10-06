@@ -108,7 +108,7 @@ Suite de tests: **82 tests, 100% passing** (`pytest tests/`)
 | 5 | Cliente Orphanet API: búsqueda de enfermedades raras | ✅ Hecho |
 | 6 | Cliente PharmGKB: relaciones fármaco-genómicas | ✅ Hecho |
 | 7 | Gestión de rate limits y fallbacks en APIs externas | ✅ Hecho |
-| 8 | Agente 02 (Especialista Genómica): prompt + llamada GPT-4o + parseo JSON | 📋 Pendiente |
+| 8 | Agente 02 (Especialista Genómica): prompt + llamada GPT-4o + parseo JSON | ✅ Hecho (`agents/agent_02_genomics.py`, `pipeline/genomic_context.py`; PR #12) |
 | 9 | Agente 04 (Árbitro Verificador): síntesis y verificación bibliográfica externa | ✅ Hecho (`agents/agent_04_arbiter.py`, `pipeline/consensus.py`, `pipeline/recitation.py`) |
 | 10 | Agente 05 (Navegador de Ensayos): búsqueda en ClinicalTrials + Orphanet | ✅ Hecho (`agents/agent_05_trials.py`, `pipeline/trial_matching.py`) |
 | 11 | Priorización de hipótesis por nivel de evidencia EBM (I, II, III) | ✅ Hecho (`pipeline/evidence.py`) |
@@ -120,6 +120,7 @@ Suite de tests: **82 tests, 100% passing** (`pytest tests/`)
 | 17 | Fix: comentarios en línea del `.env.example` se cargaban como valor de la clave | ✅ Hecho |
 | 18 | Vista de reporte: mostrar el estado de verificación de hipótesis y fuentes (EP-08) | ✅ Hecho |
 | 19 | PDF: incluir el estado de verificación en el reporte exportado (EP-07) | ✅ Hecho |
+| 20 | Cliente ClinVar: significancia clínica de variantes genéticas (tarjeta #71) | ✅ Hecho (`external/clinvar.py`, `pipeline/genomic_context.enrich()`) — ver nota (20) |
 | 20 | Landing explicativa en `/` + reubicación de la carga de casos a `/analizar` (EP-08) | ✅ Hecho (OpenSpec `landing-explicativa`) |
 | 21 | Control de costos del pipeline: punto único de llamada al proveedor, telemetría de tokens, tarifas configurables, techo/modelo por tarea, modo mock | 🔄 Casi listo — ver nota (21) |
 | 22 | Registro de médicos, matrícula, revisión admin y protección de `/api/analyze` (EP-09) | ✅ Hecho (OpenSpec `registro-medicos-matricula`) |
@@ -476,7 +477,7 @@ decisiones de fondo y distinto texto. Se resolvió en el merge del PR #13.
 
 | Responsable | Tarjetas | Área / archivos |
 |---|---|---|
-| **Facundo** | #51 Agente 02 (en curso), #73 fix del regex de genes, #71 cliente ClinVar | Genómica e ingesta: `orchestrator.py`, `debate.py`, `models/case.py`, `pharmgkb.py`, `biomarker_extractor.py`, `external/clinvar.py` |
+| **Facundo** | #51 Agente 02 ✅, #73 fix del regex de genes ✅, #71 cliente ClinVar ✅ | Genómica e ingesta: `orchestrator.py`, `debate.py`, `models/case.py`, `pharmgkb.py`, `biomarker_extractor.py`, `external/clinvar.py` |
 | **Matías** | #52 Agente 04 (Árbitro) + hallazgo G | Verificación: `verification.py`, `evidence.py`, paso 7 del router, `base_agent.parse_hypotheses()` |
 | **Fede** | #74 cliente Orphadata, hallazgos A, B y H, arreglos del PDF (portada y celdas del resumen), y los dos arreglos manuales de Trello (#65 adjunto duplicado, #63 PNG sin extensión) | RAG, frontend y calidad: `rag/retriever.py`, `tests/test_rag_integration.py`, `pdf_exporter.py`, `frontend/` |
 | **Facundo** | #62 Agente 06 (Sintetizador) | Implementado en `feature/s4-agente-06-sintetizador`. Falta grabar la respuesta mock con una corrida real. |
@@ -538,3 +539,19 @@ el alcance de la tarea en la que aparecieron. Con archivo y línea, para retomar
 > guarda lo **descarta** (cita SPTLC1/DNMT1, que no llegan al reporte mock porque las grabadas
 > guardan solo la primera respuesta de cada tarea): `executive_summary` queda `None`. Es la
 > guarda funcionando, no un fallo; no se afloja para el modo mock.
+
+> **Nota (20) — Cliente ClinVar (#71), 2026-10-06.** `external/clinvar.py` consulta
+> E-utilities (`db=clinvar`, `esearch` + `esummary`) con el gen y la notación de la variante
+> —nada más viaja a NCBI— y comparte `pubmed_limiter`/`pubmed_breaker` con PubMed (mismo
+> cupo). Acepta un registro solo si su título contiene la notación y el gen coincide; si no,
+> la variante queda `ambigua` y nunca se toma el primero de la lista. Estados por variante:
+> `encontrada`, `sin_resultados`, `ambigua`, `no_disponible`. `genomic_context.enrich()`
+> consulta PharmGKB y ClinVar en paralelo (máx. 5 variantes) y el bloque del Agente 02 muestra
+> clasificación y accession. El caso base no trae variantes: no hace ninguna solicitud.
+> **Limitación:** la numeración clásica (TTR `Val30Met`, proteína madura) no se convierte a
+> HGVS (`p.Val50Met`, desfase de 20 por el péptido señal): ClinVar devuelve 5 registros —uno
+> de otra variante, `p.Phe53Leu`— y el resultado es `ambigua`. Evidencia: `scripts/demo_clinvar.py`.
+>
+> **Hallazgo (2026-10-06):** con `GROQ_API_KEY` en `.env`, la suite de tests hace 54 llamadas
+> reales a Groq (medido con `scripts/pytest_sin_red.py`; sin la key, 0). Gasta cuota: correr la
+> suite sin la key o con la red bloqueada hasta que se arregle.

@@ -40,6 +40,31 @@ class PharmacogenomicAnnotation(BaseModel):
     raw: dict[str, Any] = Field(default_factory=dict)
 
 
+class ClinVarStatus(str, Enum):
+    """Resultado de consultar una variante en ClinVar."""
+
+    encontrada = "encontrada"
+    sin_resultados = "sin_resultados"
+    ambigua = "ambigua"
+    no_disponible = "no_disponible"
+
+
+class VariantClassification(BaseModel):
+    """Clasificación germinal de ClinVar para una variante del caso."""
+
+    gene: str
+    variant: str
+    status: ClinVarStatus
+    classification: str = ""
+    review_status: str = ""
+    last_evaluated: str = ""
+    accession: str = ""
+    url: str = ""
+    title: str = ""
+    candidates: int = 0
+    detail: str = ""
+
+
 class GenomicContext(BaseModel):
     """
     Perfil genómico del caso clínico, armado de forma determinista antes de
@@ -55,6 +80,7 @@ class GenomicContext(BaseModel):
     - negative_genetic_studies: estudios genéticos negativos mencionados en el
       caso (ej. "Panel CMT de 40 genes negativo").
     - annotations: anotaciones farmacogenómicas obtenidas de PharmGKB.
+    - clinvar: clasificación de ClinVar de cada variante consultada.
     - sources: estado de cada fuente consultada.
     """
 
@@ -64,6 +90,7 @@ class GenomicContext(BaseModel):
     discarded_symbols: list[str] = Field(default_factory=list)
     negative_genetic_studies: list[str] = Field(default_factory=list)
     annotations: list[PharmacogenomicAnnotation] = Field(default_factory=list)
+    clinvar: list[VariantClassification] = Field(default_factory=list)
     sources: list[GenomicSource] = Field(default_factory=list)
 
     @property
@@ -125,6 +152,28 @@ class GenomicContext(BaseModel):
                     lines.append("PharmGKB: no disponible en esta corrida.")
                 elif st == GenomicSourceStatus.no_consultada:
                     lines.append("PharmGKB: no consultada (sin genes en el caso).")
+
+        if self.clinvar:
+            lines.append("Clasificación de variantes (ClinVar):")
+            for c in self.clinvar:
+                if c.status == ClinVarStatus.encontrada:
+                    lines.append(
+                        f"  • {c.gene} {c.variant}: {c.classification} "
+                        f"({c.review_status}; {c.accession})"
+                    )
+                elif c.status == ClinVarStatus.ambigua:
+                    lines.append(
+                        f"  • {c.gene} {c.variant}: ambigua — {c.candidates} registros sin "
+                        "coincidencia exacta; no usar ninguna clasificación de ClinVar"
+                    )
+                elif c.status == ClinVarStatus.sin_resultados:
+                    lines.append(f"  • {c.gene} {c.variant}: sin registros en ClinVar")
+                else:
+                    lines.append(f"  • {c.gene} {c.variant}: ClinVar no disponible")
+        else:
+            clinvar_src = next((s for s in self.sources if s.name == "ClinVar"), None)
+            if clinvar_src is not None and clinvar_src.status == GenomicSourceStatus.no_consultada:
+                lines.append("ClinVar: no consultada (sin variantes con gen identificable).")
 
         lines.append("=========================")
         return "\n".join(lines)

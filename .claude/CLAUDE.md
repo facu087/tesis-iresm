@@ -60,6 +60,8 @@ Backend mergeado a `develop` (capa de recuperación de evidencia / RAG). Autor: 
 - [x] Motor RAG: búsqueda semántica + formateo para prompts (backend/rag/retriever.py)
 - [x] Cliente Orphanet API: enfermedades raras (backend/external/orphanet.py)
 - [x] Cliente PharmGKB: relaciones fármaco-genómicas (backend/external/pharmgkb.py)
+- [x] Cliente ClinVar: significancia clínica de variantes, con coincidencia verificada
+      (backend/external/clinvar.py; lo consume `pipeline/genomic_context.enrich()`)
 - [x] Gestión de rate limits y fallbacks para APIs externas (backend/external/rate_limiter.py)
 - [x] Scripts de demo EP05: pubmed, orphanet, pharmgkb, rate_limiter (scripts/demo_*.py)
 - [x] Scripts de demo RAG: chromadb, indexacion_pubmed, motor_rag (scripts/demo_*.py)
@@ -207,6 +209,8 @@ Scripts disponibles:
 - `demo_pubmed.py` — cliente PubMed E-utilities (búsqueda + verificación PMIDs)
 - `demo_orphanet.py` — cliente Orphanet (enfermedades raras)
 - `demo_pharmgkb.py` — cliente PharmGKB (fármaco-genómica)
+- `demo_clinvar.py` — cliente ClinVar: TTR `c.148G>A` (encontrada), `p.Val50Met`, `Val30Met`
+  (ambigua) y una inexistente, más el bloque del Agente 02; `--sin-red` simula la caída de NCBI
 - `demo_rate_limiter.py` — RateLimiter, CircuitBreaker, with_fallback
 - `demo_chromadb.py` — setup ChromaDB + embeddings biomédicos
 - `demo_indexacion_pubmed.py` — indexación de artículos PubMed en ChromaDB
@@ -342,6 +346,7 @@ tesis-iresm/
 │   │   ├── pubmed.py           ← cliente PubMed E-utilities + verificación PMIDs (S4)
 │   │   ├── orphanet.py         ← cliente Orphanet: enfermedades raras (S4)
 │   │   ├── pharmgkb.py         ← cliente PharmGKB: fármaco-genómica (S4)
+│   │   ├── clinvar.py          ← cliente ClinVar: significancia de variantes (S4)
 │   │   └── rate_limiter.py     ← rate limits y fallbacks para APIs externas (S4)
 │   ├── rag/                    ← capa RAG de evidencia (Sprint 4)
 │   │   ├── chroma_store.py     ← ChromaDB + embeddings biomédicos
