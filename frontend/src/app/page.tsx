@@ -14,6 +14,7 @@ import {
   CompassIcon,
   DocumentIcon,
 } from "@/components/icons";
+import BrandLockup from "@/components/NexusLogo";
 
 export const metadata: Metadata = {
   title: "NEXUS — Sistema de Soporte Investigativo Clínico",
@@ -63,7 +64,7 @@ function Header() {
     <header className="border-b border-border">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
         <span className="font-serif text-xl font-semibold tracking-tight text-accent">
-          NEXUS
+          <BrandLockup />
         </span>
         <div className="flex items-center gap-3 sm:gap-6">
           <nav className="hidden items-center gap-6 text-sm text-fg-muted md:flex">
