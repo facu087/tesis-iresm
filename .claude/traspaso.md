@@ -1,9 +1,10 @@
 # Traspaso de sesión — 2026-10-06
 
-Reemplaza al traspaso del 2026-10-04. El Sprint 4 queda con un solo pendiente grande:
-el Agente 06, que espera una rama de Facundo. El 2026-10-06 se grabaron las respuestas
-del modo mock desde una corrida real y se encontró y arregló un defecto del debate (ver
-secciones 2 y 3).
+Reemplaza al traspaso del 2026-10-04. Los seis agentes ya están en `develop`: el Agente 06
+lo mergeó Facundo el 2026-10-06 (PR #35) y una revisión posterior encontró dos defectos que
+se arreglan en la rama `fix/s4-agente06-citas-y-pdf` (ver 4.1). El 2026-10-06 también se
+grabaron las respuestas del modo mock desde una corrida real y se encontró y arregló un
+defecto del debate (ver secciones 2 y 3).
 
 **Para retomar con Claude Code**: "Leé `.claude/traspaso.md` y seguí como orquestador
 desde la sección Pendiente."
@@ -49,7 +50,7 @@ Lecciones prácticas:
 
 ## 2. Estado al cierre
 
-`develop` está en `aaa8366`. La suite tiene 1113 tests (después del PR #32); en corridas
+`develop` está en `1f11917` (PR #35). La suite tenía 1113 tests después del PR #32 y 1144 con las correcciones del Agente 06; en corridas
 completas dos tests de `tests/test_agent_05_trials.py` fallaron una vez cada uno (ver 4.7).
 
 ### Agentes
@@ -60,7 +61,7 @@ completas dos tests de `tests/test_agent_05_trials.py` fallaron una vez cada uno
 | 03 | Consultor Clínico | ✅ |
 | 04 | Árbitro Verificador | ✅ PR #19 |
 | 05 | Navegador de Ensayos | ✅ PR #13 |
-| 06 | Sintetizador | ⬜ **pendiente — #62, espera la rama de Facundo** |
+| 06 | Sintetizador | ✅ PR #35 (mergeado el 2026-10-06; correcciones en 4.1) |
 
 ### Lo que se mergeó el 2026-10-04
 | PR | Qué | Tarjeta |
@@ -79,6 +80,7 @@ Antes, el 2026-09-28, había entrado la landing explicativa (PR #21, tarjeta #82
 | #30 | Grabador de respuestas crudas (`backend/mock/recorder.py`), opción `--grabar` de `scripts/medir_costos.py` y las doce tareas del modo mock con respuestas grabadas (`backend/mock/grabadas.json`) |
 | #31 | Las críticas del debate llegan a su destinatario: el parser normaliza el destinatario y el prompt muestra un ID real de ejemplo |
 | #32 | Una crítica con destinatario ambiguo queda sin atribuir; el modo real ya no depende del archivo de respuestas grabadas (carga diferida) |
+| #35 | Agente 06 (Sintetizador), de Facundo (merge `1f11917`); ver 4.1 |
 
 ---
 
@@ -130,27 +132,45 @@ Antes, el 2026-09-28, había entrado la landing explicativa (PR #21, tarjeta #82
 
 ## 4. Pendiente (en orden)
 
-### 4.1 #62 Agente 06 (Sintetizador) — bloqueado
-Facundo escribió la propuesta OpenSpec el 2026-09-23 (`openspec/changes/agente-06-sintetizador`,
-commit `be1ce89`, rama `feature/s4-agente-06-sintetizador`) y **nunca la subió**: existe solo en
-su máquina. El 2026-10-04 se le pidió por comentario en la tarjeta que la pushee; al
-2026-10-06 la rama seguía sin estar en GitHub.
+### 4.1 #62 Agente 06 (Sintetizador) — mergeado, con correcciones y observaciones abiertas
+El PR #35 (Facundo) entró a `develop` el 2026-10-06 (merge `1f11917`). Agregó, según el
+código y `openspec/changes/agente-06-sintetizador/`:
+- `backend/agents/agent_06_synthesizer.py`: `SynthesizerAgent.synthesize()` escribe un
+  párrafo `executive_summary` (máximo 5 oraciones) sobre el `StructuredReport` ya armado.
+  Corre una vez al final, después de `build_export()`: **no reemplaza** a `report_builder.py`.
+  Nunca decide datos y nunca propaga excepciones (si falla, devuelve `None`).
+- Guarda anti-invención (`check_invention()`): descarta el resumen **entero** si cita un
+  PMID, un NCT o un símbolo génico que no está en el reporte.
+- Tarea `agente06_sintesis` en `model_tasks.py` (`GROQ_MAIN`, techo 4096), campo opcional
+  `executive_summary` en `StructuredReport`, respuesta grabada para el modo mock, sección en
+  el PDF y en `/report`, tipo en `types.ts`, `scripts/demo_agente06.py` y
+  `tests/test_agent_06_synthesizer.py`.
 
-**No escribir otra propuesta.** Cuando la rama esté en GitHub, revisar la suya con estos cuatro
-puntos, que cambiaron en `develop` después de que la escribió:
-- El Sintetizador necesita su tarea en `backend/agents/model_tasks.py` (modelo y techo, **no
-  menos de 4096** por lo medido) y su respuesta para el modo mock. Desde el 2026-10-06 las
-  respuestas del modo mock ya no se escriben a mano: la del Sintetizador tiene que ser una
-  grabación en `backend/mock/grabadas.json`, o la propuesta tiene que decir cómo se produce.
-- Los tests que llamen a `POST /api/analyze` necesitan la fixture `client_medico_verificado`
-  de `tests/conftest.py`.
-- La tarjeta dice "reemplaza a `report_builder.py`" y su diseño agrega un `executive_summary`
-  sobre el builder actual. Conviene que la propuesta diga que el builder determinista se
-  conserva.
+Defectos de la revisión posterior, **arreglados en la rama `fix/s4-agente06-citas-y-pdf`**
+(un commit cada uno, con tests):
+- **El resumen podía presentar como respaldo una cita refutada.** `build_context()` le daba al
+  LLM todos los PMIDs sin su estado y la guarda aceptaba cualquiera presente en el reporte,
+  también uno `inexistente` o `discordante`. Ahora solo se puede citar un PMID cuya fuente
+  quedó `verificada` en la verificación contra PubMed; si aparece en varias fuentes con
+  estados distintos, solo vale cuando todas lo confirman (criterio conservador). El contexto
+  lista los confirmados y de los demás solo dice cuántas referencias no se confirmaron; un
+  PMID no confirmado en el resumen se trata como inventado y lo descarta entero.
+- **El PDF se caía con el resumen.** `_executive_summary()` pasaba el texto sin escapar a un
+  `Paragraph` de ReportLab: `a<b y c>d` levantaba `ValueError` y `<font size=40>` se
+  interpretaba como marcado. Ahora se escapa y se dibuja literal.
 
-Su diseño, según el comentario: `synthesize()` corre una vez al final, agrega un resumen en
-prosa como campo opcional de `StructuredReport`, nunca decide datos, y descarta el resumen
-entero si cita un PMID, NCT o gen que no está en el reporte.
+**Observaciones abiertas** (no se tocaron; son decisiones de diseño para hablar con Facundo):
+- **a.** La guarda de genes toma cualquier sigla de 2 a 8 caracteres en mayúsculas como
+  símbolo génico: una sigla ausente del reporte ("DM2", "HSAN") descarta todo el resumen. En
+  modo mock el resumen grabado se descarta siempre (la corrida mock cita DNMT1, que el
+  reporte mock no contiene), así que el Agente 06 nunca se ve en mock: `executive_summary`
+  queda `None`.
+- **b.** El contexto se trunca a 6000 caracteres **desde el final**, que es donde van los
+  ensayos y la verificación: en un reporte largo son lo primero que el modelo no ve.
+
+Pendientes de cierre: las tareas 6.2 y 7.2 de `openspec/changes/agente-06-sintetizador/tasks.md`
+siguen sin tildar aunque el frontend ya renderiza el resumen; tildarlas con su verificación y
+recién ahí archivar el cambio.
 
 ### 4.2 Verificar contra Groq los arreglos del parseo — parcial
 Los PR #25 y #26 (fuente malformada y hipótesis malformada) se verificaron con tests. Las dos
@@ -198,6 +218,14 @@ usa una **muestra sintética**. Con el `costos.jsonl` real ya se puede recalcula
   `openspec/specs/` (12 en total).
 - Quedan 6 ramas locales `worktree-agent-*` sin revisar. Los worktrees y las demás ramas ya
   mergeadas se borraron; lo que tenían en `output/` se copió a `output/de-worktrees/`.
+- **Otros campos de texto libre llegan sin escapar a ReportLab** (`backend/pipeline/pdf_exporter.py`),
+  con el mismo defecto que tenía el resumen: `_case_summary` (`narrative`), `_hypothesis_block`
+  (`text`, `rationale`, `evidence_note`, `arbiter_note`, `contradictions[].from_agent_name` y
+  `critique_text`), `_source_line` (`title`, `journal`, `actual_title`, `publication_types`),
+  `_debate_summary` (cada divergencia), `_trial_block` (`title`, `compatibility_rationale`,
+  criterios, `related_hypotheses`, `conditions`, `locations`, `url`) y `_rare_diseases`
+  (`name`, `hypothesis`, `url`). Conviene un solo cambio que escape dentro de `_par()` los
+  campos de datos sin romper el marcado propio del módulo.
 - Tarjetas #73 y #75 (Facundo y Fede): mergeadas el 2026-09-16 y todavía en Sprint 4 sin
   evidencia.
 
@@ -278,7 +306,7 @@ anterior **no están en la máquina Linux de Matías**.
 7. Costos: 80.458 tokens por caso, medidos; y cómo medir destapó defectos que el sistema
    escondía detrás de un fallback, entre ellos que las críticas del debate no llegaban a su
    destinatario.
-8. Qué sigue: el Sintetizador.
+8. Qué sigue: el Sintetizador ya está mergeado; falta decidir las observaciones abiertas de 4.1 y que el resumen se vea en mock.
 
 ---
 
