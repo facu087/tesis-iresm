@@ -227,21 +227,17 @@ usa una **muestra sintética**. Con el `costos.jsonl` real ya se puede recalcula
   decidirse si la fuente correcta para el Agente 02 es ClinVar (#71).
 
 ### 4.5 Orden y limpieza
-- `agente-02-genomica` **no se puede archivar todavía**: figura con 0 de 26 tareas y, verificado
-  contra `develop` el 2026-10-06, solo 8 están hechas (6 confirmadas y 2 con el código ya
-  evolucionado por ClinVar), 3 no tienen evidencia y 15 están incompletas. El commit `4d57f76`
-  (tareas 7.1-7.3, `scripts/demo_agente02.py`, textos de `demo_orquestador.py` y 69 líneas de
-  tests) quedó solo en `origin/feature/s4-agente-02-genomica`: el PR #12 se mergeó sin él.
-  Defectos de código detectados:
-  - La guarda anti-invención lee `case_genetic_findings` de la hipótesis ya parseada, pero
-    `Hypothesis` no tiene ese campo: esa rama no corre nunca y solo funciona la detección por
-    notación de variante en modo orientación.
-  - `backend/external/pharmgkb.py` usa `pharmgkb_limiter` pero no `pharmgkb_breaker`, y levanta
-    `ExternalApiError` en vez de `ApiUnavailableError` / `RateLimitError`.
-  - El `SYSTEM_PROMPT` del Agente 02 nombra `TTR p.Val30Met` en su ejemplo JSON, contra lo que
-    pide la spec.
-- El CLI `openspec` está instalado en esta máquina. `control-de-costos-del-pipeline` y
-  `landing-demostrativa` se archivaron el 2026-10-06; `cliente-clinvar` lo archiva el PR #43.
+- No queda ningún cambio OpenSpec abierto (`openspec list` vacío al 2026-10-06). Ese día se
+  archivaron `control-de-costos-del-pipeline` y `landing-demostrativa` (PR #45),
+  `cliente-clinvar` (PR #43) y `agente-02-genomica` (PR #44). El CLI `openspec` está instalado
+  en esta máquina.
+- `agente-02-genomica` figuraba con 0 de 26 tareas y varias no estaban cumplidas: el commit
+  `4d57f76` (tareas 7.1-7.3, `scripts/demo_agente02.py` y tests) había quedado fuera del PR #12.
+  El PR #44 (Facundo) lo cerró: la guarda anti-invención ahora lee `case_genetic_findings` del
+  JSON crudo (antes lo buscaba en la `Hypothesis` ya parseada, que no tiene ese campo, y con
+  hallazgos en el caso no degradaba nada), PharmGKB usa `pharmgkb_breaker`, y se agregaron los
+  tests de tres agentes y el demo. **Sigue abierto**: el `SYSTEM_PROMPT` del Agente 02 nombra
+  `TTR p.Val30Met` en su ejemplo JSON, y la spec pide que no nombre genes concretos.
 - Quedan 6 ramas locales `worktree-agent-*` sin revisar. Los worktrees y las demás ramas ya
   mergeadas se borraron; lo que tenían en `output/` se copió a `output/de-worktrees/`.
 - **Texto libre del PDF** (resuelto en `fix/s4-agente06-pendientes`): todo valor que llega a un
