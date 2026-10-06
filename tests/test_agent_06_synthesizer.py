@@ -123,3 +123,14 @@ def test_no_importa_groq_directamente():
 
 def test_vocabulario_genomico_no_es_gen():
     assert check_invention("Secuenciar el genoma para buscar CNV y VUS.", _report()) is None
+
+
+def test_biomarker_extractor_importa_sin_ciclo():
+    import subprocess
+    import sys
+
+    r = subprocess.run(
+        [sys.executable, "-c", "import backend.ingestion.biomarker_extractor"],
+        capture_output=True, text=True,
+    )
+    assert r.returncode == 0, r.stderr
