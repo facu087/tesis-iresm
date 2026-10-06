@@ -166,11 +166,8 @@
       `TestElModoMockEjercitaElParseoReal` (parsea con `BaseAgent.parse_hypotheses()`,
       `_parse_critiques()`, `pico._parse_pico()`, y corre `pico.build()` /
       `biomarker_extractor.extract()` completos con el modo activo).
-- [ ] 6.2 Generar las respuestas grabadas desde una corrida real del caso de prueba, para que se parezcan a lo que el modelo devuelve de verdad.
-      **Parcial.** `backend/mock/responses.py` tiene fixtures razonadas a mano (no
-      una grabación real: esta sesión tiene prohibido gastar cuota) que pasan el
-      parseo vigente de las 12 tareas. Documentado en el docstring del módulo.
-      Pendiente: regenerar desde una corrida real cuando haya cuota.
+- [x] 6.2 Generar las respuestas grabadas desde una corrida real del caso de prueba, para que se parezcan a lo que el modelo devuelve de verdad.
+      Hecho con la corrida real del 2026-10-06 (`backend/mock/grabadas.json`, texto crudo). 11 de 12 tareas grabadas; `debate_critica` sigue escrita a mano: las críticas reales nombran al destinatario ("Agent 02") y `_critiques_for()` compara contra el ID ("02"), así que no llegarían a nadie.
 - [x] 6.3 Activación explícita por variable de entorno, **apagada por defecto** y nunca por inferencia: si falta `GROQ_API_KEY` y el modo mock no está activo, el análisis falla con un error claro. Verificar con dos tests, uno por cada caso.
       Hecho: `NEXUS_MOCK_LLM` (`backend/mock/mode.py`, `is_mock_active()`), apagada
       por defecto. Sin ella y sin `GROQ_API_KEY`, `call_provider()` lanza
