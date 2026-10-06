@@ -103,7 +103,8 @@ Backend mergeado a `develop` (capa de recuperación de evidencia / RAG). Autor: 
 > `debate → verificación → Árbitro (04) → navegación de ensayos (05)`. El RAG
 > enriquece el contexto de la Ronda 1 y ahora **conserva** los artículos
 > recuperados en el `Report`, que es lo que permite medir si los agentes citan
-> la literatura que se les da. Falta el Agente 06.
+> la literatura que se les da. El Agente 06 corre al final y solo agrega el
+> `executive_summary`; no reemplaza a `report_builder.py`.
 >
 > El Agente 04 es **híbrido**: el LLM solo propone qué hipótesis son
 > equivalentes —devolviendo índices, nunca texto— y redacta los veredictos. La

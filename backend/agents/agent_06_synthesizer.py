@@ -8,7 +8,10 @@ Rol: redactar un resumen ejecutivo en prosa (máximo 5 oraciones) para el médic
 No participa del debate adversarial: expone `synthesize()`, no `run()`.
 
 Guarda anti-invención: el resumen se descarta entero si cita un PMID, un NCT o
-un símbolo génico que no aparezca en el reporte recibido.
+un símbolo génico que no aparezca en el reporte recibido. Un PMID que figura en
+el reporte pero que la verificación bibliográfica no confirmó (inexistente,
+discordante o no verificado) cuenta igual que uno inventado: una referencia sin
+respaldo nunca se presenta como respaldo.
 
 Privacidad: los logs registran el tipo de excepción o el token infractor
 (un identificador público), nunca el texto del resumen ni datos clínicos.
@@ -22,6 +25,7 @@ import re
 
 from ..api.schemas import StructuredReport
 from ..models.report import AgentOutput
+from ..pipeline.verification import SourceStatus
 from .base_agent import GROQ_MAIN, BaseAgent
 
 logger = logging.getLogger(__name__)
@@ -51,6 +55,24 @@ def _genes_in(text: str) -> set[str]:
     return {m.group(1) for m in _GENE_RE.finditer(text)} - _NON_GENE_TERMS - _REPORT_TERMS
 
 
+def _confirmed_pmids(report: StructuredReport) -> set[str]:
+    """
+    PMIDs que el resumen puede citar: los confirmados contra PubMed.
+
+    Un PMID puede figurar en varias fuentes (hipótesis y bibliografía). Criterio
+    conservador: solo es citable si TODAS sus apariciones en el reporte están
+    confirmadas; si alguna aparece como inexistente, discordante o sin verificar,
+    se excluye. Citar de más un PMID dudoso es el error caro (el médico lo lee
+    como respaldo); descartar de más solo cuesta el resumen, que es opcional.
+    """
+    todas = [s for h in report.hypotheses for s in h.sources] + list(report.bibliography)
+    confirmados = {s.pmid for s in todas
+                   if s.pmid and s.verification_status == SourceStatus.VERIFICADA.value}
+    refutados = {s.pmid for s in todas
+                 if s.pmid and s.verification_status != SourceStatus.VERIFICADA.value}
+    return confirmados - refutados
+
+
 def _report_text(report: StructuredReport) -> str:
     """Todo el texto del reporte del que el resumen puede tomar siglas."""
     parts = [report.case_summary.narrative, report.case_summary.patient_profile,
@@ -64,12 +86,17 @@ def _report_text(report: StructuredReport) -> str:
 
 def build_context(report: StructuredReport) -> str:
     """Serializa el reporte a texto plano para el prompt del Sintetizador."""
+    citables = _confirmed_pmids(report)
     lines = [f"=== Caso ===\n{report.case_summary.narrative}\n", "=== Hipótesis priorizadas ==="]
     for h in report.hypotheses:
-        pmids = ", ".join(s.pmid for s in h.sources if s.pmid) or "sin PMID"
+        confirmados = sorted({s.pmid for s in h.sources if s.pmid in citables})
+        dudosas = sum(1 for s in h.sources if s.pmid not in citables)
+        pmids = ", ".join(confirmados) or "ninguno"
+        if dudosas:
+            pmids += f"; {dudosas} referencia(s) no confirmada(s), no citar"
         lines.append(
             f"{h.rank}. [prioridad {h.priority} / EBM {h.evidence_level} / {h.status}] "
-            f"{h.text} — {h.rationale} (PMIDs: {pmids})"
+            f"{h.text} — {h.rationale} (PMIDs confirmados: {pmids})"
         )
         if h.arbiter_note:
             lines.append(f"   Árbitro: {h.arbiter_note}")
@@ -93,11 +120,11 @@ def build_context(report: StructuredReport) -> str:
 
 def check_invention(text: str, report: StructuredReport) -> str | None:
     """
-    Devuelve el primer PMID, NCT o gen del texto que no está en el reporte,
-    o None si el texto es limpio.
+    Devuelve el primer PMID, NCT o gen del texto que no está en el reporte, o
+    el primer PMID que está pero no fue confirmado por la verificación, o None
+    si el texto es limpio.
     """
-    known_pmids = {s.pmid for h in report.hypotheses for s in h.sources if s.pmid}
-    known_pmids |= {s.pmid for s in report.bibliography if s.pmid}
+    known_pmids = _confirmed_pmids(report)
     for m in _PMID_RE.finditer(text):
         if m.group(1) not in known_pmids:
             return m.group(1)
@@ -126,7 +153,8 @@ class SynthesizerAgent(BaseAgent):
         "de no más de 5 oraciones, dirigido al médico responsable, que resuma las "
         "hipótesis principales, su nivel de evidencia y estado de verificación, y "
         "los ensayos clínicos relevantes. No introduzcas datos, PMIDs, números NCT "
-        "ni genes que no estén en el reporte. No uses lenguaje diagnóstico "
+        "ni genes que no estén en el reporte. Solo podés citar los PMIDs listados "
+        "como confirmados; nunca cites una referencia marcada como no confirmada. No uses lenguaje diagnóstico "
         "definitivo: son hipótesis de investigación ('sugiere', 'es compatible con'). "
         "Devolvé solo el párrafo, sin títulos, listas ni markdown."
     )
@@ -154,6 +182,9 @@ class SynthesizerAgent(BaseAgent):
 
         offender = check_invention(text, structured_report)
         if offender is not None:
-            logger.warning("[Ag06] Resumen descartado: cita %s, ausente en el reporte", offender)
+            logger.warning(
+                "[Ag06] Resumen descartado: cita %s, ausente o no confirmado en el reporte",
+                offender,
+            )
             return None
         return text

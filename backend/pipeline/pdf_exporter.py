@@ -7,6 +7,7 @@ El layout de este módulo no cambia.
 """
 
 import io
+from xml.sax.saxutils import escape
 
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
@@ -378,10 +379,15 @@ def _group_status(status: str) -> str:
 
 
 def _executive_summary(report: StructuredReport, s: dict) -> list:
-    """Resumen del Agente 06; vacío si no hay (reporte previo o descartado)."""
+    """
+    Resumen del Agente 06; vacío si no hay (reporte previo o descartado).
+
+    Es prosa libre del LLM (y en POST /api/report/pdf viene del cliente): se
+    escapa para que ReportLab la dibuje como texto y no la interprete como marcado.
+    """
     if not report.executive_summary:
         return []
-    return [*_section("RESUMEN EJECUTIVO", s), _par(report.executive_summary, s["body"])]
+    return [*_section("RESUMEN EJECUTIVO", s), _par(escape(report.executive_summary), s["body"])]
 
 
 def _hypotheses(report: StructuredReport, s: dict) -> list:

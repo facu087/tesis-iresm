@@ -51,6 +51,21 @@ def _base_de_datos_temporal(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _sin_clave_del_proveedor(monkeypatch):
+    """
+    Quita la clave real de Groq del entorno antes de CADA test.
+
+    Varios módulos llaman a `load_dotenv()` al importarse, así que la clave del
+    `.env` queda en el entorno de toda la suite. Con ella presente, un test que
+    no aísla una llamada al modelo la hace de verdad: gasta la cuota diaria y
+    depende de la red. Sin clave, `call_provider()` falla con un error claro
+    antes de tocar la red. El test que necesita una clave la define él mismo,
+    con un valor falso (ver `tests/test_aislamiento_proveedor.py`).
+    """
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+
+
+@pytest.fixture(autouse=True)
 def _limitadores_aislados():
     """
     Deja los limitadores y breakers globales como recién creados antes de CADA test.

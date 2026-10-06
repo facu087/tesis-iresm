@@ -44,7 +44,8 @@ def _report() -> StructuredReport:
                 rank=1, text="Amiloidosis hereditaria por TTR", priority="HIGH",
                 evidence_level="II", rationale="Neuropatía axonal progresiva.",
                 supporting_agents=["01"], status="respaldada",
-                sources=[Source(pmid=PMID_OK, title="TTR amyloidosis")],
+                sources=[Source(pmid=PMID_OK, title="TTR amyloidosis",
+                                verified=True, verification_status="verificada")],
             ),
         ],
         debate_summary=DebateSummary(
@@ -123,6 +124,77 @@ def test_no_importa_groq_directamente():
 
 def test_vocabulario_genomico_no_es_gen():
     assert check_invention("Secuenciar el genoma para buscar CNV y VUS.", _report()) is None
+
+
+# ── Solo se cita lo confirmado contra PubMed ──────────────────────────────────
+
+PMID_MALO = "87654321"
+
+
+def _report_con_fuente(estado: str | None, *, en_bibliografia: str | None = None) -> StructuredReport:
+    """Reporte con una segunda fuente (PMID_MALO) en el estado de verificación dado."""
+    r = _report()
+    r.hypotheses[0].sources.append(
+        Source(pmid=PMID_MALO, title="Otro artículo", verification_status=estado)
+    )
+    if en_bibliografia is not None:
+        r.bibliography.append(
+            Source(pmid=PMID_MALO, title="Otro artículo", verification_status=en_bibliografia)
+        )
+    return r
+
+
+@pytest.mark.parametrize("estado", ["inexistente", "discordante", "no_verificable", None])
+def test_pmid_no_confirmado_descarta(estado):
+    r = _report_con_fuente(estado)
+    assert check_invention(f"Respaldada por PMID {PMID_MALO}.", r) == PMID_MALO
+
+
+def test_pmid_confirmado_pasa():
+    r = _report_con_fuente("verificada")
+    assert check_invention(f"Respaldada por PMID {PMID_MALO}.", r) is None
+
+
+def test_pmid_con_estados_mixtos_se_trata_como_no_confirmado():
+    # Confirmado en la bibliografía pero refutado en la hipótesis: criterio conservador.
+    r = _report_con_fuente("discordante", en_bibliografia="verificada")
+    assert check_invention(f"Ver PMID {PMID_MALO}.", r) == PMID_MALO
+
+
+def test_pmid_confirmado_en_bibliografia_sin_fuente_en_hipotesis_pasa():
+    r = _report()
+    r.bibliography.append(Source(pmid=PMID_MALO, title="X", verification_status="verificada"))
+    assert check_invention(f"Ver PMID {PMID_MALO}.", r) is None
+
+
+def test_resumen_con_pmid_refutado_se_descarta_entero():
+    r = _report_con_fuente("inexistente")
+
+    def fake(prompt: str, *, task: str) -> str:
+        return f"Sugiere amiloidosis (PMID {PMID_OK}) y también PMID {PMID_MALO}."
+    agent = SynthesizerAgent()
+    agent._call_llm = fake  # type: ignore[method-assign]
+    assert asyncio.run(agent.synthesize(r)) is None
+
+
+@pytest.mark.parametrize("estado", ["inexistente", "discordante", "no_verificable", None])
+def test_contexto_no_ofrece_pmids_no_confirmados(estado):
+    ctx = ag06.build_context(_report_con_fuente(estado))
+    assert PMID_MALO not in ctx
+    assert PMID_OK in ctx
+    assert "no confirmada" in ctx
+
+
+def test_contexto_lista_los_confirmados_y_el_prompt_lo_exige():
+    ctx = ag06.build_context(_report_con_fuente("verificada"))
+    assert PMID_OK in ctx and PMID_MALO in ctx
+    assert "confirmados" in ctx.lower()
+    assert "confirmad" in SynthesizerAgent.SYSTEM_PROMPT
+
+
+def test_contexto_con_pmid_de_estados_mixtos_no_lo_ofrece():
+    ctx = ag06.build_context(_report_con_fuente("discordante", en_bibliografia="verificada"))
+    assert PMID_MALO not in ctx
 
 
 def test_biomarker_extractor_importa_sin_ciclo():
