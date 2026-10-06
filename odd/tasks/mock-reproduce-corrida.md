@@ -96,6 +96,21 @@ Pendiente fuera de este cambio: `orchestrator.run_pipeline` (síncrono) y los sc
 abren sesión, así que con un archivo de varias entradas recibirían la primera revisión en las
 Rondas 3 y 4.
 
+Revisión nativa (commit `23ee391`, riesgo medio, exigida por superar el presupuesto de líneas):
+consentida por Matías, una lente (fiabilidad), **aprobada** y reconocida el 2026-10-06. Dejó
+tres observaciones no bloqueantes:
+- **Escritura no atómica del generador** (`backend/mock/regenerar.py`). **Arreglada** en un
+  commit aparte: escribe en un archivo vecino y reemplaza; un fallo de escritura levanta
+  `DestinoNoEscribible`, deja el destino como estaba y el script sale con código 2. Tres tests
+  nuevos, que fallaban antes del arreglo.
+- **Cobertura de los chequeos de parseo** (`tests/test_mock_responses.py`). **Abierta**: los
+  cuatro chequeos que llegan a la grabación por `call_provider` (biomarcadores, agrupación,
+  planificación de términos y compatibilidad) recorren las entradas pero no afirman cuál
+  recibió cada llamada. Con un archivo de varias entradas, alguna podría quedar sin parsear y
+  el test pasar igual. Mirarlo al regenerar el archivo.
+- **El invariante de orden no se detecta, solo se documenta** (`backend/mock/responses.py`).
+  **Abierta**: nada avisa si algún día un par (tarea, agente) se llama en paralelo.
+
 Siguiente paso, con cuota de Groq:
 1. `python scripts/medir_costos.py --grabar` (deja `output/medicion_costos/grabacion.json`).
 2. `python scripts/regenerar_mock.py output/medicion_costos/grabacion.json backend/mock/grabadas.json`
