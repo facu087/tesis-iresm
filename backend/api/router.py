@@ -32,6 +32,7 @@ from ..pipeline.report_builder import build_export
 from ..pipeline.consensus import build_arbitration_input, degraded, summarize
 from ..pipeline.trial_matching import build_navigation_input
 from ..pipeline.verification import SourceVerification, verify_report_sources
+from ..mock import responses as mock_responses
 from ..mock.mode import is_mock_active
 from ..telemetry import usage as usage_telemetry
 from .schemas import StructuredReport
@@ -174,6 +175,13 @@ async def analyze(
     # completo de un análisis, y se cierra en el `finally` para que un fallo a
     # mitad de pipeline no deje el contexto de telemetría activo.
     telemetry_token = usage_telemetry.open_registry()
+    # Sesión de reproducción del modo mock: cuenta las llamadas de este
+    # análisis para entregar a cada agente su grabación de cada ronda. Se abre
+    # acá, antes de que el pipeline reparta trabajo con `asyncio.gather()`,
+    # para que todas las tareas compartan el mismo conteo; y por análisis, para
+    # que dos análisis del mismo texto den el mismo resultado. Fuera del modo
+    # mock nadie la consulta.
+    replay_token = mock_responses.open_replay_session()
     try:
         # ── 1. Extracción de texto ─────────────────────────────────────────
         if file is not None:
@@ -251,6 +259,7 @@ async def analyze(
         structured.metadata.processing_time_seconds = round(processing_time, 2)
         return structured
     finally:
+        mock_responses.close_replay_session(replay_token)
         usage_telemetry.close_registry(telemetry_token, mock=is_mock_active())
 
 

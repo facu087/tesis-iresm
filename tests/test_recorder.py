@@ -277,6 +277,44 @@ class TestScriptGrabar:
         _cargar_script().preservar_grabacion_anterior(tmp_path)
         assert list(tmp_path.iterdir()) == []
 
+    def test_la_pasada_base_corre_dentro_de_una_sesion_de_reproduccion(
+        self, tmp_path, monkeypatch
+    ):
+        """El conteo del modo mock es por pasada, igual que el registro de consumo."""
+        from backend.mock import responses as mock_responses
+
+        script = _cargar_script()
+        vistas: list[object] = []
+
+        async def pasada_falsa(res) -> None:
+            vistas.append(mock_responses.current_replay_session())
+
+        monkeypatch.setattr(script, "pasada_base", pasada_falsa)
+        codigo = asyncio.run(script.correr(tmp_path, mock=True))
+
+        assert codigo == 0
+        assert len(vistas) == 1 and vistas[0] is not None
+        assert mock_responses.current_replay_session() is None  # quedó cerrada
+
+    def test_cada_rama_de_la_comparacion_tiene_su_propia_sesion(self, tmp_path):
+        """Una rama no hereda el conteo de la pasada base ni el de otra rama."""
+        from backend.mock import responses as mock_responses
+
+        script = _cargar_script()
+
+        async def rama() -> object:
+            return mock_responses.current_replay_session()
+
+        async def dos_ramas() -> tuple[object, object]:
+            primera, _ = await script._en_registro_aparte(tmp_path, True, rama)
+            segunda, _ = await script._en_registro_aparte(tmp_path, True, rama)
+            return primera, segunda
+
+        primera, segunda = asyncio.run(dos_ramas())
+        assert primera is not None and segunda is not None
+        assert primera is not segunda
+        assert mock_responses.current_replay_session() is None
+
     def test_grabar_con_mock_no_escribe_grabacion_y_avisa(self, tmp_path):
         env = {**os.environ, "GROQ_API_KEY": "", "NEXUS_MOCK_LLM": ""}
         r = subprocess.run(
