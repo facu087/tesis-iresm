@@ -239,6 +239,52 @@ class TestEntradaInvalida:
 
 # ── scripts/regenerar_mock.py ─────────────────────────────────────────────────
 
+class TestEscrituraDelDestino:
+    """
+    El destino habitual es el archivo versionado de respuestas: una escritura
+    que falla no puede dejarlo truncado ni terminar en un traceback crudo.
+    """
+
+    def _origen(self, tmp_path: Path) -> Path:
+        origen = tmp_path / "grabacion.json"
+        origen.write_text(json.dumps(_grabacion()), encoding="utf-8")
+        return origen
+
+    def test_un_fallo_al_reemplazar_deja_el_destino_como_estaba(self, tmp_path, monkeypatch):
+        destino = tmp_path / "grabadas.json"
+        destino.write_text("contenido anterior", encoding="utf-8")
+
+        def _falla(*_args, **_kwargs):
+            raise PermissionError("destino bloqueado")
+
+        monkeypatch.setattr(regenerar.os, "replace", _falla)
+
+        with pytest.raises(regenerar.DestinoNoEscribible):
+            regenerar.regenerar_archivo(self._origen(tmp_path), destino)
+
+        assert destino.read_text(encoding="utf-8") == "contenido anterior"
+        assert sorted(p.name for p in tmp_path.iterdir()) == ["grabacion.json", "grabadas.json"]
+
+    def test_un_destino_que_es_una_carpeta_falla_con_el_error_claro(self, tmp_path):
+        destino = tmp_path / "carpeta"
+        destino.mkdir()
+
+        with pytest.raises(regenerar.DestinoNoEscribible):
+            regenerar.regenerar_archivo(self._origen(tmp_path), destino)
+
+        assert destino.is_dir()
+
+    def test_el_script_informa_el_fallo_de_escritura_sin_traceback(self, tmp_path, capsys):
+        destino = tmp_path / "carpeta"
+        destino.mkdir()
+        script = _cargar_script()
+
+        codigo = script.main([str(self._origen(tmp_path)), str(destino)])
+
+        assert codigo == 2
+        assert "No se escribió ningún archivo" in capsys.readouterr().err
+
+
 def _cargar_script():
     """Importa `scripts/regenerar_mock.py` como módulo, sin ejecutarlo."""
     ruta = _RAIZ / "scripts" / "regenerar_mock.py"

@@ -33,6 +33,7 @@ sobre el archivo versionado, y hay que correrlo después de reemplazarlo.
 from __future__ import annotations
 
 import json
+import os
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -49,6 +50,10 @@ _DESCRIPCION = (
 
 class GrabacionInvalida(ValueError):
     """La grabación de origen falta, no es JSON válido o no tiene la forma esperada."""
+
+
+class DestinoNoEscribible(RuntimeError):
+    """El archivo de destino no se pudo escribir; lo que había queda como estaba."""
 
 
 def _fecha(grabacion: dict[str, Any], recorded_at: str | None) -> str:
@@ -169,6 +174,8 @@ def regenerar_archivo(
                            la forma esperada.
         RespuestasGrabadasInvalidas: si el resultado no pasa la validación del
                            cargador.
+        DestinoNoEscribible: si el destino no se puede escribir (sin permiso,
+                           disco lleno, es una carpeta). El destino no cambia.
     """
     origen = Path(origen)
     destino = Path(destino)
@@ -184,10 +191,25 @@ def regenerar_archivo(
     datos = construir_grabadas(grabacion, recorded_at=recorded_at)
     validadas = responses.validar_grabadas(datos, destino.name)
 
-    destino.parent.mkdir(parents=True, exist_ok=True)
-    destino.write_text(
-        json.dumps(datos, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
+    # Se escribe en un archivo vecino y recién después se reemplaza el destino:
+    # el destino habitual es el archivo versionado, y una escritura que falla
+    # por la mitad no puede dejarlo truncado.
+    contenido = json.dumps(datos, ensure_ascii=False, indent=2) + "\n"
+    temporal = destino.with_name(destino.name + ".tmp")
+    try:
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        temporal.write_text(contenido, encoding="utf-8")
+        os.replace(temporal, destino)
+    except OSError as exc:
+        try:
+            temporal.unlink(missing_ok=True)
+        except OSError:
+            # Sin poder borrar el temporal no hay más que hacer: lo que importa
+            # es informar el fallo original, que es el que sigue abajo.
+            pass
+        raise DestinoNoEscribible(
+            f"no se pudo escribir el destino ({type(exc).__name__})"
+        ) from exc
     return {
         "tasks": len(validadas),
         "entries": sum(len(entradas) for entradas in validadas.values()),

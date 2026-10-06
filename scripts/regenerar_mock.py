@@ -50,7 +50,11 @@ def main(argv: list[str] | None = None) -> int:
         resumen = regenerar.regenerar_archivo(
             args.grabacion, args.salida, recorded_at=args.fecha
         )
-    except (regenerar.GrabacionInvalida, RespuestasGrabadasInvalidas) as exc:
+    except (
+        regenerar.GrabacionInvalida,
+        regenerar.DestinoNoEscribible,
+        RespuestasGrabadasInvalidas,
+    ) as exc:
         print(f"ERROR: {exc}. No se escribió ningún archivo.", file=sys.stderr)
         return 2
 
