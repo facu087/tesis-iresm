@@ -201,6 +201,40 @@ class TestReporteConConsenso:
         assert attr.contradictions[0].critique_text == "Sin biopsia no se sostiene."
         assert attr.contradictions[0].severity == "HIGH"
 
+    def test_sin_agentes_en_ambas_listas_no_hay_reservas(self):
+        reporte = _export(_arbitraje())
+        assert all(h.agents_with_reservations == [] for h in reporte.hypotheses)
+
+    def test_agente_que_sostiene_y_objeta_queda_con_reservas(self):
+        """
+        El agente aportó una hipótesis al grupo y objetó otra del mismo grupo:
+        el reporte lo exporta como "con reservas" y conserva las dos listas.
+        """
+        arbitraje = _arbitraje()
+        arbitraje.consensus[0].supporting_agents = [
+            "Analista de Literatura", "Especialista Genómica", "Consultor Clínico",
+        ]
+        arbitraje.consensus[0].refuting_agents = ["Consultor Clínico"]
+
+        attr = next(h for h in _export(arbitraje).hypotheses if h.text == ATTR)
+
+        assert attr.agents_with_reservations == ["Consultor Clínico"]
+        assert attr.supporting_agents == [
+            "Analista de Literatura", "Especialista Genómica", "Consultor Clínico",
+        ]
+        assert attr.refuting_agents == ["Consultor Clínico"]
+
+    def test_las_reservas_viajan_en_el_json(self):
+        arbitraje = _arbitraje()
+        arbitraje.consensus[0].supporting_agents = [
+            "Analista de Literatura", "Consultor Clínico",
+        ]
+
+        datos = _export(arbitraje).model_dump()
+        attr = next(h for h in datos["hypotheses"] if h["text"] == ATTR)
+
+        assert attr["agents_with_reservations"] == ["Consultor Clínico"]
+
     def test_veredicto_del_arbitro(self):
         reporte = _export(_arbitraje())
         attr = next(h for h in reporte.hypotheses if h.text == ATTR)
@@ -244,6 +278,7 @@ class TestReporteSinArbitraje:
     def test_los_campos_nuevos_tienen_default(self):
         h = _export().hypotheses[0]
         assert h.refuting_agents == []
+        assert h.agents_with_reservations == []
         assert h.contradictions == []
         assert h.arbiter_note == ""
         assert h.recitation == "no_aplica"

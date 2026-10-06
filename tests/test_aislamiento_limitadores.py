@@ -2,15 +2,19 @@
 Aislamiento entre tests de los limitadores globales de `backend/external/rate_limiter.py`.
 
 Los limitadores son objetos de módulo y cada test asíncrono corre en un event
-loop propio. `RateLimiter.acquire()` duerme con el lock tomado cuando la ráfaga
-del último segundo está agotada; si en ese momento hay otra corrutina esperando,
-el lock queda ligado a ese loop. El test siguiente que vuelva a tener contención
-recibe `RuntimeError: ... is bound to a different event loop`, que los clientes
-externos tratan como una caída de la API: el resultado sale degradado en
-silencio. Así fallaban de forma intermitente los tests del Agente 05.
+loop propio. Hasta el arreglo de `RateLimiter.acquire()`, este dormía con un
+`asyncio.Lock` tomado cuando la ráfaga del último segundo estaba agotada; si en
+ese momento había otra corrutina esperando, el lock quedaba ligado a ese loop.
+El test siguiente que volviera a tener contención recibía `RuntimeError: ... is
+bound to a different event loop`, que los clientes externos tratan como una
+caída de la API: el resultado salía degradado en silencio. Así fallaban de forma
+intermitente los tests del Agente 05.
 
-Los dos tests de abajo provocan la misma contención, uno después del otro: sin
-la fixture `_limitadores_aislados` de `tests/conftest.py`, el segundo falla.
+Hoy `acquire()` reserva el turno y duerme sin lock, así que el segundo loop ya
+no falla aunque no exista la fixture (lo cubre `tests/test_rate_limiter.py`).
+Los dos tests de abajo provocan la misma contención, uno después del otro, y
+siguen como regresión; la fixture `_limitadores_aislados` de `tests/conftest.py`
+sigue haciendo falta para que no se arrastren turnos consumidos entre tests.
 """
 
 import asyncio

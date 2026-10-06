@@ -445,6 +445,13 @@ def _hypothesis_block(h: RankedHypothesis, s: dict) -> list:
     if topeada:
         evidencia += f" (declarado {_t(h.declared_evidence_level)})"
 
+    # Un agente puede sostener la hipótesis y además objetarla: se lo muestra una
+    # sola vez, como quien la sostiene con reservas, y sale de las otras dos
+    # listas para que su nombre no aparezca en dos lugares.
+    con_reservas = list(h.agents_with_reservations)
+    sostienen = [a for a in h.supporting_agents if a not in con_reservas]
+    objetan = [a for a in h.refuting_agents if a not in con_reservas]
+
     # Fila de badges: rango | estado | evidencia | prioridad | agentes
     badge_row = [[
         _par(f"<b>#{h.rank}</b>", s["cell"]),
@@ -461,7 +468,7 @@ def _hypothesis_block(h: RankedHypothesis, s: dict) -> list:
             s["cell"],
         ),
         _par(
-            _t(", ".join(h.supporting_agents)) if h.supporting_agents else "—",
+            _t(", ".join(sostienen)) if sostienen else "—",
             s["small"],
         ),
     ]]
@@ -506,10 +513,16 @@ def _hypothesis_block(h: RankedHypothesis, s: dict) -> list:
 
     # Objeciones de peso que ningún agente retiró. Van junto a la hipótesis: un
     # consenso presentado sin su objeción es un consenso mal reportado.
-    if h.refuting_agents:
+    if con_reservas:
+        elems.append(_par(
+            f"<font color='{_hex(_ORANGE)}'><i>Sostenida con reservas por:</i> "
+            f"{_t(', '.join(con_reservas))}</font>",
+            s["small"],
+        ))
+    if objetan:
         elems.append(_par(
             f"<font color='{_hex(_RED)}'><i>Objetada por:</i> "
-            f"{_t(', '.join(h.refuting_agents))}</font>",
+            f"{_t(', '.join(objetan))}</font>",
             s["small"],
         ))
     for contra in h.contradictions[:2]:

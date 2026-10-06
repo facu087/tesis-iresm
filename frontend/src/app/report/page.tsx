@@ -442,6 +442,13 @@ function HypothesisCard({ h }: { h: RankedHypothesis }) {
   const topeada =
     !!h.declared_evidence_level && h.declared_evidence_level !== h.evidence_level;
 
+  // Un agente puede sostener la hipótesis y además objetarla. Se lo muestra una
+  // sola vez, con reservas, y sale de las otras dos listas. Un reporte sin el
+  // campo se trata como lista vacía y se renderiza como antes.
+  const conReservas = h.agents_with_reservations ?? [];
+  const sostienen = h.supporting_agents.filter((ag) => !conReservas.includes(ag));
+  const objetan = (h.refuting_agents ?? []).filter((ag) => !conReservas.includes(ag));
+
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6 space-y-4">
       {/* Rank + título + badges */}
@@ -476,12 +483,21 @@ function HypothesisCard({ h }: { h: RankedHypothesis }) {
                 </span>
               )}
             </span>
-            {h.supporting_agents.map((ag) => (
+            {sostienen.map((ag) => (
               <span key={ag} className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-500">
                 Agente {ag}
               </span>
             ))}
-            {(h.refuting_agents ?? []).map((ag) => (
+            {conReservas.map((ag) => (
+              <span
+                key={`res-${ag}`}
+                className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs text-amber-800"
+                title="Este agente aportó una hipótesis equivalente y además mantiene una objeción sin resolver"
+              >
+                Sostiene con reservas: {ag}
+              </span>
+            ))}
+            {objetan.map((ag) => (
               <span
                 key={`ref-${ag}`}
                 className="rounded-full bg-rose-50 px-2.5 py-0.5 text-xs text-rose-700"
