@@ -18,6 +18,7 @@ import sys
 import time
 from abc import ABC, abstractmethod
 
+from ..mock import recorder as response_recorder
 from ..mock.mode import ENV_VAR, is_mock_active
 from ..mock.responses import get_mock_response
 from ..models.hypothesis import EvidenceLevel, Hypothesis, Priority, Source
@@ -28,6 +29,37 @@ from . import model_tasks
 # techo) que las usa; se re-exportan acá porque `agents/__init__.py` y varios
 # agentes ya las importan desde `base_agent`.
 from .model_tasks import GROQ_FAST, GROQ_MAIN
+
+
+def _grabar_respuesta(
+    *,
+    task: str,
+    model: str,
+    agent_id: str | None,
+    agent_name: str | None,
+    truncated: bool,
+    response: str,
+) -> None:
+    """
+    Entrega al grabador de respuestas (si hay uno abierto) la respuesta cruda de
+    una llamada real exitosa.
+
+    Sin grabador abierto no hace nada. Recibe solo la respuesta del modelo,
+    nunca el prompt ni el mensaje del usuario. Un fallo del grabador no puede
+    romper la llamada ya paga: se avisa por stderr con el tipo de la excepción,
+    sin su mensaje, que podría arrastrar texto de la respuesta.
+    """
+    try:
+        response_recorder.record_response(
+            task=task, model=model, agent_id=agent_id, agent_name=agent_name,
+            truncated=truncated, response=response,
+        )
+    except Exception as exc:
+        print(
+            f"[NEXUS] grabador: no se pudo registrar la respuesta de {task} "
+            f"({type(exc).__name__}). La llamada continúa igual.",
+            file=sys.stderr,
+        )
 
 
 def call_provider(
@@ -156,12 +188,17 @@ def call_provider(
         latencia = time.perf_counter() - inicio
         choice = response.choices[0]
         consumo = getattr(response, "usage", None)
+        truncada = getattr(choice, "finish_reason", None) == "length"
         usage_telemetry.record_call(
             task=task, model=model, agent_id=agent_id, agent_name=agent_name,
             ok=True, latency_seconds=latencia,
             prompt_tokens=getattr(consumo, "prompt_tokens", None) if consumo else None,
             completion_tokens=getattr(consumo, "completion_tokens", None) if consumo else None,
-            truncated=getattr(choice, "finish_reason", None) == "length",
+            truncated=truncada,
+        )
+        _grabar_respuesta(
+            task=task, model=model, agent_id=agent_id, agent_name=agent_name,
+            truncated=truncada, response=choice.message.content,
         )
         return choice.message.content
 

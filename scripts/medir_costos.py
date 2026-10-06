@@ -28,9 +28,18 @@ Los resultados se guardan en disco al terminar cada etapa: una falla a mitad de
 camino no pierde lo ya pagado. Un fallo en una rama de la comparación se
 registra y no detiene las demás.
 
+Con `--grabar` (solo corrida real) la pasada base deja además las respuestas
+crudas del modelo en `grabacion.json`, para regenerar las respuestas del modo
+mock (`backend/mock/responses.py`). No se graba durante la comparación, que
+repite las mismas tareas con otros modelos, ni el prompt ni el mensaje del
+usuario. Esas respuestas pueden contener texto del caso: la carpeta es local e
+ignorada por git. Con `--mock` no hay nada que grabar y se avisa.
+
 Uso:
-    python3 scripts/medir_costos.py --mock    # recorrido completo sin cuota
-    python3 scripts/medir_costos.py           # corrida real (gasta cuota de Groq)
+    python3 scripts/medir_costos.py --mock            # recorrido completo sin cuota
+    python3 scripts/medir_costos.py                   # corrida real (gasta cuota de Groq)
+    python3 scripts/medir_costos.py --grabar          # corrida real + grabacion.json
+    python3 scripts/medir_costos.py --mock --grabar   # solo avisa: nada que grabar
 
 La corrida real hace entre 25 y 27 llamadas al LLM (ver docstring de `main()`).
 """
@@ -61,6 +70,7 @@ from backend.agents.agent_05_trials import TrialNavigatorAgent
 from backend.api.router import _arbitrate_safe, _navigate_trials_safe
 from backend.ingestion.biomarker_extractor import extract as extract_biomarkers
 from backend.ingestion.normalizer import normalize
+from backend.mock import recorder
 from backend.mock.mode import ENV_VAR, is_mock_active
 from backend.models.arbitration import ArbitrationResult
 from backend.models.case import ClinicalCase
@@ -130,6 +140,14 @@ class Medicion:
             "error": error,
         }
         self.guardar()
+
+
+def preservar_grabacion_anterior(carpeta: Path) -> None:
+    """No pisa una grabación previa: la renombra con su fecha de modificación."""
+    previa = carpeta / "grabacion.json"
+    if previa.exists():
+        sello = datetime.fromtimestamp(previa.stat().st_mtime).strftime("%Y%m%d_%H%M%S")
+        previa.rename(carpeta / f"grabacion.{sello}.json")
 
 
 def _error(exc: BaseException) -> str:
@@ -427,10 +445,20 @@ def rondas_3_y_4(report: Report | None) -> dict:
 
 # ── Punto de entrada ──────────────────────────────────────────────────────────
 
-async def correr(carpeta: Path, mock: bool) -> int:
+async def correr(carpeta: Path, mock: bool, grabar: bool = False) -> int:
     m = Medicion(carpeta, mock)
     presupuestos = dict(model_tasks.TASK_BUDGETS)
     res = ResultadoBase()
+
+    # El grabador se abre solo para la pasada base y solo en corrida real: la
+    # comparación repite tareas con otros modelos y en mock no hay nada que grabar.
+    token_grabador = None
+    if grabar and mock:
+        print("[medir_costos] --grabar: en modo mock no hay respuestas reales que "
+              "grabar; no se escribe grabacion.json.", file=sys.stderr)
+    elif grabar:
+        preservar_grabacion_anterior(carpeta)
+        token_grabador = recorder.open_recorder()
 
     # Pasada base, en su propio registro: costos.jsonl.
     token = usage_telemetry.open_registry()
@@ -446,6 +474,13 @@ async def correr(carpeta: Path, mock: bool) -> int:
     finally:
         espera = time.perf_counter() - inicio
         usage_telemetry.close_registry(token, output_path=carpeta / "costos.jsonl", mock=mock)
+        if token_grabador is not None:
+            # Aunque la pasada falle a mitad de camino: lo ya pagado no se pierde.
+            entradas = recorder.close_recorder(
+                token_grabador, output_path=carpeta / "grabacion.json"
+            )
+            print(f"[medir_costos] grabación: {len(entradas or [])} respuesta(s) en "
+                  f"{carpeta / 'grabacion.json'}", file=sys.stderr)
     llamadas = list(registro.calls) if registro else []
 
     m.datos["base"] = {
@@ -497,6 +532,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Medición de costos del pipeline NEXUS.")
     parser.add_argument("--mock", action="store_true",
                         help=f"activa {ENV_VAR}: recorrido completo sin llamar al LLM")
+    parser.add_argument("--grabar", action="store_true",
+                        help="guarda las respuestas crudas del modelo de la pasada base en "
+                             "grabacion.json (solo corrida real)")
     parser.add_argument("--salida", type=Path, default=None,
                         help="carpeta de salida (por defecto output/medicion_costos[/mock])")
     args = parser.parse_args()
@@ -515,7 +553,7 @@ def main() -> int:
         return 2
 
     carpeta = args.salida or (SALIDA_REAL / "mock" if args.mock else SALIDA_REAL)
-    return asyncio.run(correr(carpeta, args.mock))
+    return asyncio.run(correr(carpeta, args.mock, args.grabar))
 
 
 if __name__ == "__main__":
