@@ -261,3 +261,17 @@ class TestAtribucionEnElReporte:
             report=report, trials=[], processing_time=1.0,
         )
         assert "Especialista Genómica" in exportado.hypotheses[0].supporting_agents
+
+
+def test_system_prompt_no_nombra_genes_ni_variantes():
+    """La spec pide un prompt genérico: un ejemplo con un gen real sesga al modelo."""
+    import re
+    from backend.agents import agent_02_genomics as ag02
+
+    prompt = ag02.SYSTEM_PROMPT
+    assert not re.search(r"\b[cpg]\.[A-Z0-9]", prompt), "el prompt cita una notación de variante"
+    siglas = set(re.findall(r"\b[A-Z][A-Z0-9]{1,7}\b", prompt))
+    permitidas = {"NO", "JSON", "ORIENTACIÓN", "HIGH", "MEDIUM", "LOW", "DEBE", "PubMed",
+                  "ID", "IDs", "RCT", "RCTs", "II", "III", "I", "X", "CONTEXTO", "GENÓMICO",
+                  "ADVERTENCIA", "ÚNICAMENTE", "REGLAS", "FORMATO", "DE"}
+    assert siglas <= permitidas, f"siglas con forma de gen en el prompt: {siglas - permitidas}"
