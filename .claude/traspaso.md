@@ -181,10 +181,10 @@ Defectos de la revisión posterior, **arreglados y mergeados** (rama
 - **c.** Texto libre sin escapar en el PDF. **Cerrada**: `_t()` en `pdf_exporter.py` escapa
   cada valor al interpolarlo en un `Paragraph` (ver 4.5).
 
-Tareas de `openspec/changes/agente-06-sintetizador/tasks.md`: la 7.2 quedó tildada (suite
-completa en verde) y la 6.2 sigue abierta: el build del frontend compila, pero nadie vio la
-sección "Resumen ejecutivo" en el navegador, y en mock hoy no hay resumen (depende de T4).
-Archivar el cambio recién cuando la 6.2 se cierre.
+El cambio OpenSpec `agente-06-sintetizador` se archivó el 2026-10-06 (PR #42): la 6.2 se
+verificó en el navegador con un reporte de prueba cargado en `sessionStorage` (la sección
+aparece arriba de las hipótesis y desaparece con `executive_summary: null`). En mock sigue sin
+haber resumen hasta cerrar la T4.
 
 ### 4.2 Verificar contra Groq los arreglos del parseo — parcial
 Los PR #25 y #26 (fuente malformada y hipótesis malformada) se verificaron con tests. Las dos
@@ -254,8 +254,10 @@ usa una **muestra sintética**. Con el `costos.jsonl` real ya se puede recalcula
   El PR #44 (Facundo) lo cerró: la guarda anti-invención ahora lee `case_genetic_findings` del
   JSON crudo (antes lo buscaba en la `Hypothesis` ya parseada, que no tiene ese campo, y con
   hallazgos en el caso no degradaba nada), PharmGKB usa `pharmgkb_breaker`, y se agregaron los
-  tests de tres agentes y el demo. **Sigue abierto**: el `SYSTEM_PROMPT` del Agente 02 nombra
-  `TTR p.Val30Met` en su ejemplo JSON, y la spec pide que no nombre genes concretos.
+  tests de tres agentes y el demo. El `SYSTEM_PROMPT` del Agente 02 nombraba `TTR p.Val30Met` en
+  su ejemplo JSON, contra la spec; desde `fix/s4-prompt-agente02-sin-genes` usa un marcador
+  genérico, pide `case_genetic_findings` vacío en modo orientación y un test impide volver a
+  nombrar genes o variantes en el prompt.
 - Quedan 6 ramas locales `worktree-agent-*` sin revisar. Los worktrees y las demás ramas ya
   mergeadas se borraron; lo que tenían en `output/` se copió a `output/de-worktrees/`.
 - **Texto libre del PDF** (resuelto en `fix/s4-agente06-pendientes`): todo valor que llega a un
@@ -265,11 +267,11 @@ usa una **muestra sintética**. Con el `costos.jsonl` real ya se puede recalcula
   agentes, objeciones), fuentes, divergencias, ensayos, enfermedades raras, versión y
   descargo. Las celdas de tabla con texto plano (perfil del paciente, etc.) no interpretan
   marcado y no hacen falta. Las URL se imprimen como texto, no como enlaces.
-- Tarjetas #73 y #75 (Facundo y Fede): mergeadas el 2026-09-16 y todavía en Sprint 4 sin
-  evidencia.
+- Tarjeta #73 (Facundo): evidencia adjunta y en QA desde el 2026-10-06. La #75 (Fede) sigue
+  en Sprint 4 sin evidencia.
 
 ### 4.6 De otros integrantes
-- **Facundo**: #71 cliente ClinVar.
+- **Facundo**: #71 cliente ClinVar — hecho (PR #41) y en QA desde el 2026-10-06.
 - **Fede**: #74 cliente Orphadata, #76 filtro de relevancia del RAG, #77 lint del frontend,
   #78 portada del PDF.
 - Sin asignar: #79 (comentario en el `.env` que desactiva la verificación) y #80 (un agente
