@@ -168,11 +168,8 @@ Defectos de la revisión posterior, **arreglados y mergeados** (rama
   símbolo génico: una sigla ausente del reporte ("DM2", "HSAN") descarta todo el resumen.
   **Mitigada, no cerrada**: la guarda no se tocó (sigue igual de estricta), pero el prompt
   ahora le dice al modelo que no introduzca siglas ni símbolos ausentes del reporte y que
-  los escriba con palabras. **Pendiente (T4)**: en modo mock el resumen grabado se descarta
-  siempre (cita DNMT1, que el reporte mock no contiene), así que el Agente 06 no se ve en
-  mock (`executive_summary` queda `None`). Arreglarlo exige grabar el resumen con el prompt
-  nuevo sobre el reporte mock: una llamada real a Groq, que depende de la cuota diaria y
-  puede quedar para otro día. Las grabaciones no se editan a mano.
+  los escriba con palabras. **T4 cerrada el 2026-10-07**: con la regrabación completa (ver 4.3) el reporte
+  mock es el de la corrida y la guarda acepta el resumen grabado: el Agente 06 se ve en mock.
 - **b.** El contexto se truncaba a 6000 caracteres desde el final (ensayos y verificación).
   **Cerrada**: `build_context()` acorta solo los textos libres largos (narrativa,
   fundamentos y notas del Árbitro), con el mayor tope común que entre en el límite, y deja
@@ -213,23 +210,25 @@ Con 6.2, 6.4 y 7.5 hechas, `control-de-costos-del-pipeline` quedó sin tareas ab
 archivó el 2026-10-06 junto con `landing-demostrativa`. Sus specs están en `openspec/specs/`
 (`modo-mock-pipeline`, `presupuesto-por-tarea` y `telemetria-de-costos`).
 
-**El modo mock puede reproducir la corrida completa** (rama
-`feature/s4-mock-reproduce-corrida`, 2026-10-06; detalle en
-`odd/tasks/mock-reproduce-corrida.md`). `backend/mock/grabadas.json` admite varias grabaciones
-por tarea y cada agente recibe la suya, en el orden en que la pidió. El archivo versionado
-sigue con una por tarea, así que el reporte mock todavía sale con hipótesis duplicadas y notas
-del Árbitro que no corresponden (medido en el ensayo del 2026-10-06: 10 hipótesis de consenso,
-5 textos repetidos). Para que salga fiel hace falta una corrida real:
+**El modo mock reproduce la corrida completa** (PR #53 + regrabación del 2026-10-07, rama
+`feature/s4-regrabar-mock`). `backend/mock/grabadas.json` tiene las 22 respuestas de la
+corrida real del 2026-10-07, una por llamada y con su agente. Medido en mock: 9 hipótesis de
+consenso sin repetidas (antes 10 con 5 textos repetidos), 10 ensayos y el `executive_summary`
+del Agente 06. `regenerar_mock.py` se usó por primera vez con una grabación real y funcionó sin
+cambios. Para regrabar otra vez:
 
 ```bash
 python scripts/medir_costos.py --grabar
-python scripts/regenerar_mock.py output/medicion_costos/grabacion.json backend/mock/grabadas.json
-pytest tests/test_mock_responses.py -q
+python scripts/regenerar_mock.py output/medicion_costos/grabacion.json backend/mock/grabadas.json --fecha AAAA-MM-DD
+pytest tests/test_mock_responses.py tests/test_mock_pipeline.py -q
 ```
 
-`regenerar_mock.py` nunca se corrió contra una grabación real: la primera vez hay que mirar el
-resultado. Esa misma corrida sirve para cerrar la T4 del Agente 06 (4.1), exportar el PDF de
-respaldo de la demo y sacar la captura real de la tarjeta #80.
+Los tests del mock que fijan el contenido de la grabación (fecha, críticas por agente) hay que
+actualizarlos con cada regrabación. La corrida del 2026-10-07 (ya con el prompt del Agente 02
+sin genes) midió 84.867 tokens en 27 llamadas (5 reintentadas por 429) y 493 s, ninguna
+respuesta cortada. El PDF de respaldo para la demo, generado en mock con verificación real
+contra PubMed, quedó en `output/demo_respaldo/reporte_mock.pdf` (local, gitignoreado).
+Falta la captura real de la tarjeta #80.
 
 La comparación de costo contra Claude, GPT-4o y Gemini que muestra `scripts/demo_costos.py`
 usa una **muestra sintética**. Con el `costos.jsonl` real ya se puede recalcular con

@@ -92,7 +92,7 @@ class TestGrabacionFiel:
             assert entrada["model"].startswith("openai/gpt-oss-")
             assert isinstance(entrada["seq"], int)
             assert "agent_id" in entrada
-            assert entrada["recorded_at"] == "2026-10-06"
+            assert entrada["recorded_at"] == "2026-10-07"
 
     @pytest.mark.parametrize("tarea", sorted(_ESPERADAS_GRABADAS))
     def test_el_modelo_de_la_grabacion_coincide_con_el_presupuesto_de_la_tarea(self, tarea):
@@ -100,18 +100,25 @@ class TestGrabacionFiel:
         for entrada in _entradas_del_archivo(tarea):
             assert entrada["model"] == model_tasks.TASK_BUDGETS[tarea].model
 
-    def test_el_archivo_versionado_trae_una_entrada_por_tarea(self):
+    def test_el_archivo_versionado_trae_la_corrida_completa_por_agente(self):
         """
-        Con una sola entrada por tarea el modo mock se comporta como antes de
-        la reproducción por agente: la corrida completa no está grabada acá.
+        Grabación del 2026-10-07: las tareas del debate tienen una entrada por
+        llamada, con su agente, y cada agente recibe la suya (no la de otro).
         """
-        datos = json.loads(_ARCHIVO.read_text(encoding="utf-8"))["tasks"]
-        assert all(isinstance(entrada, dict) for entrada in datos.values())
-        for agente in (None, "01", "02", "03", "04", "05", "06"):
-            for tarea, entrada in datos.items():
-                assert mock_responses.get_mock_response(tarea, agent_id=agente) == (
-                    entrada["response"]
-                )
+        entradas = mock_responses.get_recorded_entries()
+        autores = {e["agent_id"] for e in entradas["debate_critica"]}
+        assert autores == {"01", "02", "03"}
+        assert len(entradas["debate_revision"]) == 6
+        for tarea in ("debate_critica", "debate_revision", "debate_recitacion"):
+            for agente in {e["agent_id"] for e in entradas[tarea]}:
+                propia = next(e for e in entradas[tarea] if e["agent_id"] == agente)
+                assert mock_responses.get_mock_response(tarea, agent_id=agente) == propia["response"]
+
+    def test_ninguna_critica_grabada_apunta_a_su_autor(self):
+        for entrada in mock_responses.get_recorded_entries()["debate_critica"]:
+            criticas = ArbiterAgent()._parse_critiques(entrada["response"])
+            assert criticas
+            assert entrada["agent_id"] not in {c.target_agent_id for c in criticas}
 
     def test_las_respuestas_conservan_el_formato_crudo_del_modelo(self):
         """Un JSON re-serializado por nosotros no traería sangría de dos espacios."""
@@ -215,16 +222,16 @@ class TestParseoRealPorSitioDeLlamada:
     def test_la_critica_grabada_parsea_con_ids_canonicos(self):
         """El modelo real nombra "Agent 02"; el parser real lo lleva a "02"."""
         criticas = ArbiterAgent()._parse_critiques(mock_responses.get_mock_response("debate_critica"))
-        assert len(criticas) == 5
+        assert len(criticas) == 8
         assert all(re.fullmatch(r"\d{2}", c.target_agent_id) for c in criticas)
-        assert sorted(c.target_agent_id for c in criticas) == ["02", "02", "03", "03", "03"]
+        assert sorted(c.target_agent_id for c in criticas) == ["02"] * 3 + ["03"] * 5
 
     def test_la_critica_grabada_llega_a_un_agente_del_debate(self):
         from backend.pipeline.debate import _critiques_for
 
         criticas = ArbiterAgent()._parse_critiques(mock_responses.get_mock_response("debate_critica"))
-        assert len(_critiques_for("02", criticas)) == 2
-        assert len(_critiques_for("03", criticas)) == 3
+        assert len(_critiques_for("02", criticas)) == 3
+        assert len(_critiques_for("03", criticas)) == 5
         assert _critiques_for("01", criticas) == []  # nadie critica al autor de la grabación
 
     def test_recitacion_parsea_con_fuentes(self):
