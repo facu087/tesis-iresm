@@ -322,7 +322,7 @@ tesis-iresm/
 │   ├── mock/                   ← modo mock del pipeline (S4)
 │   │   ├── mode.py             ← activación de `NEXUS_MOCK_LLM`
 │   │   ├── responses.py        ← respuestas por tarea, carga diferida de grabadas.json
-│   │   ├── grabadas.json       ← respuestas textuales de la corrida real del 2026-10-06
+│   │   ├── grabadas.json       ← respuestas textuales de la corrida real del 2026-10-07
 │   │   ├── recorder.py         ← grabador de respuestas crudas (solo lo abre un script)
 │   │   └── __init__.py
 │   ├── telemetry/              ← control de costos (S4)
@@ -574,8 +574,9 @@ marcado (`StructuredReport.metadata.mock`) y la marca se muestra en el PDF y
 en el frontend con la misma visibilidad que la advertencia del consenso de
 IA.
 
-Las doce tareas de `TASK_BUDGETS` usan respuestas **textuales de la corrida
-real del 2026-10-06**, guardadas en `backend/mock/grabadas.json` (versionado) y
+Las trece tareas de `TASK_BUDGETS` usan respuestas **textuales de la corrida
+real del 2026-10-07** (22 respuestas: una por llamada, con el agente que la
+pidió), guardadas en `backend/mock/grabadas.json` (versionado) y
 cargadas de forma diferida por `backend/mock/responses.py` en el primer uso en
 modo mock: el modo real nunca lee ese archivo, y si falta o está malformado se
 levanta `RespuestasGrabadasInvalidas`. Salieron de `backend/mock/recorder.py`,
@@ -583,9 +584,12 @@ un grabador de respuestas crudas basado en `contextvars` que **solo abre un
 script** (nunca una variable de entorno ni `POST /api/analyze`) y guarda
 únicamente la respuesta del modelo, nunca el prompt. Se usa con
 `scripts/medir_costos.py --grabar`, que lo abre durante la pasada base y escribe
-`output/medicion_costos/grabacion.json` (gitignoreado). Salvedad: las
-grabadas que citan posiciones, PMIDs o NCT pertenecen a esa corrida; en modo
-mock se aplican por posición a hipótesis distintas y dependen de que PubMed y
+`output/medicion_costos/grabacion.json` (gitignoreado);
+`scripts/regenerar_mock.py` la convierte en `grabadas.json`. Como cada agente
+recibe su propia grabación en el orden en que la pidió, el modo mock reproduce
+la corrida: 9 hipótesis de consenso sin repetidas, 10 ensayos y el
+`executive_summary` del Agente 06. Salvedad: los PMIDs y NCT que citan las
+grabadas pertenecen a esa corrida y dependen de que PubMed y
 ClinicalTrials.gov sigan devolviendo lo mismo.
 
 ---
