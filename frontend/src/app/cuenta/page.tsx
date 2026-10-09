@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { logout, obtenerCuenta, reenviarRegistro } from "@/lib/api";
 import type { CuentaEstado } from "@/lib/types";
 import { AlertIcon, ClockIcon, VerifiedIcon } from "@/components/icons";
+import BrandLockup from "@/components/NexusLogo";
 
 const inputClass =
   "w-full rounded-lg border border-fg-muted bg-bg px-3.5 py-2.5 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-accent";
@@ -20,7 +21,7 @@ function Header({ onLogout }: { onLogout: () => void }) {
           href="/"
           className="cursor-pointer rounded-sm font-serif text-lg font-semibold tracking-tight text-accent transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
         >
-          NEXUS
+          <BrandLockup />
         </Link>
         <div className="flex items-center gap-2 sm:gap-4">
           <ThemeToggle />

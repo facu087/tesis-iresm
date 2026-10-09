@@ -6,6 +6,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import { useRouter } from "next/navigation";
 import { aprobarCuenta, listarPendientes, logout, obtenerCuenta, rechazarCuenta } from "@/lib/api";
 import type { CuentaPendiente } from "@/lib/types";
+import BrandLockup from "@/components/NexusLogo";
 
 const inputClass =
   "w-full rounded-lg border border-fg-muted bg-bg px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-accent";
@@ -173,7 +174,7 @@ export default function AdminPendientesPage() {
             href="/"
             className="cursor-pointer rounded-sm font-serif text-lg font-semibold tracking-tight text-accent transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
           >
-            NEXUS
+            <BrandLockup />
           </Link>
           <div className="flex items-center gap-2 sm:gap-4">
             <ThemeToggle />

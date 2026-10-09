@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeftIcon } from "@phosphor-icons/react/ssr";
 import ThemeToggle from "@/components/ThemeToggle";
 import { CONTAINER, FOCUS_RING, PRIMARY_BUTTON, TRANSITION } from "@/components/landing/styles";
+import BrandLockup from "@/components/NexusLogo";
 
 /**
  * Branded 404. Shares the landing visual system through the `.landing`
@@ -23,7 +24,7 @@ export default function NotFound() {
           aria-label="NEXUS, inicio"
           className={`rounded-full px-3 py-2 text-base font-bold text-accent ${TRANSITION} hover:opacity-80 active:translate-y-px ${FOCUS_RING}`}
         >
-          NEXUS
+          <BrandLockup />
         </Link>
         <ThemeToggle />
       </header>

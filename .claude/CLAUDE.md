@@ -645,6 +645,15 @@ ORPHANET_API_KEY=       # Opcional: la API responde sin credencial (medido el
                         # manda en el header apiKey; si no, el cliente manda un
                         # valor por defecto que el servicio acepta.
 
+# RAG — umbral de relevancia (opcional)
+NEXUS_RAG_MIN_SCORE=    # Score mínimo para que un artículo recuperado llegue
+                        # al agente. Default 0.55, medido con
+                        # scripts/demo_umbral_relevancia.py. OJO con la escala:
+                        # score = (1 + coseno) / 2, no es la similitud coseno.
+                        # 0.5 es coseno 0 (ortogonal). Un valor inválido o fuera
+                        # de [0, 1] avisa por stderr y cae al default.
+                        # Al cambiar NEXUS_EMBEDDING_MODEL hay que volver a medir.
+
 # RAG — embeddings (opcional)
 NEXUS_EMBEDDING_MODEL=  # Sobreescribe el modelo de embeddings del RAG.
                         # Default: NeuML/pubmedbert-base-embeddings (768 dims).
