@@ -7,6 +7,7 @@ import HowItWorksSection from "@/components/landing/HowItWorksSection";
 import IslandNav, { type NavLink } from "@/components/landing/IslandNav";
 import LandingFooter from "@/components/landing/LandingFooter";
 import LandingMarkSprite from "@/components/landing/LandingMarkSprite";
+import { LandingSessionProvider } from "@/components/landing/LandingSession";
 import ReportSection from "@/components/landing/ReportSection";
 import TaglineReveal from "@/components/landing/TaglineReveal";
 import VerificationSection from "@/components/landing/VerificationSection";
@@ -25,6 +26,10 @@ import { CONTAINER, FOCUS_RING, SECTION_PADDING } from "@/components/landing/sty
  * under `components/landing/` (navigation, tagline reveal, pipeline diagram,
  * agent tiles) and in `ScrollReveal`. The `.landing` wrapper scopes the
  * visual system: see `globals.css`.
+ *
+ * `LandingSessionProvider` asks once whether someone is signed in; the
+ * navigation and both calls to action read it. The server render is always
+ * the page of a visitor without a session.
  */
 
 const TITLE = "NEXUS: hipótesis de investigación clínica con citas verificadas";
@@ -91,18 +96,20 @@ export default function LandingPage() {
 
       <LandingMarkSprite />
 
-      <IslandNav links={NAV_LINKS} heroActionId={HERO_ACTION_ID} />
+      <LandingSessionProvider>
+        <IslandNav links={NAV_LINKS} heroActionId={HERO_ACTION_ID} />
 
-      <main id="contenido" tabIndex={-1} className="flex-1 outline-none">
-        <Hero />
-        <VerificationSection />
-        <TaglineSection />
-        <ReportSection />
-        <HowItWorksSection />
-        <AgentsSection />
-        <FaqSection />
-        <FinalCta />
-      </main>
+        <main id="contenido" tabIndex={-1} className="flex-1 outline-none">
+          <Hero />
+          <VerificationSection />
+          <TaglineSection />
+          <ReportSection />
+          <HowItWorksSection />
+          <AgentsSection />
+          <FaqSection />
+          <FinalCta />
+        </main>
+      </LandingSessionProvider>
 
       <LandingFooter links={NAV_LINKS} />
 

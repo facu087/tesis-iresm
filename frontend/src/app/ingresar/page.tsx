@@ -31,8 +31,9 @@ function IngresarForm() {
     setError(null);
     setEnviando(true);
     try {
-      await login(email, password);
-      router.push("/cuenta");
+      const cuenta = await login(email, password);
+      // An admin has nothing to do on the physician account page.
+      router.push(cuenta.rol === "admin" ? "/admin/pendientes" : "/cuenta");
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo iniciar sesión.");
     } finally {

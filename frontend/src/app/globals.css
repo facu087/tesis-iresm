@@ -417,6 +417,18 @@ body {
   }
 }
 
+/* With JavaScript the account link of the navigation waits for the session:
+   hidden while it loads, so "Ingresar" never flashes into the user's name.
+   `visibility` keeps its box, so the pill does not change width twice, and
+   takes the link out of the tab order. Without JavaScript the session never
+   resolves and the link stays visible. Unlayered for the same reason as the
+   blocks above. */
+@media (scripting: enabled) {
+  .landing [data-session-pending] {
+    visibility: hidden;
+  }
+}
+
 @keyframes landing-verify-pulse {
   from {
     opacity: 1;

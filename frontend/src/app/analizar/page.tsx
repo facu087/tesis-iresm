@@ -116,6 +116,9 @@ export default function AnalizarPage() {
         if (cancelado) return;
         if (cuenta === null) {
           router.push("/ingresar");
+        } else if (cuenta.rol === "admin") {
+          // El backend exige rol médico: al admin le corresponde la revisión.
+          router.push("/admin/pendientes");
         } else if (cuenta.rol !== "medico" || cuenta.estado !== "verificado") {
           router.push("/cuenta");
         } else {

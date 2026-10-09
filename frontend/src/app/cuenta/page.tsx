@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   ClockIcon,
   SealCheckIcon,
+  ShieldCheckIcon,
   UserCircleIcon,
   WarningCircleIcon,
 } from "@phosphor-icons/react/ssr";
@@ -207,6 +208,28 @@ export default function CuentaPage() {
   }
 
   if (cuenta === null) return null;
+
+  // An admin has no licence under review and cannot analyse cases (the
+  // backend only accepts the analysis from a verified physician): the account
+  // page leads to the review of registrations instead.
+  if (cuenta.rol === "admin") {
+    return (
+      <CuentaShell onLogout={handleLogout}>
+        <StatusCard
+          tone="neutral"
+          icon={<ShieldCheckIcon aria-hidden="true" weight="bold" className="size-6" />}
+          title="Cuenta de administrador"
+        >
+          <p className="mt-2 text-sm text-pretty text-fg-muted">
+            Revisá las solicitudes de registro y decidí cada matrícula.
+          </p>
+          <Link href="/admin/pendientes" className={`mt-4 ${PRIMARY_BUTTON}`}>
+            Cuentas pendientes →
+          </Link>
+        </StatusCard>
+      </CuentaShell>
+    );
+  }
 
   return (
     <CuentaShell onLogout={handleLogout}>
