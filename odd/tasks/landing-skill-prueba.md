@@ -304,8 +304,19 @@ Excepción: el frontend no tiene corredor de tests (`package.json` solo define
 ## Entrega
 
 Estrategia: `ask-on-risk`. Pronóstico: más de 400 líneas cambiadas (reescritura
-de `page.tsx`, 442 líneas). La estrategia de cadena queda pendiente de decidir
-con el usuario si la prueba se convierte en PR.
+de `page.tsx`, 442 líneas).
+
+El usuario pidió abrir el PR partido en dos (2026-10-09). Cadena apilada: el
+primero apunta a `develop` y el segundo a la rama del primero.
+
+| PR | Rama | Base | Commits | Líneas |
+|----|------|------|---------|--------|
+| 1 — landing | `feature/s4-landing-rediseno` | `develop` | `665c947`..`aa89e99` | 2427 + 716 |
+| 2 — pantallas de acceso y cuenta, landing interactiva | `feature/s4-landing-skill-prueba` | rama del PR 1 | `30e604d`..`HEAD` | 1531 + 652 |
+
+Los dos superan las 400 líneas: el corte sigue las unidades de trabajo y no se
+puede achicar más sin separar un rediseño de su propio CSS. El PR 1 se
+comprobó aislado en `aa89e99`: tipos y lint pasan.
 
 ## Progreso
 
