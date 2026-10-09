@@ -140,10 +140,12 @@ Excepción: el frontend no tiene corredor de tests (`package.json` solo define
 
 ## Pendientes
 
-- Error de lint previo en `/report` (fuera del alcance de esta rama).
+- ~~Error de lint previo en `/report`~~: resuelto por el PR #49, que entró con
+  el merge de `develop` (`21e12dc`). `npm run lint` sale 0.
 - `NEXT_PUBLIC_SITE_URL` sin definir: las etiquetas para compartir resuelven a
   `http://localhost:3000`.
-- Favicon por defecto; sin política de privacidad ni términos.
+- ~~Favicon por defecto~~: resuelto por el PR #54 (`icon.svg`). Sigue sin
+  política de privacidad ni términos.
 - `.claude/CLAUDE.md` sigue describiendo la identidad Newsreader + Atkinson; se
   actualiza solo si la prueba se adopta.
 - Confirmar el CTA "Solicitar acceso" → `/registro`.
