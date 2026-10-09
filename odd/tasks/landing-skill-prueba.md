@@ -154,6 +154,15 @@ Excepción: el frontend no tiene corredor de tests (`package.json` solo define
     16 % de opacidad; el extremo claro del pipeline usa `#4a6fa1` y no el
     `#6e8bb0` del logo, por contraste de los números.
 
+  - Commit: `cac7ebb`. Revisión nativa: consentimiento otorgado, pero el
+    inicio se detuvo con `lens_context_budget_exceeded`: el tramo desde
+    `6710745` incluye el merge de `develop` (PR #47, #49, #50 y #54, con el
+    trazado y el SVG del logo) y no entra en el presupuesto del revisor. No se
+    creó ninguna autoridad de revisión. Evaluado solo el commit del motivo
+    (`8726c8b..cac7ebb`, 331 líneas): riesgo medio, `under_budget`, sin
+    revisión debida. Los commits propios posteriores al merge quedan sin
+    revisión nativa; los de `develop` se revisaron en sus PR.
+
 ## Pendientes
 
 - ~~Error de lint previo en `/report`~~: resuelto por el PR #49, que entró con
