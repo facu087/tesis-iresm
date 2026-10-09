@@ -1,56 +1,57 @@
-import { AlertIcon } from "@/components/icons";
+import { WarningIcon } from "@phosphor-icons/react/ssr";
 
 /**
- * Comparación "antes y después" de una cita.
+ * "Before and after" comparison of one citation.
  *
- * El par sale de una corrida real del caso de prueba (2026-09-22,
- * `output/corrida_agente04/reporte.json`, PMID 23686244): lo que declaró el
- * modelo frente al título que PubMed devuelve para ese PMID. El veredicto se
- * dice con texto y con un ícono de alerta, no solo con color.
+ * The pair comes from a real run of the test case (2026-09-22,
+ * `output/corrida_agente04/reporte.json`, PMID 23686244): what the model
+ * declared against the title PubMed returns for that PMID. Both titles are
+ * real data and are kept verbatim. The verdict is stated with text and a
+ * warning icon, never with colour alone.
+ *
+ * The three panels share one bordered card: the 1 px gaps of the grid show
+ * the border colour, so no panel carries a border on a single side.
  */
 export default function BeforeAfter() {
   return (
     <figure aria-labelledby="beforeafter-caption" className="m-0">
-      <div className="grid gap-px overflow-hidden rounded-lg border border-border bg-border md:grid-cols-2">
-        <div className="bg-surface p-6 sm:p-8">
-          <p className="text-xs font-bold uppercase tracking-widest text-fg-muted">
+      <div className="grid gap-px overflow-hidden rounded-2xl border border-border bg-border md:grid-cols-2">
+        <div className="bg-surface p-6">
+          <p className="text-sm font-semibold text-fg-muted">
             Antes · lo que declaró el modelo
           </p>
-          <blockquote className="mt-4 border-l-2 border-fg pl-4 font-serif text-xl leading-snug">
+          <blockquote className="mt-4 text-xl font-semibold text-pretty text-fg">
             IgM paraprotein-associated neuropathy: clinical features and
             treatment
           </blockquote>
           <p className="mt-3 text-sm text-fg-muted">
-            Neurology · 2013 · PMID 23686244
+            Neurology · 2013 · <span className="font-mono">PMID 23686244</span>
           </p>
         </div>
-        <div className="bg-surface p-6 sm:p-8">
-          <p className="text-xs font-bold uppercase tracking-widest text-fg-muted">
+        <div className="bg-surface p-6">
+          <p className="text-sm font-semibold text-fg-muted">
             Después · lo que devuelve PubMed
           </p>
-          <blockquote className="mt-4 border-l-2 border-fg pl-4 font-serif text-xl leading-snug">
+          <blockquote className="mt-4 text-xl font-semibold text-pretty text-fg">
             Paper-based transparent flexible thin film supercapacitors.
           </blockquote>
           <p className="mt-3 text-sm text-fg-muted">
-            Título real del PMID 23686244
+            Título real del <span className="font-mono">PMID 23686244</span>
           </p>
         </div>
-        <div className="bg-bg-subtle px-6 py-4 sm:px-8 md:col-span-2">
-          <p className="flex items-start gap-2 text-base font-bold text-ochre">
-            <AlertIcon className="mt-0.5 h-5 w-5 shrink-0" />
+        <div className="bg-bg-subtle p-6 md:col-span-2">
+          <p className="flex items-start gap-2 text-base font-semibold text-ochre">
+            <WarningIcon aria-hidden="true" weight="bold" className="mt-0.5 size-5 shrink-0" />
             Veredicto del sistema: no coincide
           </p>
-          <p className="mt-1 text-sm text-fg-muted">
+          <p className="mt-2 text-sm text-pretty text-fg-muted">
             El título citado no corresponde al artículo que existe con ese
             PMID. La referencia no cuenta como respaldo y la hipótesis que
             dependía de ella queda marcada como sin respaldo verificable.
           </p>
         </div>
       </div>
-      <figcaption
-        id="beforeafter-caption"
-        className="mt-3 text-xs text-fg-muted"
-      >
+      <figcaption id="beforeafter-caption" className="mt-3 text-xs text-fg-muted">
         Caso real, no ilustrativo: corrida del caso de prueba del 22 de
         septiembre de 2026.
       </figcaption>

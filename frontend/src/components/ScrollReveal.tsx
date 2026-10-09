@@ -3,24 +3,22 @@
 import { useEffect, useRef } from "react";
 
 /**
- * Animación de aparición al hacer scroll, como mejora progresiva (design D6).
+ * Scroll reveal as progressive enhancement, used only by the landing.
  *
- * El HTML servido por el servidor ya trae las clases de "visible"
- * (`opacity-100 translate-y-0`): sin JavaScript el contenido se ve completo.
- * Recién después de montarse — y solo si el usuario no pidió
- * `prefers-reduced-motion` y el nodo todavía está por debajo del viewport —
- * el efecto oculta el nodo (8–16px, opacity 0)
- * manipulando `classList` directamente (sin pasar por estado de React, para
- * no disparar un re-render en cascada) hasta que un `IntersectionObserver`
- * compartido lo revela (300ms) al entrar en el viewport. Deja de observar
- * tras revelar: nunca vuelve a ocultarse.
+ * The server sends the content fully visible: without JavaScript nothing is
+ * hidden. After mounting, and only if the user did not ask for reduced motion
+ * and the node is still below the viewport, the effect marks the node as
+ * hidden (`data-reveal="hidden"`: 64 px down, blurred, transparent) until a
+ * shared `IntersectionObserver` reveals it with a heavy fade up of 900 ms on
+ * the landing curve. The styles live in `globals.css` (`.landing-reveal`).
  *
- * Renderiza siempre un `div`: para envolver un `<section>` u otro landmark,
- * anidarlo adentro (`<ScrollReveal><section>…</section></ScrollReveal>`).
+ * The DOM is touched directly instead of going through React state, so
+ * arming a reveal never triggers a cascading render. A revealed node is no
+ * longer observed: it never hides again.
+ *
+ * Always renders a `div`: to wrap a `<section>` or another landmark, nest it
+ * inside (`<ScrollReveal><section>…</section></ScrollReveal>`).
  */
-
-const HIDDEN_CLASSES = ["opacity-0", "translate-y-3"];
-const VISIBLE_CLASSES = ["opacity-100", "translate-y-0"];
 
 let sharedObserver: IntersectionObserver | null = null;
 const revealCallbacks = new WeakMap<Element, () => void>();
@@ -39,7 +37,9 @@ function getSharedObserver(): IntersectionObserver | null {
         revealCallbacks.delete(entry.target);
       }
     },
-    { threshold: 0.15, rootMargin: "0px 0px -10% 0px" },
+    // The hidden state shifts the node 64 px down; a small threshold keeps
+    // tall blocks (the report example) from waiting too long to appear.
+    { threshold: 0.05, rootMargin: "0px 0px -8% 0px" },
   );
   return sharedObserver;
 }
@@ -47,11 +47,14 @@ function getSharedObserver(): IntersectionObserver | null {
 interface ScrollRevealProps {
   children: React.ReactNode;
   className?: string;
+  /** Delay of the reveal in milliseconds, to stagger sibling blocks. */
+  delay?: number;
 }
 
 export default function ScrollReveal({
   children,
   className = "",
+  delay = 0,
 }: ScrollRevealProps) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -62,36 +65,38 @@ export default function ScrollReveal({
     const prefersReducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
     ).matches;
-    if (prefersReducedMotion) return; // queda visible, sin animar
+    if (prefersReducedMotion) return; // stays visible, no animation
 
-    // Lo que ya está en pantalla al montar (el hero, con el aviso de alcance)
-    // queda visible: ocultarlo acá lo haría aparecer, desaparecer y volver.
+    // What is already on screen when mounting stays visible: hiding it here
+    // would make it appear, vanish and come back.
     if (node.getBoundingClientRect().top < window.innerHeight) return;
 
     const observer = getSharedObserver();
     if (!observer) return;
 
-    // Manipulación directa del DOM (no estado de React): oculta recién acá,
-    // como mejora progresiva, sin provocar un re-render.
-    node.classList.remove(...VISIBLE_CLASSES);
-    node.classList.add(...HIDDEN_CLASSES);
-
+    node.dataset.reveal = "hidden";
     revealCallbacks.set(node, () => {
-      node.classList.remove(...HIDDEN_CLASSES);
-      node.classList.add(...VISIBLE_CLASSES);
+      node.dataset.reveal = "shown";
     });
     observer.observe(node);
 
     return () => {
       observer.unobserve(node);
       revealCallbacks.delete(node);
+      // Never leave content hidden behind an unmounted observer.
+      if (node.dataset.reveal === "hidden") delete node.dataset.reveal;
     };
   }, []);
 
   return (
     <div
       ref={ref}
-      className={`${className} translate-y-0 opacity-100 transition-all duration-300 ease-out motion-reduce:transition-none`}
+      className={`landing-reveal ${className}`}
+      style={
+        delay > 0
+          ? ({ "--landing-delay": `${delay}ms` } as React.CSSProperties)
+          : undefined
+      }
     >
       {children}
     </div>
