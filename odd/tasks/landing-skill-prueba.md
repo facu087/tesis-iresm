@@ -80,6 +80,20 @@ Excepción: el frontend no tiene corredor de tests (`package.json` solo define
   - Sin verificar: tema oscuro, interacción del menú móvil y las animaciones
     (las capturas se tomaron con movimiento reducido).
 
+  - Commit: `665c947`.
+  - Revisión nativa (2026-10-09): riesgo medio, consentimiento otorgado, un
+    lente (fiabilidad), **aprobada** y acusada (`review-8bb3bc7c188fd81e`).
+    Hallazgos no bloqueantes, quedan como trabajo posterior:
+    1. `page.tsx:47`: `new URL(NEXT_PUBLIC_SITE_URL ?? …)` lanza si la variable
+       está vacía o sin esquema.
+    2. `landing/IslandNav.tsx:124-131`: Escape y la trampa de foco del menú
+       móvil solo funcionan mientras el foco está dentro del header.
+    3. `landing/IslandNav.tsx:75-77`: el observador lee la primera entrada del
+       lote y no la última.
+    4. El comportamiento interactivo no tiene ninguna comprobación automática.
+    - Descartado: el aviso sobre `dark:` sin enlazar a `data-theme`;
+      `globals.css:4` ya declara `@custom-variant dark` sobre ese atributo.
+
 ## Pendientes
 
 - Error de lint previo en `/report` (fuera del alcance de esta rama).
