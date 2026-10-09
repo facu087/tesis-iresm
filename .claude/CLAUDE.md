@@ -371,8 +371,15 @@ tesis-iresm/
 ├── frontend/
 │   ├── src/
 │   │   ├── app/
-│   │   │   ├── page.tsx            ← landing demostrativa (S4) — Server Component
-│   │   │   ├── globals.css         ← tokens: azul marino + ocre, tema claro/oscuro por atributo (S4)
+│   │   │   ├── page.tsx            ← landing (S4) — Server Component; compone las
+│   │   │   │                          secciones de components/landing/
+│   │   │   ├── layout.tsx          ← fuentes, tema y `metadataBase` (lib/siteUrl.ts)
+│   │   │   ├── not-found.tsx       ← 404 propio con el sistema visual nuevo (S4)
+│   │   │   ├── opengraph-image.tsx ← tarjeta para compartir generada con texto; al
+│   │   │   │                          estar en la raíz aplica a todas las rutas (S4)
+│   │   │   ├── icon.svg            ← favicon de marca (isotipo NEXUS, S4)
+│   │   │   ├── globals.css         ← tokens globales + el sistema visual nuevo,
+│   │   │   │                          acotado a la clase envoltorio `.landing` (S4)
 │   │   │   ├── analizar/
 │   │   │   │   ├── page.tsx        ← vista de carga (S4, movida desde `/`; guard de
 │   │   │   │   │                      sesión — capa de UX, no de seguridad)
@@ -384,18 +391,37 @@ tesis-iresm/
 │   │   │   ├── cuenta/page.tsx     ← estado de cuenta + reenvío tras rechazo (S4)
 │   │   │   └── admin/pendientes/page.tsx ← revisión admin de cuentas pendientes (S4)
 │   │   ├── components/
+│   │   │   ├── landing/            ← sistema visual nuevo (S4): `/`, `/registro`,
+│   │   │   │   │                      `/ingresar`, `/cuenta` y `/analizar`
+│   │   │   │   ├── styles.ts       ← clases compartidas: botones, foco, transición
+│   │   │   │   ├── IslandNav.tsx   ← navegación flotante + menú móvil accesible
+│   │   │   │   ├── AuthShell.tsx   ← marco de las pantallas de acceso y de cuenta
+│   │   │   │   ├── FormPrimitives.tsx ← campo, error y botón de envío
+│   │   │   │   ├── LandingMarkSprite.tsx, LandingMark.tsx, LandingLogo.tsx
+│   │   │   │   │                   ← el isotipo se define UNA vez (sprite) y se
+│   │   │   │   │                      reutiliza con <use>; sin el sprite no se dibuja
+│   │   │   │   ├── Hero.tsx, HeroReportTabs.tsx ← tarjeta del reporte con tres pestañas
+│   │   │   │   ├── reportExample.tsx ← fuente única de las hipótesis de ejemplo
+│   │   │   │   ├── VerificationSection.tsx, VerificationSequence.tsx
+│   │   │   │   │                   ← comparación de citas como secuencia
+│   │   │   │   ├── HowItWorksSection.tsx, PipelineDiagram.tsx ← pipeline animado
+│   │   │   │   ├── AgentsSection.tsx, AgentTiles.tsx ← fichas de los seis agentes
+│   │   │   │   └── ReportSection, TaglineReveal, FaqSection, FinalCta,
+│   │   │   │       LandingFooter, AccessCta, SectionHeading, copy.ts
 │   │   │   ├── UploadForm.tsx      ← formulario de carga PDF/texto
 │   │   │   ├── ScrollReveal.tsx    ← animación de aparición al hacer scroll (S4)
-│   │   │   ├── ReportDemo.tsx      ← vista del reporte de ejemplo (ilustrativa) de la landing (S4)
+│   │   │   ├── ReportDemo.tsx      ← reporte de ejemplo (ilustrativo) de la landing (S4)
 │   │   │   ├── BeforeAfter.tsx     ← cita declarada vs. título real de PubMed (dato real, S4)
-│   │   │   ├── DebateDiagram.tsx   ← diagrama SVG del flujo del pipeline (S4)
+│   │   │   ├── NexusLogo.tsx       ← isotipo y lockup de marca (S4), con nexus-mark-path.ts
 │   │   │   ├── ThemeToggle.tsx     ← selector claro/oscuro de la barra (S4)
 │   │   │   ├── ThemeScope.tsx      ← mantiene /report y /analyzing en claro (S4)
-│   │   │   └── icons.tsx           ← iconos SVG inline (agentes, cuentas y tema, S4)
+│   │   │   └── icons.tsx           ← iconos SVG inline de las pantallas no migradas (S4)
 │   │   └── lib/
 │   │       ├── api.ts              ← cliente HTTP al backend FastAPI (credentials: "include", S4)
 │   │       ├── types.ts            ← tipos TypeScript del reporte y de cuentas (S4)
 │   │       ├── inputStore.ts       ← estado compartido entre vistas
+│   │       ├── reportStore.ts      ← lectura del reporte guardado (useSyncExternalStore, S4)
+│   │       ├── siteUrl.ts          ← origen público validado (`NEXT_PUBLIC_SITE_URL`, S4)
 │   │       └── pipelineSteps.ts    ← pasos del pipeline (S4, fuente única landing + /analizar)
 │   ├── next.config.ts
 │   └── package.json
@@ -426,12 +452,31 @@ tesis-iresm/
 
 ### Identidad visual del frontend (S4)
 
-Azul marino institucional con acento ocre, títulos en Newsreader y cuerpo en
-Atkinson Hyperlegible, para las pantallas que usan los tokens (`/`, `/analizar`,
-`/registro`, `/ingresar`, `/cuenta`, `/admin/pendientes`). El tema claro es el
-predeterminado; el oscuro se elige con el selector de la barra (atributo
-`data-theme` en `<html>`, clave `nexus-theme` en `localStorage`). `/report` y
-`/analyzing` siguen con colores fijos claros y Geist: se migran en otra etapa.
+Conviven dos sistemas mientras se termina la migración:
+
+- **Sistema nuevo** — `/`, `/registro`, `/ingresar`, `/cuenta` y `/analizar`.
+  Geist como única tipografía (Geist Mono solo para datos), azul marino y ocre
+  como colores de marca, fondos planos, iconos Phosphor
+  (`@phosphor-icons/react`) y el isotipo NEXUS como motivo. Vive bajo la clase
+  envoltorio `.landing` de `globals.css`: toda regla nueva va ahí adentro y no
+  toca los tokens globales. Sale de aplicar la skill externa
+  `landing-page-design` (elayadesign/ai-design-skills), subordinada a tres
+  reglas del proyecto: nada de testimonios, cifras ni garantías inventadas; el
+  aviso "NEXUS no emite diagnósticos" siempre visible; y se respeta
+  `prefers-reduced-motion`. No se usan imágenes generadas: lo visual es el
+  producto (tarjeta del reporte, comparación de citas, pipeline).
+- **Sistema anterior** — `/admin/pendientes`: azul marino y ocre, títulos en
+  Newsreader y cuerpo en Atkinson Hyperlegible, sobre los tokens globales.
+- `/report` y `/analyzing` siguen con colores fijos claros y Geist: se migran
+  en otra etapa.
+
+El tema claro es el predeterminado; el oscuro se elige con el selector de la
+barra (atributo `data-theme` en `<html>`, clave `nexus-theme` en
+`localStorage`; la variante `dark:` de Tailwind está enlazada a ese atributo).
+
+El frontend no tiene corredor de tests: lo interactivo se verifica en un
+navegador sin interfaz contra el servidor de desarrollo, simulando las
+respuestas del backend.
 
 ---
 
@@ -689,6 +734,13 @@ PROVINCIAL_LICENSE_SEARCH_URL=  # Enlace al buscador de matrícula de la
                          # /admin/pendientes. Puede quedar sin definir (el de
                          # Córdoba está roto al momento de este cambio). El
                          # Buscador Nacional REFEPS no es configurable.
+
+# Frontend (se definen en frontend/.env.local)
+NEXT_PUBLIC_API_URL=http://localhost:8000  # Base del backend FastAPI.
+NEXT_PUBLIC_SITE_URL=    # Origen público del despliegue, con https://. Lo usa
+                         # frontend/src/lib/siteUrl.ts para las etiquetas de
+                         # compartir. Vacía o malformada cae a
+                         # http://localhost:3000 con un aviso, sin romper el build.
 ```
 
 ---

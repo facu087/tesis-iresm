@@ -269,18 +269,23 @@ Excepción: el frontend no tiene corredor de tests (`package.json` solo define
     ya se ven durante la carga (antes solo el texto de carga).
   - Abierto: los dos mensajes de "campo requerido" de `UploadForm` siguen
     inalcanzables porque el botón se deshabilita con el formulario vacío.
-- [ ] **T9 — `.claude/CLAUDE.md` describe el frontend actual** · ruta: en línea.
+- [x] **T9 — `.claude/CLAUDE.md` describe el frontend actual** · ruta: en línea.
+  - Árbol del frontend, sección de identidad visual (dos sistemas en
+    convivencia) y las dos variables `NEXT_PUBLIC_*`. Documentación pasiva:
+    comprobación por lectura.
 
 ## Pendientes
 
 - ~~Error de lint previo en `/report`~~: resuelto por el PR #49, que entró con
   el merge de `develop` (`21e12dc`). `npm run lint` sale 0.
 - `NEXT_PUBLIC_SITE_URL` sin definir: las etiquetas para compartir resuelven a
-  `http://localhost:3000`.
+  `http://localhost:3000` hasta que haya un dominio. La validación y el
+  `metadataBase` ya están en el layout raíz (T8).
 - ~~Favicon por defecto~~: resuelto por el PR #54 (`icon.svg`). Sigue sin
   política de privacidad ni términos.
-- `.claude/CLAUDE.md` sigue describiendo la identidad Newsreader + Atkinson; se
-  actualiza solo si la prueba se adopta.
+- ~~`.claude/CLAUDE.md` desactualizado~~: resuelto en T9.
+- `/admin/pendientes` sigue con la identidad anterior; `/analyzing` y
+  `/report` siguen pendientes de otra etapa.
 - Confirmar el CTA "Solicitar acceso" → `/registro`.
 
 ## Entrega
