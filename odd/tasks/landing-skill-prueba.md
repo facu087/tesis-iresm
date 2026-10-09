@@ -197,6 +197,24 @@ Excepción: el frontend no tiene corredor de tests (`package.json` solo define
     cero si la lista tuviera una sola etapa (hoy tiene ocho).
   - Sin verificar: el alta y el ingreso contra el backend real.
 
+- [x] **T6 — Hero interactivo** · ruta: delegada.
+  - La tarjeta del reporte del hero pasa a tener tres pestañas (respaldada,
+    pendiente, especulativa) con las tres hipótesis del reporte de ejemplo;
+    al cambiar se ven el nivel de evidencia y el estado de la cita.
+  - Sin texto nuevo: reutiliza el contenido de `ReportDemo.tsx`.
+  - Observado (escritor): `tsc`, lint y build salen 0. En navegador, ambos
+    temas a 1280 y 390 px: una sola pestaña seleccionada al cargar; clic y
+    teclado (flechas con vuelta, Inicio, Fin) cambian hipótesis, nivel y
+    estado; sin desplazamiento (botón del hero en 442,5 px y tarjeta de 481 px
+    en las tres pestañas a 1280); sin desborde ni errores de consola; sin
+    JavaScript se ve la primera hipótesis.
+  - Repetido por el orquestador: `tsc` sale 0; capturas de "Respaldada" y
+    "Especulativa" en claro revisadas.
+  - Única cadena nueva: el nombre accesible de las pestañas, "Estado de la
+    hipótesis". Palabras en el HTML: 961 (las dos hipótesis ocultas del hero).
+  - Abierto: las pestañas "Pendiente" y "Especulativa" dejan espacio vacío
+    abajo, porque el alto se reserva para la más larga.
+
 ## Pendientes
 
 - ~~Error de lint previo en `/report`~~: resuelto por el PR #49, que entró con

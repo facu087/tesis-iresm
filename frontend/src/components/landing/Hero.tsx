@@ -8,6 +8,7 @@ import { CONTAINER } from "@/components/landing/styles";
  * Hero: outcome headline, a one sentence subheadline, the single primary
  * action and the scope notice, beside the product itself: one hypothesis card
  * of the example report, built in code and marked as an illustrative example.
+ * Its tabs switch between a backed, a pending and a speculative hypothesis.
  * Behind that card sits the NEXUS mark as a faint watermark: decorative, wide
  * screens only. It starts at the left edge of the card and runs off to the
  * right, where the section clips it, so it never sits under the text column.

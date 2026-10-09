@@ -336,6 +336,24 @@ body {
       opacity: 1;
     }
   }
+
+  /* Hero report tabs (see landing/HeroReportTabs.tsx). The panels share one
+     grid cell, so the card keeps the height of the tallest one. A panel
+     leaves at once; the transition lives on the selected state, which eases
+     in. */
+  .landing-hero-panel {
+    grid-area: 1 / 1;
+  }
+  .landing-hero-panel[data-selected="false"] {
+    visibility: hidden;
+    opacity: 0;
+    translate: 0 0.5rem;
+  }
+  .landing-hero-panel[data-selected="true"] {
+    transition:
+      opacity 500ms var(--landing-ease),
+      translate 500ms var(--landing-ease);
+  }
 }
 
 /* Without JavaScript a tap cannot pin a tile: show every description under
@@ -349,6 +367,10 @@ body {
     opacity: 1;
   }
   .landing .landing-agent-toggle {
+    display: none;
+  }
+  /* The hero tabs cannot switch either: the card shows its first hypothesis. */
+  .landing .landing-hero-tabs {
     display: none;
   }
 }
