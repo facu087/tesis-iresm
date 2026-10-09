@@ -422,10 +422,24 @@ body {
    `visibility` keeps its box, so the pill does not change width twice, and
    takes the link out of the tab order. Without JavaScript the session never
    resolves and the link stays visible. Unlayered for the same reason as the
-   blocks above. */
+   blocks above.
+
+   Failsafe: scripting can be enabled and the script still never run (a chunk
+   that fails to load, an error during hydration). The delayed keyframe brings
+   the link back without JavaScript, after the 4 s the provider waits at most.
+   It is an instant switch, not motion, so it is kept under reduced motion:
+   `!important` plus the higher specificity beat the blanket `animation: none`
+   below. */
 @media (scripting: enabled) {
   .landing [data-session-pending] {
     visibility: hidden;
+    animation: landing-session-failsafe 0s linear 6s forwards !important;
+  }
+}
+
+@keyframes landing-session-failsafe {
+  to {
+    visibility: visible;
   }
 }
 

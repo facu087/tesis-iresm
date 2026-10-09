@@ -94,6 +94,27 @@ sobre el #58.
   había señalado como duplicado.
 - Para un admin, `/cuenta` muestra solo la tarjeta de administrador.
 
+## Revisión nativa
+
+Commit `0e742bc`: riesgo medio, consentida, **aprobada y acusada**
+(linaje `review-46232e28d7fc4f3d`). Hallazgos, ninguno bloqueante:
+
+- Corregido: vencido el tope de 4 s la sesión quedaba fija como anónima y una
+  respuesta tardía se descartaba. Ahora el tope solo corta la espera y la
+  respuesta tardía se aplica. Comprobado con el backend demorado 6 s: "Ingresar"
+  a los 4,8 s y el nombre al llegar la respuesta.
+- Corregido: con JavaScript habilitado pero sin ejecutarse (un script que no
+  carga), "Ingresar" quedaba oculto para siempre. Se agregó un respaldo en CSS
+  que lo muestra a los 6 s, también con movimiento reducido. Comprobado
+  bloqueando todos los scripts.
+- Corregido: la acción "Analizar un caso" exige rol `medico` además de estado
+  `verificado`, igual que la guarda de `/analizar`.
+- Abierto: no hay pruebas repetibles; el recorrido de navegador no está en el
+  repositorio porque el frontend no tiene corredor de tests.
+
+Después de los arreglos: recorrido 24 de 24, tipos, lint y build sin errores.
+El commit de los arreglos no pasó por revisión nativa.
+
 ## Pendientes
 
 - La sesión se consulta al montar: una página restaurada desde la caché de

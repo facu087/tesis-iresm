@@ -13,9 +13,11 @@ import type { CuentaEstado } from "@/lib/types";
  * to `/` the provider mounts again and asks again, so a stale session is never
  * shown. The account lives in memory only, never in web storage.
  *
- * The request races a timeout: a slow backend, a failed request and a missing
- * session all resolve to `anonymous`, which is also what the server renders
- * and what the page shows without JavaScript.
+ * A failed request and a missing session resolve to `anonymous`, which is also
+ * what the server renders and what the page shows without JavaScript. A slow
+ * backend does too, after a timeout, so the page is not left waiting; if the
+ * account still arrives later it is applied, so a signed in user never stays
+ * shown as a visitor.
  */
 
 export interface LandingSessionState {
@@ -23,7 +25,7 @@ export interface LandingSessionState {
   cuenta: CuentaEstado | null;
 }
 
-/** Longest the landing waits for the session before treating it as absent. */
+/** Longest the landing waits for the session before showing it as absent. */
 const SESSION_TIMEOUT_MS = 4000;
 
 const LOADING: LandingSessionState = { status: "loading", cuenta: null };
@@ -37,12 +39,12 @@ export function LandingSessionProvider({ children }: { children: React.ReactNode
 
   useEffect(() => {
     let mounted = true;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const timeout = new Promise<null>((resolve) => {
-      timer = setTimeout(() => resolve(null), SESSION_TIMEOUT_MS);
-    });
+    // The timeout only stops the wait: it never overrides an answer.
+    const timer = setTimeout(() => {
+      if (mounted) setSession((current) => (current.status === "loading" ? ANONYMOUS : current));
+    }, SESSION_TIMEOUT_MS);
 
-    Promise.race([obtenerCuenta(), timeout])
+    obtenerCuenta()
       .catch(() => null)
       .then((cuenta) => {
         clearTimeout(timer);
@@ -90,7 +92,7 @@ export function primaryActionFor(cuenta: CuentaEstado | null): PrimaryAction {
   if (cuenta.rol === "admin") {
     return { label: "Cuentas pendientes", href: "/admin/pendientes", showHint: false };
   }
-  if (cuenta.estado === "verificado") {
+  if (cuenta.rol === "medico" && cuenta.estado === "verificado") {
     return { label: "Analizar un caso", href: "/analizar", showHint: false };
   }
   return { label: "Ver mi cuenta", href: "/cuenta", showHint: false };
