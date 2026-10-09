@@ -2,15 +2,19 @@
 
 import { Suspense, useState } from "react";
 import Link from "next/link";
-import ThemeToggle from "@/components/ThemeToggle";
 import { useRouter, useSearchParams } from "next/navigation";
+import { LockIcon } from "@phosphor-icons/react/ssr";
 import { login } from "@/lib/api";
-import { LockIcon } from "@/components/icons";
-import BrandLockup from "@/components/NexusLogo";
+import AuthShell from "@/components/landing/AuthShell";
+import {
+  FORM_CARD,
+  FormError,
+  FormField,
+  SubmitButton,
+} from "@/components/landing/FormPrimitives";
+import { TEXT_LINK } from "@/components/landing/styles";
 
-const inputClass =
-  "w-full rounded-lg border border-fg-muted bg-bg px-3.5 py-2.5 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-accent";
-const labelClass = "mb-1.5 block text-sm font-medium text-fg";
+const ERROR_ID = "ingresar-error";
 
 function IngresarForm() {
   const router = useRouter();
@@ -37,63 +41,44 @@ function IngresarForm() {
   };
 
   return (
-    <div className="mx-auto max-w-md px-6 py-14">
-      <div className="mb-8 flex items-center gap-3">
-        <LockIcon className="h-7 w-7" />
-        <h1 className="font-serif text-2xl font-semibold">Ingresar</h1>
-      </div>
-
+    <div className="flex max-w-md flex-col gap-6">
       {recienRegistrado && (
-        <p className="mb-6 rounded-lg border border-border bg-bg-subtle px-4 py-3 text-sm text-fg-muted">
-          Tu cuenta fue creada y quedó <strong className="text-fg">pendiente de revisión</strong>.
+        <p className="rounded-2xl border border-border bg-bg-subtle p-4 text-sm text-pretty text-fg-muted">
+          Tu cuenta fue creada y quedó <strong className="font-semibold text-fg">pendiente de revisión</strong>.
           Iniciá sesión para ver su estado.
         </p>
       )}
 
-      <form onSubmit={handleSubmit} noValidate className="space-y-5 rounded-2xl border border-border bg-bg-subtle p-8">
-        <div>
-          <label htmlFor="email" className={labelClass}>Email institucional</label>
-          <input
-            id="email"
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className={inputClass}
-            autoComplete="email"
-          />
-        </div>
+      <form onSubmit={handleSubmit} noValidate className={FORM_CARD}>
+        <FormField
+          id="email"
+          label="Email institucional"
+          type="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          autoComplete="email"
+        />
 
-        <div>
-          <label htmlFor="password" className={labelClass}>Contraseña</label>
-          <input
-            id="password"
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className={inputClass}
-            autoComplete="current-password"
-          />
-        </div>
+        <FormField
+          id="password"
+          label="Contraseña"
+          type="password"
+          required
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          autoComplete="current-password"
+        />
 
-        {error && (
-          <p role="alert" className="rounded-lg border border-red-600/30 bg-red-600/10 px-4 py-2 text-sm text-red-700 dark:text-red-400">
-            {error}
-          </p>
-        )}
+        {error && <FormError id={ERROR_ID}>{error}</FormError>}
 
-        <button
-          type="submit"
-          disabled={enviando}
-          className="w-full cursor-pointer rounded-xl bg-accent py-3 font-semibold text-accent-fg transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-60"
-        >
+        <SubmitButton pending={enviando} describedBy={error ? ERROR_ID : undefined}>
           {enviando ? "Ingresando..." : "Ingresar"}
-        </button>
+        </SubmitButton>
 
         <p className="text-center text-sm text-fg-muted">
           ¿No tenés cuenta?{" "}
-          <Link href="/registro" className="cursor-pointer font-medium text-fg underline underline-offset-2">
+          <Link href="/registro" className={TEXT_LINK}>
             Registrate
           </Link>
         </p>
@@ -104,23 +89,14 @@ function IngresarForm() {
 
 export default function IngresarPage() {
   return (
-    <div className="flex min-h-screen font-body flex-col bg-bg text-fg">
-      <header className="border-b border-border">
-        <div className="mx-auto flex max-w-md items-center justify-between px-6 py-5">
-          <Link
-            href="/"
-            className="cursor-pointer rounded-sm font-serif text-lg font-semibold tracking-tight text-accent transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
-          >
-            <BrandLockup />
-          </Link>
-          <ThemeToggle />
-        </div>
-      </header>
-      <main className="flex-1">
-        <Suspense fallback={null}>
-          <IngresarForm />
-        </Suspense>
-      </main>
-    </div>
+    <AuthShell
+      headerLink={{ href: "/registro", label: "Solicitar acceso" }}
+      icon={<LockIcon aria-hidden="true" weight="bold" className="size-6" />}
+      title="Ingresar"
+    >
+      <Suspense fallback={null}>
+        <IngresarForm />
+      </Suspense>
+    </AuthShell>
   );
 }

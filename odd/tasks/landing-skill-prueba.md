@@ -163,6 +163,27 @@ Excepción: el frontend no tiene corredor de tests (`package.json` solo define
     revisión debida. Los commits propios posteriores al merge quedan sin
     revisión nativa; los de `develop` se revisaron en sus PR.
 
+- [x] **T5 — `/registro` e `/ingresar` con el sistema visual de la landing** ·
+  ruta: delegada.
+  - Motivo (usuario, 2026-10-09): "Solicitar acceso" saca al médico de la
+    landing nueva y lo deja en una pantalla con la identidad anterior.
+  - Amplía el alcance original (solo `/`) a esas dos rutas. Solo presentación:
+    la lógica de los formularios, las llamadas al backend y el texto del
+    consentimiento Ley 25.326 no cambian.
+  - Fuera de alcance: `/cuenta`, `/admin/pendientes`, `/analizar`.
+  - Observado (escritor): `tsc`, `npm run lint` y `npm run build` salen 0;
+    las 21 cadenas de registro y las 12 de ingresar siguen presentes;
+    `src/lib` sin diferencias; mismas llamadas (`registrarMedico`, `login`) y
+    mismas redirecciones; sin desborde ni errores de consola en ambos temas a
+    1280 y 390 px. Con el backend caído, `/ingresar` muestra el error en línea.
+  - Repetido por el orquestador: `tsc` sale 0; `lib`, `cuenta`, `admin` y
+    `analizar` sin diferencias; capturas de registro (claro) e ingresar
+    (oscuro) revisadas.
+  - Cambios de texto: "Ya tengo cuenta — Ingresar" pasó de la cabecera a
+    debajo del botón; se agregaron los enlaces de la píldora y "Saltar al
+    contenido".
+  - Sin verificar: el alta y el ingreso reales (backend apagado).
+
 ## Pendientes
 
 - ~~Error de lint previo en `/report`~~: resuelto por el PR #49, que entró con

@@ -106,7 +106,8 @@ body {
 
 /* ── Landing scope ─────────────────────────────────────────────────────────
  *
- * Visual system of the public landing (`/`) and the branded 404. Everything
+ * Visual system of the public landing (`/`), the branded 404 and the access
+ * pages (`/registro`, `/ingresar`). Everything
  * below is scoped to the `.landing` wrapper, so the other routes keep the
  * tokens defined above untouched. The wrapper redefines the semantic tokens
  * for its own subtree: the Tailwind utilities (`bg-bg`, `text-fg`, …) resolve
