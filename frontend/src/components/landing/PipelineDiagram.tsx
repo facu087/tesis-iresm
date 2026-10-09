@@ -20,6 +20,12 @@ import { PIPELINE_STEPS } from "@/lib/pipelineSteps";
  * `globals.css`) and one `IntersectionObserver` lights each stage when it
  * crosses the trigger line. Progress only moves forward: a lit stage never
  * dims again, and lighting a stage lights every stage before it.
+ *
+ * The drawing borrows the vocabulary of the NEXUS mark: round filled nodes
+ * that alternate between two columns, joined by a thick stroke that curves
+ * from one to the next. Lit, the column runs through the gradient of the mark
+ * from the first stage to the last: each link fades between the tints of the
+ * two nodes it joins (`--landing-stage-from` and `--landing-stage-to`).
  */
 
 /** Short line and agents per stage, keyed by the shared step `id`. */
@@ -40,6 +46,66 @@ const TRIGGER_MARGIN = "0px 0px -25% 0px";
 /** Display form of a shared step label: the dash becomes a colon. */
 function displayLabel(label: string): string {
   return label.replace(" — ", ": ");
+}
+
+/** Horizontal centre of a node in the 64 px rail: left column or right one. */
+const NODE_CENTER = { left: 20, right: 44 } as const;
+
+/** Position of a stage along the gradient, as the tints of its node and link. */
+function stagePosition(index: number, lastIndex: number): React.CSSProperties {
+  const percent = (position: number) => `${Math.round((position / lastIndex) * 100)}%`;
+  return {
+    "--landing-stage-from": percent(index),
+    "--landing-stage-to": percent(Math.min(index + 1, lastIndex)),
+  } as React.CSSProperties;
+}
+
+/**
+ * Curved stroke from the centre of a node to the centre of the next one.
+ *
+ * It is as tall as the stage and starts half a node down, which is exactly
+ * centre to centre; stretched like that, the stroke keeps its width with
+ * `vector-effect`. The page draws it twice: a neutral track and, on top, the
+ * lit stroke painted with the gradient, which `globals.css` unveils downwards.
+ */
+function StageLink({
+  id,
+  fromOffset,
+  lit = false,
+}: {
+  id: string;
+  fromOffset: boolean;
+  lit?: boolean;
+}) {
+  const from = fromOffset ? NODE_CENTER.right : NODE_CENTER.left;
+  const to = fromOffset ? NODE_CENTER.left : NODE_CENTER.right;
+  const gradientId = `landing-pipeline-link-${id}`;
+  return (
+    <svg
+      aria-hidden="true"
+      focusable="false"
+      viewBox="0 0 64 100"
+      preserveAspectRatio="none"
+      className={`absolute top-5 left-0 h-full w-16 ${lit ? "landing-pipeline-link-lit" : "landing-pipeline-link"}`}
+    >
+      {lit && (
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" className="landing-pipeline-stop-from" />
+            <stop offset="1" className="landing-pipeline-stop-to" />
+          </linearGradient>
+        </defs>
+      )}
+      <path
+        d={`M${from} 0 C${from} 50 ${to} 50 ${to} 100`}
+        fill="none"
+        stroke={lit ? `url(#${gradientId})` : "currentColor"}
+        strokeWidth="6"
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  );
 }
 
 export default function PipelineDiagram() {
@@ -87,26 +153,30 @@ export default function PipelineDiagram() {
     };
   }, []);
 
+  const lastIndex = PIPELINE_STEPS.length - 1;
+
   return (
     <ol ref={ref} className="landing-pipeline">
       {PIPELINE_STEPS.map((step, index) => {
         const detail = STAGE_DETAILS[step.id];
-        const isLast = index === PIPELINE_STEPS.length - 1;
+        const isLast = index === lastIndex;
+        const isOffset = index % 2 === 1;
         return (
           <li
             key={step.id}
             data-stage
-            className={`relative grid grid-cols-[auto_1fr] gap-4 ${isLast ? "" : "pb-8"}`}
+            style={stagePosition(index, lastIndex)}
+            className={`relative grid grid-cols-[4rem_1fr] gap-4 ${isLast ? "" : "pb-8"}`}
           >
             {!isLast && (
-              <span
-                aria-hidden="true"
-                className="landing-pipeline-link absolute top-10 bottom-0 left-5 w-0.5 -translate-x-1/2"
-              />
+              <>
+                <StageLink id={step.id} fromOffset={isOffset} />
+                <StageLink id={step.id} fromOffset={isOffset} lit />
+              </>
             )}
             <span
               aria-hidden="true"
-              className="landing-pipeline-node relative flex size-10 items-center justify-center rounded-full border-2 font-mono text-sm font-semibold"
+              className={`landing-pipeline-node relative flex size-10 items-center justify-center rounded-full border-2 font-mono text-sm font-semibold ${isOffset ? "ml-6" : ""}`}
             >
               {step.id}
             </span>

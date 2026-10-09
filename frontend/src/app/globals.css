@@ -140,6 +140,14 @@ body {
 
   --landing-hero-from: #000000;
   --landing-hero-to: #666666;
+
+  /* Gradient of the logo mark where the landing draws it (LandingMark). */
+  --landing-mark-from: var(--color-accent);
+  --landing-mark-to: #6e8bb0;
+  /* Same gradient on the pipeline. The light end is deeper here so the stage
+     numbers keep AA contrast on the last nodes. */
+  --landing-pipeline-from: var(--color-accent);
+  --landing-pipeline-to: #4a6fa1;
 }
 
 :root[data-theme="dark"] .landing {
@@ -161,6 +169,9 @@ body {
 
   --landing-hero-from: #ffffff;
   --landing-hero-to: #9b9b9b;
+
+  --landing-mark-to: #dbe8f8;
+  --landing-pipeline-to: #dbe8f8;
 }
 
 /* The logo mark fades from the accent to this token; in the landing's dark
@@ -226,10 +237,17 @@ body {
 
   /* Pipeline diagram (see landing/PipelineDiagram.tsx). Every stage is lit by
      default; stages are dimmed only once the component has enhanced the list,
-     then light up in order. The link below a node fills towards the next. */
+     then light up in order. Lit, a node takes the tint of its position along
+     the gradient of the mark and the stroke below it fades to the next tint,
+     unveiled from the node downwards. */
   .landing-pipeline-node {
-    border-color: var(--color-accent);
-    background-color: var(--color-accent);
+    --landing-pipeline-tint: color-mix(
+      in srgb,
+      var(--landing-pipeline-from),
+      var(--landing-pipeline-to) var(--landing-stage-from)
+    );
+    border-color: var(--landing-pipeline-tint);
+    background-color: var(--landing-pipeline-tint);
     color: var(--color-accent-fg);
     transition:
       background-color 700ms var(--landing-ease),
@@ -237,15 +255,25 @@ body {
       color 700ms var(--landing-ease);
   }
   .landing-pipeline-link {
-    background-color: var(--color-border);
+    color: var(--color-border);
   }
-  .landing-pipeline-link::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background-color: var(--color-accent);
-    transform-origin: top;
-    transition: scale 700ms var(--landing-ease) 200ms;
+  .landing-pipeline-link-lit {
+    clip-path: inset(0);
+    transition: clip-path 700ms var(--landing-ease) 200ms;
+  }
+  .landing-pipeline-stop-from {
+    stop-color: color-mix(
+      in srgb,
+      var(--landing-pipeline-from),
+      var(--landing-pipeline-to) var(--landing-stage-from)
+    );
+  }
+  .landing-pipeline-stop-to {
+    stop-color: color-mix(
+      in srgb,
+      var(--landing-pipeline-from),
+      var(--landing-pipeline-to) var(--landing-stage-to)
+    );
   }
   .landing-pipeline-body {
     transition: opacity 700ms var(--landing-ease);
@@ -256,11 +284,31 @@ body {
       background-color: var(--color-surface);
       color: var(--color-fg-muted);
     }
-    .landing-pipeline-link::after {
-      scale: 1 0;
+    .landing-pipeline-link-lit {
+      clip-path: inset(0 0 100% 0);
     }
     .landing-pipeline-body {
       opacity: 0.4;
+    }
+  }
+
+  /* The mark as a motif (see landing/LandingMark.tsx). Behind the hero card
+     it is a faint watermark; inside the navy closing card it is repainted
+     with the tokens of that surface. Both stay well below the text content. */
+  .landing-hero-mark {
+    opacity: 0.1;
+  }
+  .landing-cta-mark {
+    --landing-mark-from: var(--color-brand-line);
+    --landing-mark-to: var(--color-brand-fg);
+    opacity: 0.16;
+  }
+  :root[data-theme="dark"] .landing .landing-cta-mark {
+    --landing-mark-from: var(--color-brand-btn);
+  }
+  @media (width >= 64rem) {
+    .landing-cta-mark {
+      opacity: 0.32;
     }
   }
 

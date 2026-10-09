@@ -1,5 +1,6 @@
 import { ReportSnippet } from "@/components/ReportDemo";
 import AccessCta from "@/components/landing/AccessCta";
+import LandingMark from "@/components/landing/LandingMark";
 import { HERO_HEADLINE_LINES, SCOPE_NOTICE } from "@/components/landing/copy";
 import { CONTAINER } from "@/components/landing/styles";
 
@@ -7,6 +8,9 @@ import { CONTAINER } from "@/components/landing/styles";
  * Hero: outcome headline, a one sentence subheadline, the single primary
  * action and the scope notice, beside the product itself: one hypothesis card
  * of the example report, built in code and marked as an illustrative example.
+ * Behind that card sits the NEXUS mark as a faint watermark: decorative, wide
+ * screens only. It starts at the left edge of the card and runs off to the
+ * right, where the section clips it, so it never sits under the text column.
  *
  * The blocks rise in with a CSS only entrance (`.landing-rise`), so they end
  * visible without JavaScript and stay static under reduced motion.
@@ -21,7 +25,7 @@ function rise(delayMs: number): React.CSSProperties {
 
 export default function Hero() {
   return (
-    <section aria-labelledby="hero-heading" className="bg-bg pt-24">
+    <section aria-labelledby="hero-heading" className="overflow-x-clip bg-bg pt-24">
       <div
         className={`${CONTAINER} grid gap-12 pt-10 pb-16 lg:grid-cols-12 lg:items-center lg:gap-8 lg:pb-24`}
       >
@@ -60,8 +64,16 @@ export default function Hero() {
           </p>
         </div>
 
-        <div className="landing-rise lg:col-span-5" style={rise(160)}>
-          <ReportSnippet />
+        <div className="landing-rise relative lg:col-span-5" style={rise(160)}>
+          <div
+            aria-hidden="true"
+            className="landing-hero-mark pointer-events-none absolute -inset-y-24 left-0 hidden lg:block"
+          >
+            <LandingMark className="block h-full w-auto max-w-none" />
+          </div>
+          <div className="relative">
+            <ReportSnippet />
+          </div>
         </div>
       </div>
     </section>

@@ -181,7 +181,7 @@ export default function IslandNav({ links, heroActionId }: IslandNavProps) {
           aria-label="NEXUS, inicio"
           className={`inline-flex items-center rounded-full px-3 py-2 text-base font-bold text-accent ${TRANSITION} hover:opacity-80 active:translate-y-px ${FOCUS_RING}`}
         >
-          <LandingLogo />
+          <LandingLogo fromSprite />
         </Link>
 
         <nav aria-label="Principal" className="hidden items-center lg:flex">

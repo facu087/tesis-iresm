@@ -6,6 +6,7 @@ import Hero, { HERO_ACTION_ID } from "@/components/landing/Hero";
 import HowItWorksSection from "@/components/landing/HowItWorksSection";
 import IslandNav, { type NavLink } from "@/components/landing/IslandNav";
 import LandingFooter from "@/components/landing/LandingFooter";
+import LandingMarkSprite from "@/components/landing/LandingMarkSprite";
 import ReportSection from "@/components/landing/ReportSection";
 import TaglineReveal from "@/components/landing/TaglineReveal";
 import VerificationSection from "@/components/landing/VerificationSection";
@@ -111,6 +112,8 @@ export default function LandingPage() {
       >
         Saltar al contenido
       </a>
+
+      <LandingMarkSprite />
 
       <IslandNav links={NAV_LINKS} heroActionId={HERO_ACTION_ID} />
 

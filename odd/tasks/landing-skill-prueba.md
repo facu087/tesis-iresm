@@ -138,6 +138,22 @@ Excepción: el frontend no tiene corredor de tests (`package.json` solo define
     - Abierto: sin pruebas automáticas de interacción; tarjeta para compartir
       en la raíz sin `metadataBase` fuera de `/`.
 
+- [x] **T4 — El logo como motivo de la landing** · ruta: delegada.
+  - Pedido del usuario (2026-10-09) tras integrar el logo del PR #54.
+  - Isotipo tenue detrás de la tarjeta del hero (oculto bajo `lg`), pipeline
+    redibujado con nodos y trazo curvo que se encienden con el degradé, e
+    isotipo dentro de la tarjeta del CTA final.
+  - El trazado se define una vez (`LandingMarkSprite`) y se reutiliza con
+    `<use>`. Observado: 1 aparición del trazado en el HTML servido.
+  - Observado (escritor): `tsc`, `npm run lint` y `npm run build` salen 0;
+    sin desborde horizontal ni errores de consola en claro y oscuro a 1280 y
+    390 px; el pipeline enciende 0 → 2 → 6 → 8 etapas al hacer scroll.
+  - Repetido por el orquestador: `tsc` sale 0; capturas del hero y del
+    pipeline en claro y del CTA en oscuro revisadas.
+  - Abierto: en pantallas chicas el isotipo del CTA queda detrás del texto al
+    16 % de opacidad; el extremo claro del pipeline usa `#4a6fa1` y no el
+    `#6e8bb0` del logo, por contraste de los números.
+
 ## Pendientes
 
 - ~~Error de lint previo en `/report`~~: resuelto por el PR #49, que entró con
