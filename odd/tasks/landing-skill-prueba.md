@@ -182,7 +182,20 @@ Excepción: el frontend no tiene corredor de tests (`package.json` solo define
   - Cambios de texto: "Ya tengo cuenta — Ingresar" pasó de la cabecera a
     debajo del botón; se agregaron los enlaces de la píldora y "Saltar al
     contenido".
-  - Sin verificar: el alta y el ingreso reales (backend apagado).
+  - Commit: `30e604d`. Revisión nativa del tramo `21e12dc..30e604d` (todo lo
+    posterior al merge, 907 líneas): riesgo medio, consentimiento otorgado,
+    **aprobada** y acusada (`review-119a7b3dd99e6e04`).
+  - Hallazgo 1 (cableado de formularios sin prueba), comprobado después en un
+    navegador con las respuestas del backend simuladas:
+    - `/registro` no envía sin el consentimiento marcado; con él, manda las
+      nueve claves de `RegistroMedicoPayload` con los valores cargados y
+      redirige a `/ingresar?registrado=1`.
+    - `/ingresar` manda `email` y `password`; ante un 401 muestra el `detail`
+      en línea y se queda en la página; ante un 200 redirige a `/cuenta`.
+  - Hallazgos abiertos: `LandingMark` no dibuja nada si la página no incluye
+    `LandingMarkSprite`, y nada lo avisa; `PipelineDiagram.tsx:56` divide por
+    cero si la lista tuviera una sola etapa (hoy tiene ocho).
+  - Sin verificar: el alta y el ingreso contra el backend real.
 
 ## Pendientes
 
