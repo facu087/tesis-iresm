@@ -226,6 +226,27 @@ Excepción: el frontend no tiene corredor de tests (`package.json` solo define
       `.landing` ya anula las transiciones.
     - Abierto: sin pruebas automáticas de las pestañas.
 
+- [x] **T7 — La verificación como secuencia** · ruta: delegada.
+  - Al entrar en pantalla, la comparación de citas se reproduce en tres
+    tiempos: el título citado, la consulta a PubMed y el título real con el
+    veredicto "no coincide". Se reproduce una vez; hay un control para verla
+    de nuevo.
+  - Sin texto nuevo salvo el control de repetición y un estado de consulta;
+    los títulos y la nota de medición quedan literales.
+  - Observado (escritor): `tsc`, lint y build salen 0; las 12 cadenas
+    protegidas siguen literales. En navegador: no arranca antes del scroll;
+    pasa por citado (0 ms), consulta (800), resultado (1900) y veredicto
+    (2600), 3197 ms en total; no se repite al volver a pasar; "Ver de nuevo"
+    la reinicia con clic y con teclado; dos clics seguidos dejan una sola
+    corrida; alto del bloque idéntico en todos los muestreos (355 px a 1280,
+    628 px a 390); con movimiento reducido o sin JavaScript se ve el estado
+    final de entrada.
+  - Repetido por el orquestador: `tsc` sale 0; capturas de la consulta y del
+    estado final en claro revisadas.
+  - Cadenas nuevas: "Ver de nuevo" y "Consultando PubMed".
+  - Abierto: al recargar con la sección ya en pantalla se ve un instante el
+    estado final antes de que arranque la secuencia.
+
 ## Pendientes
 
 - ~~Error de lint previo en `/report`~~: resuelto por el PR #49, que entró con
