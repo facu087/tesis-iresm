@@ -163,6 +163,15 @@ body {
   --landing-hero-to: #9b9b9b;
 }
 
+/* The logo mark fades from the accent to this token; in the landing's dark
+   theme the inherited value is a border grey, so the mark gets its own stop. */
+.landing .landing-logo {
+  --color-brand-line: #6e8bb0;
+}
+:root[data-theme="dark"] .landing .landing-logo {
+  --color-brand-line: #dbe8f8;
+}
+
 /* Anchored sections stop below the floating navigation pill. */
 .landing section[id] {
   scroll-margin-top: 6rem;

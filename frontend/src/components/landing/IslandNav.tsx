@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import BrandLockup from "@/components/NexusLogo";
+import LandingLogo from "@/components/landing/LandingLogo";
 import ThemeToggle from "@/components/ThemeToggle";
 import {
   EASE,
@@ -181,7 +181,7 @@ export default function IslandNav({ links, heroActionId }: IslandNavProps) {
           aria-label="NEXUS, inicio"
           className={`rounded-full px-3 py-2 text-base font-bold text-accent ${TRANSITION} hover:opacity-80 active:translate-y-px ${FOCUS_RING}`}
         >
-          <BrandLockup />
+          <LandingLogo />
         </Link>
 
         <nav aria-label="Principal" className="hidden items-center lg:flex">
