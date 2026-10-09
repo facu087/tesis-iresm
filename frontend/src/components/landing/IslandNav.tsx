@@ -72,8 +72,11 @@ export default function IslandNav({ links, heroActionId }: IslandNavProps) {
   useEffect(() => {
     const heroAction = document.getElementById(heroActionId);
     if (!heroAction) return;
-    const observer = new IntersectionObserver(([entry]) => {
-      setHeroActionVisible(entry.isIntersecting);
+    // A batch can queue several records for the same target: the last one is
+    // the current state.
+    const observer = new IntersectionObserver((entries) => {
+      const latest = entries[entries.length - 1];
+      if (latest) setHeroActionVisible(latest.isIntersecting);
     });
     observer.observe(heroAction);
     return () => observer.disconnect();
@@ -100,8 +103,9 @@ export default function IslandNav({ links, heroActionId }: IslandNavProps) {
     return () => observer.disconnect();
   }, [links]);
 
-  // While the overlay is open: lock page scroll, move focus into the menu and
-  // close it if the viewport grows into the desktop layout.
+  // While the overlay is open: lock page scroll, move focus into the menu,
+  // handle Escape and the focus trap, and close it if the viewport grows into
+  // the desktop layout.
   useEffect(() => {
     if (!open) return;
 
@@ -115,48 +119,55 @@ export default function IslandNav({ links, heroActionId }: IslandNavProps) {
     };
     desktop.addEventListener("change", onChange);
 
+    // Listened on the document, not on the header: a tap on an empty area of
+    // the overlay moves focus to the body, and the keys must keep working.
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        close(true);
+        return;
+      }
+      const header = headerRef.current;
+      if (event.key !== "Tab" || !header) return;
+
+      // Focus trap: cycle through what is focusable and rendered in the header.
+      const focusable = Array.from(
+        header.querySelectorAll<HTMLElement>("a[href], button"),
+      ).filter(
+        (element) =>
+          element.closest("[inert]") === null && element.getClientRects().length > 0,
+      );
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      if (!header.contains(active)) {
+        // Focus escaped the menu: bring it back in.
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+
     return () => {
       document.body.style.overflow = previousOverflow;
       desktop.removeEventListener("change", onChange);
+      document.removeEventListener("keydown", onKeyDown);
     };
-  }, [open]);
-
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
-    if (!open) return;
-
-    if (event.key === "Escape") {
-      event.preventDefault();
-      close(true);
-      return;
-    }
-    if (event.key !== "Tab" || !headerRef.current) return;
-
-    // Focus trap: cycle through what is focusable and rendered in the header.
-    const focusable = Array.from(
-      headerRef.current.querySelectorAll<HTMLElement>("a[href], button"),
-    ).filter(
-      (element) =>
-        element.closest("[inert]") === null && element.getClientRects().length > 0,
-    );
-    if (focusable.length === 0) return;
-
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  };
+  }, [open, close]);
 
   const showPillAction = !heroActionVisible;
 
   return (
     <header
       ref={headerRef}
-      onKeyDown={handleKeyDown}
       className="pointer-events-none fixed inset-x-0 top-0 z-50 px-4"
     >
       {/* Closed state: floating glass pill */}

@@ -94,6 +94,19 @@ Excepción: el frontend no tiene corredor de tests (`package.json` solo define
     - Descartado: el aviso sobre `dark:` sin enlazar a `data-theme`;
       `globals.css:4` ya declara `@custom-variant dark` sobre ese atributo.
 
+- [x] **T2 — Hallazgos 1 a 3 de la revisión** · ruta: en línea (un archivo no
+  trivial, `IslandNav.tsx`, más dos ediciones mecánicas).
+  - `page.tsx`: `resolveSiteUrl()` cae al origen local si la variable está
+    vacía o no es una URL http(s). Observado: `npm run build` termina bien con
+    `NEXT_PUBLIC_SITE_URL=` y con `NEXT_PUBLIC_SITE_URL=sin-esquema` (este
+    último imprime el aviso).
+  - `IslandNav.tsx`: Escape y la trampa de foco se escuchan en `document`
+    mientras el menú está abierto; si el foco salió del header, Tab lo devuelve.
+  - `IslandNav.tsx` y `TaglineReveal.tsx`: los observadores leen la última
+    entrada del lote.
+  - Observado: `tsc` sale 0, `eslint` sobre los archivos cambiados sale 0.
+    Sin verificar: el menú con teclado en un navegador real.
+
 ## Pendientes
 
 - Error de lint previo en `/report` (fuera del alcance de esta rama).

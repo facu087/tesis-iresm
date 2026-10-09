@@ -41,10 +41,32 @@ const OG_IMAGE = {
   alt: "Ilustración de seis nodos cuyas líneas convergen en una hoja de reporte.",
 };
 
+const LOCAL_ORIGIN = "http://localhost:3000";
+
+/**
+ * Public origin of the deployment, used to resolve the sharing image. There is
+ * no production domain yet: set NEXT_PUBLIC_SITE_URL when there is one. An
+ * empty or malformed value falls back to the local origin instead of throwing
+ * while the route module is evaluated.
+ */
+function resolveSiteUrl(): URL {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (configured) {
+    try {
+      const url = new URL(configured);
+      if (url.protocol === "http:" || url.protocol === "https:") return url;
+    } catch {
+      // Not an absolute URL: fall through to the local origin.
+    }
+    console.warn(
+      `NEXT_PUBLIC_SITE_URL is not a valid http(s) URL; using ${LOCAL_ORIGIN} for sharing metadata.`,
+    );
+  }
+  return new URL(LOCAL_ORIGIN);
+}
+
 export const metadata: Metadata = {
-  // Public origin of the deployment, used to resolve the sharing image. There
-  // is no production domain yet: set NEXT_PUBLIC_SITE_URL when there is one.
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
+  metadataBase: resolveSiteUrl(),
   title: TITLE,
   description: DESCRIPTION,
   alternates: { canonical: "/" },

@@ -83,9 +83,12 @@ export default function TaglineReveal({ lines, className = "" }: TaglineRevealPr
       }
     };
 
-    const observer = new IntersectionObserver(([entry]) => {
-      listen(entry.isIntersecting);
-      if (entry.isIntersecting) onScroll();
+    // The last record of a batch is the current state.
+    const observer = new IntersectionObserver((entries) => {
+      const latest = entries[entries.length - 1];
+      if (!latest) return;
+      listen(latest.isIntersecting);
+      if (latest.isIntersecting) onScroll();
     });
 
     function stop() {
