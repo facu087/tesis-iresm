@@ -214,6 +214,17 @@ Excepción: el frontend no tiene corredor de tests (`package.json` solo define
     hipótesis". Palabras en el HTML: 961 (las dos hipótesis ocultas del hero).
   - Abierto: las pestañas "Pendiente" y "Especulativa" dejan espacio vacío
     abajo, porque el alto se reserva para la más larga.
+  - Commit: `65c7d9f`. Revisión nativa: riesgo medio, consentimiento
+    otorgado, **aprobada** y acusada (`review-d846c56400fa8787`).
+    - Arreglado después: las teclas con modificador (Alt, Ctrl, Meta, Mayús)
+      ya no cambian de pestaña. Observado: Alt+flecha deja "Respaldada",
+      flecha sola pasa a "Pendiente".
+    - Arreglado después: a 320 px se recortaban "Respaldada" (7 px) y
+      "Especulativa" (13 px). Con letra más chica y menos margen bajo 360 px,
+      el recorte medido es 0 a 320 y a 360 px.
+    - Descartado: la transición con movimiento reducido; la regla global de
+      `.landing` ya anula las transiciones.
+    - Abierto: sin pruebas automáticas de las pestañas.
 
 ## Pendientes
 

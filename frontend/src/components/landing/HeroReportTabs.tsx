@@ -39,6 +39,8 @@ export default function HeroReportTabs() {
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   function onKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    // Leave browser shortcuts such as Alt+ArrowLeft (history back) alone.
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
     const move = NEXT_INDEX[event.key];
     if (!move) return;
     event.preventDefault();
@@ -49,7 +51,7 @@ export default function HeroReportTabs() {
 
   return (
     <>
-      <div className="landing-hero-tabs bg-surface px-4 py-3 sm:px-6">
+      <div className="landing-hero-tabs bg-surface px-2 py-3 min-[360px]:px-4 sm:px-6">
         {/* Nested radius: both shapes are full pills, 4 px apart. */}
         <div
           role="tablist"
@@ -72,7 +74,7 @@ export default function HeroReportTabs() {
                 aria-controls={panelId}
                 tabIndex={isSelected ? 0 : -1}
                 onClick={() => setSelected(index)}
-                className={`cursor-pointer rounded-full px-1 py-2 text-center text-sm font-semibold whitespace-nowrap active:scale-[0.98] sm:px-3 ${TRANSITION} ${FOCUS_RING} ${
+                className={`cursor-pointer rounded-full px-1 py-2 text-center text-xs font-semibold whitespace-nowrap min-[360px]:text-sm active:scale-[0.98] sm:px-3 ${TRANSITION} ${FOCUS_RING} ${
                   isSelected
                     ? "bg-accent text-accent-fg"
                     : "text-fg-muted hover:text-accent"
