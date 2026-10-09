@@ -9,6 +9,7 @@ import { inputStore } from "@/lib/inputStore";
 import type { AnalysisInput } from "@/lib/inputStore";
 import { PIPELINE_STEPS } from "@/lib/pipelineSteps";
 import { obtenerCuenta } from "@/lib/api";
+import BrandLockup from "@/components/NexusLogo";
 
 export default function AnalizarPage() {
   const router = useRouter();
@@ -61,7 +62,7 @@ export default function AnalizarPage() {
             href="/"
             className="cursor-pointer rounded-sm font-serif text-lg font-semibold tracking-tight text-accent transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
           >
-            NEXUS
+            <BrandLockup />
           </Link>
           <div className="flex items-center gap-2 sm:gap-4">
             <ThemeToggle />
