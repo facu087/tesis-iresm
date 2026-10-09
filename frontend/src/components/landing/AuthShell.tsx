@@ -6,26 +6,40 @@ import LandingMarkSprite from "@/components/landing/LandingMarkSprite";
 import { CONTAINER, FOCUS_RING, NAV_LINK, TRANSITION } from "@/components/landing/styles";
 
 /**
- * Page frame of the access routes (`/registro`, `/ingresar`), in the landing
- * visual system: the `.landing` scope, the same floating pill as the landing
- * navigation (logo back to `/`, one plain link to the sibling page, theme
- * selector) and a two column body with the page heading beside the form.
+ * Page frame of the access routes (`/registro`, `/ingresar`) and of the
+ * signed in routes (`/cuenta`, `/analizar`), in the landing visual system: the
+ * `.landing` scope, the same floating pill as the landing navigation (logo
+ * back to `/`, one plain link or action, theme selector) and a two column
+ * body with the page heading beside the form.
  *
  * The NEXUS mark sits below the heading as a faint watermark on wide screens
  * only. It is decorative, never under text, and `main` clips whatever runs
- * past its edges, so it cannot cause overflow.
+ * past its edges, so it cannot cause overflow. A page that passes `aside`
+ * gets that content under the heading instead, and no watermark.
  *
  * Presentation only: forms, requests and redirects stay in each page.
  */
 
 interface AuthShellProps {
   /** Plain link of the pill, pointing at the sibling access page. */
-  headerLink: { href: string; label: string };
+  headerLink?: { href: string; label: string };
+  /**
+   * Control of the pill for pages whose header is not a plain sibling link
+   * (e.g. the logout button). Style it with `NAV_LINK`.
+   */
+  headerAction?: React.ReactNode;
   /** Decorative icon shown above the heading. */
   icon: React.ReactNode;
   title: string;
   /** Optional sentence under the heading. */
   lead?: string;
+  /**
+   * Secondary content. On wide screens it sits under the heading, beside the
+   * main column; on narrow screens it follows the main column.
+   */
+  aside?: React.ReactNode;
+  /** Page footer, below the body (e.g. a standing notice). */
+  footer?: React.ReactNode;
   children: React.ReactNode;
 }
 
@@ -33,7 +47,16 @@ function rise(delayMs: number): React.CSSProperties {
   return { "--landing-delay": `${delayMs}ms` } as React.CSSProperties;
 }
 
-export default function AuthShell({ headerLink, icon, title, lead, children }: AuthShellProps) {
+export default function AuthShell({
+  headerLink,
+  headerAction,
+  icon,
+  title,
+  lead,
+  aside,
+  footer,
+  children,
+}: AuthShellProps) {
   return (
     <div className="landing flex min-h-screen flex-col bg-bg font-sans text-fg">
       <a
@@ -54,23 +77,30 @@ export default function AuthShell({ headerLink, icon, title, lead, children }: A
           >
             <LandingLogo fromSprite />
           </Link>
-          <Link href={headerLink.href} className={NAV_LINK}>
-            {headerLink.label}
-          </Link>
+          {headerLink && (
+            <Link href={headerLink.href} className={NAV_LINK}>
+              {headerLink.label}
+            </Link>
+          )}
+          {headerAction}
           {/* Below `sm` the selector keeps its icon and accessible name only. */}
           <ThemeToggle className="max-sm:[&>span]:hidden" />
         </div>
       </header>
 
       <main id="contenido" tabIndex={-1} className="flex-1 overflow-clip outline-none">
-        <div className={`${CONTAINER} grid items-start gap-8 pt-12 pb-16 lg:grid-cols-12 lg:pb-24`}>
+        <div
+          className={`${CONTAINER} grid items-start gap-8 pt-12 pb-16 lg:grid-cols-12 lg:pb-24 ${aside ? "lg:grid-rows-[auto_1fr]" : ""}`}
+        >
           <div className="relative lg:col-span-5">
-            <div
-              aria-hidden="true"
-              className="landing-hero-mark pointer-events-none absolute top-full -left-24 mt-12 hidden h-96 lg:block"
-            >
-              <LandingMark className="block h-full w-auto max-w-none" />
-            </div>
+            {!aside && (
+              <div
+                aria-hidden="true"
+                className="landing-hero-mark pointer-events-none absolute top-full -left-24 mt-12 hidden h-96 lg:block"
+              >
+                <LandingMark className="block h-full w-auto max-w-none" />
+              </div>
+            )}
             <div className="relative">
               <span className="landing-rise inline-flex size-12 items-center justify-center rounded-full border border-border bg-bg-subtle text-accent">
                 {icon}
@@ -92,11 +122,22 @@ export default function AuthShell({ headerLink, icon, title, lead, children }: A
             </div>
           </div>
 
-          <div className="landing-rise relative lg:col-span-7" style={rise(160)}>
+          <div
+            className={`landing-rise relative lg:col-span-7 ${aside ? "lg:row-span-2" : ""}`}
+            style={rise(160)}
+          >
             {children}
           </div>
+
+          {aside && (
+            <div className="landing-rise lg:col-span-5 lg:col-start-1 lg:row-start-2" style={rise(240)}>
+              {aside}
+            </div>
+          )}
         </div>
       </main>
+
+      {footer}
     </div>
   );
 }

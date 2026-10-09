@@ -249,6 +249,28 @@ Excepción: el frontend no tiene corredor de tests (`package.json` solo define
   - Commit: `f9ee342`. Evaluación nativa: riesgo medio, 318 líneas,
     `under_budget`; sin revisión debida, queda pendiente para el próximo corte.
 
+- [x] **T8 — `/cuenta` y `/analizar` con el sistema visual nuevo, y URL base
+  en el layout** · ruta: delegada.
+  - Pedido del usuario (2026-10-09): cerrar los pendientes. Solo
+    presentación en las dos rutas; lógica, llamadas y textos sin cambios.
+  - `metadataBase` pasa al layout raíz para que la tarjeta para compartir
+    resuelva bien en todas las rutas.
+  - Fuera de alcance: `/admin/pendientes`, `/analyzing`, `/report`.
+  - Observado (escritor): `tsc`, lint y build salen 0; el aviso de
+    `metadataBase` ya no aparece; el build termina bien con
+    `NEXT_PUBLIC_SITE_URL` vacía y malformada. Todas las cadenas previas
+    siguen presentes (18 en cuenta, 6 y 2 en analizar, 9 en `UploadForm`).
+    Con el backend simulado, 174 comprobaciones pasan: estados de cuenta,
+    reenvío por `PUT /api/registro`, cierre de sesión, guardias de
+    `/analizar` y paso a `/analyzing`, en ambos temas a 1280 y 390 px.
+  - Repetido por el orquestador: `tsc` sale 0; el cambio en `layout.tsx` son
+    un import y un campo; capturas de cuenta rechazada y de analizar revisadas.
+  - Cambio de comportamiento visible: el título y el marco de ambas páginas
+    ya se ven durante la carga (antes solo el texto de carga).
+  - Abierto: los dos mensajes de "campo requerido" de `UploadForm` siguen
+    inalcanzables porque el botón se deshabilita con el formulario vacío.
+- [ ] **T9 — `.claude/CLAUDE.md` describe el frontend actual** · ruta: en línea.
+
 ## Pendientes
 
 - ~~Error de lint previo en `/report`~~: resuelto por el PR #49, que entró con

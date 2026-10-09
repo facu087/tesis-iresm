@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Atkinson_Hyperlegible, Geist, Geist_Mono, Newsreader } from "next/font/google";
 import "./globals.css";
 import ThemeScope from "@/components/ThemeScope";
+import { resolveSiteUrl } from "@/lib/siteUrl";
 
 /**
  * Fija el tema elegido antes del primer pintado, para que quien eligió oscuro
@@ -33,6 +34,8 @@ const newsreader = Newsreader({
 });
 
 export const metadata: Metadata = {
+  // Base of every URL based metadata field, sharing image included.
+  metadataBase: resolveSiteUrl(),
   title: "NEXUS — Sistema de Soporte Investigativo Clínico",
   description:
     "Pipeline multi-agente para generación de hipótesis clínicas basadas en evidencia. " +

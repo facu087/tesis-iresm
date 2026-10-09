@@ -32,33 +32,9 @@ const DESCRIPTION =
   "Seis agentes de IA debaten un caso clínico, cada cita se contrasta con " +
   "PubMed y las hipótesis se ordenan por nivel de evidencia. NEXUS no emite " +
   "diagnósticos.";
-const LOCAL_ORIGIN = "http://localhost:3000";
 
-/**
- * Public origin of the deployment, used to resolve the sharing image (the
- * generated card of `opengraph-image.tsx`, which Next.js adds to the tags). There is
- * no production domain yet: set NEXT_PUBLIC_SITE_URL when there is one. An
- * empty or malformed value falls back to the local origin instead of throwing
- * while the route module is evaluated.
- */
-function resolveSiteUrl(): URL {
-  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-  if (configured) {
-    try {
-      const url = new URL(configured);
-      if (url.protocol === "http:" || url.protocol === "https:") return url;
-    } catch {
-      // Not an absolute URL: fall through to the local origin.
-    }
-    console.warn(
-      `NEXT_PUBLIC_SITE_URL is not a valid http(s) URL; using ${LOCAL_ORIGIN} for sharing metadata.`,
-    );
-  }
-  return new URL(LOCAL_ORIGIN);
-}
-
+/** `metadataBase` comes from the root layout (`lib/siteUrl.ts`). */
 export const metadata: Metadata = {
-  metadataBase: resolveSiteUrl(),
   title: TITLE,
   description: DESCRIPTION,
   alternates: { canonical: "/" },

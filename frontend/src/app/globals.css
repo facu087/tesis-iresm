@@ -106,8 +106,9 @@ body {
 
 /* ── Landing scope ─────────────────────────────────────────────────────────
  *
- * Visual system of the public landing (`/`), the branded 404 and the access
- * pages (`/registro`, `/ingresar`). Everything
+ * Visual system of the public landing (`/`), the branded 404, the access
+ * pages (`/registro`, `/ingresar`) and the signed in pages (`/cuenta`,
+ * `/analizar`). Everything
  * below is scoped to the `.landing` wrapper, so the other routes keep the
  * tokens defined above untouched. The wrapper redefines the semantic tokens
  * for its own subtree: the Tailwind utilities (`bg-bg`, `text-fg`, …) resolve
@@ -382,6 +383,13 @@ body {
     transition: opacity 300ms var(--landing-ease);
   }
   .landing-verify[data-beat="lookup"] .landing-verify-bar {
+    animation: landing-verify-pulse 700ms var(--landing-ease) infinite alternate;
+  }
+
+  /* Loading placeholders of the signed in routes (`/cuenta`, `/analizar`):
+     flat bars shaped like the content, with the same pulse as the lookup. */
+  .landing .landing-skeleton {
+    background-color: var(--color-border);
     animation: landing-verify-pulse 700ms var(--landing-ease) infinite alternate;
   }
 }
