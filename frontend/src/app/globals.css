@@ -214,6 +214,82 @@ body {
   .landing-tagline[data-enhanced="true"] [data-word][data-on="true"] {
     opacity: 1;
   }
+
+  /* Pipeline diagram (see landing/PipelineDiagram.tsx). Every stage is lit by
+     default; stages are dimmed only once the component has enhanced the list,
+     then light up in order. The link below a node fills towards the next. */
+  .landing-pipeline-node {
+    border-color: var(--color-accent);
+    background-color: var(--color-accent);
+    color: var(--color-accent-fg);
+    transition:
+      background-color 700ms var(--landing-ease),
+      border-color 700ms var(--landing-ease),
+      color 700ms var(--landing-ease);
+  }
+  .landing-pipeline-link {
+    background-color: var(--color-border);
+  }
+  .landing-pipeline-link::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-color: var(--color-accent);
+    transform-origin: top;
+    transition: scale 700ms var(--landing-ease) 200ms;
+  }
+  .landing-pipeline-body {
+    transition: opacity 700ms var(--landing-ease);
+  }
+  .landing-pipeline[data-enhanced="true"] [data-stage]:not([data-on="true"]) {
+    .landing-pipeline-node {
+      border-color: var(--color-border);
+      background-color: var(--color-surface);
+      color: var(--color-fg-muted);
+    }
+    .landing-pipeline-link::after {
+      scale: 1 0;
+    }
+    .landing-pipeline-body {
+      opacity: 0.4;
+    }
+  }
+
+  /* Agent tiles (see landing/AgentTiles.tsx). The description shares the grid
+     cell of the tile face and shows on hover (pointer devices only, so a tap
+     does not leave it stuck), on keyboard focus and while the tile is pinned. */
+  .landing-agent-detail {
+    grid-area: 1 / 1;
+    opacity: 0;
+    transition: opacity 700ms var(--landing-ease);
+  }
+  .landing-agent-toggle {
+    transition: rotate 700ms var(--landing-ease);
+  }
+  .landing-agent[data-open="true"] .landing-agent-detail,
+  .landing-agent button:focus-visible + .landing-agent-detail {
+    opacity: 1;
+  }
+  .landing-agent[data-open="true"] .landing-agent-toggle {
+    rotate: 45deg;
+  }
+  @media (hover: hover) {
+    .landing-agent:hover .landing-agent-detail {
+      opacity: 1;
+    }
+  }
+  /* Without JavaScript a tap cannot pin a tile: show every description under
+     its tile face instead of behind it. */
+  @media (scripting: none) {
+    .landing-agent-detail {
+      grid-area: 2 / 1;
+      padding-top: 0;
+      opacity: 1;
+    }
+    .landing-agent-toggle {
+      display: none;
+    }
+  }
 }
 
 @keyframes landing-rise {

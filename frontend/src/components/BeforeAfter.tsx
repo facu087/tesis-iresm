@@ -1,7 +1,8 @@
 import { WarningIcon } from "@phosphor-icons/react/ssr";
 
 /**
- * "Before and after" comparison of one citation.
+ * "Before and after" comparison of one citation: the centrepiece of the
+ * verification section.
  *
  * The pair comes from a real run of the test case (2026-09-22,
  * `output/corrida_agente04/reporte.json`, PMID 23686244): what the model
@@ -12,42 +13,44 @@ import { WarningIcon } from "@phosphor-icons/react/ssr";
  * The three panels share one bordered card: the 1 px gaps of the grid show
  * the border colour, so no panel carries a border on a single side.
  */
+
+const PANEL = "bg-surface p-6 sm:p-8";
+const QUOTE = "mt-4 text-2xl font-semibold text-pretty text-fg sm:text-3xl";
+
 export default function BeforeAfter() {
   return (
     <figure aria-labelledby="beforeafter-caption" className="m-0">
       <div className="grid gap-px overflow-hidden rounded-2xl border border-border bg-border md:grid-cols-2">
-        <div className="bg-surface p-6">
+        <div className={PANEL}>
           <p className="text-sm font-semibold text-fg-muted">
             Antes · lo que declaró el modelo
           </p>
-          <blockquote className="mt-4 text-xl font-semibold text-pretty text-fg">
+          <blockquote className={QUOTE}>
             IgM paraprotein-associated neuropathy: clinical features and
             treatment
           </blockquote>
-          <p className="mt-3 text-sm text-fg-muted">
+          <p className="mt-4 text-sm text-fg-muted">
             Neurology · 2013 · <span className="font-mono">PMID 23686244</span>
           </p>
         </div>
-        <div className="bg-surface p-6">
+        <div className={PANEL}>
           <p className="text-sm font-semibold text-fg-muted">
             Después · lo que devuelve PubMed
           </p>
-          <blockquote className="mt-4 text-xl font-semibold text-pretty text-fg">
+          <blockquote className={QUOTE}>
             Paper-based transparent flexible thin film supercapacitors.
           </blockquote>
-          <p className="mt-3 text-sm text-fg-muted">
+          <p className="mt-4 text-sm text-fg-muted">
             Título real del <span className="font-mono">PMID 23686244</span>
           </p>
         </div>
-        <div className="bg-bg-subtle p-6 md:col-span-2">
-          <p className="flex items-start gap-2 text-base font-semibold text-ochre">
-            <WarningIcon aria-hidden="true" weight="bold" className="mt-0.5 size-5 shrink-0" />
+        <div className="bg-bg-subtle p-6 sm:px-8 md:col-span-2">
+          <p className="flex items-start gap-2 text-lg font-semibold text-ochre">
+            <WarningIcon aria-hidden="true" weight="bold" className="mt-1 size-5 shrink-0" />
             Veredicto del sistema: no coincide
           </p>
-          <p className="mt-2 text-sm text-pretty text-fg-muted">
-            El título citado no corresponde al artículo que existe con ese
-            PMID. La referencia no cuenta como respaldo y la hipótesis que
-            dependía de ella queda marcada como sin respaldo verificable.
+          <p className="mt-2 text-base text-pretty text-fg-muted">
+            La referencia no cuenta como respaldo de la hipótesis.
           </p>
         </div>
       </div>

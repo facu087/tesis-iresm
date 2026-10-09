@@ -107,6 +107,27 @@ Excepción: el frontend no tiene corredor de tests (`package.json` solo define
   - Observado: `tsc` sale 0, `eslint` sobre los archivos cambiados sale 0.
     Sin verificar: el menú con teclado en un navegador real.
 
+- [x] **T3 — Menos texto, el producto como imagen** · ruta: delegada (varios
+  archivos no triviales).
+  - Motivo (usuario, 2026-10-09): las ilustraciones generadas no gustaron y la
+    página tiene demasiado texto.
+  - Se quitan las tres ilustraciones y `og.jpg`; la imagen para compartir pasa
+    a generarse con texto (`opengraph-image`).
+  - Hero con una tarjeta real del reporte; verificación con la comparación de
+    citas y el "14 de 18" como pieza central; pipeline como diagrama animado;
+    agentes en fichas compactas con la descripción al enfocar; beneficios como
+    anotaciones sobre el reporte de ejemplo; preguntas en acordeón, cinco.
+  - Observado (escritor): `tsc` sale 0, `eslint` sobre lo cambiado sale 0,
+    `npm run build` sale 0 con 12 páginas, `/` y `/opengraph-image` responden
+    200. Palabras visibles: 1.625 → 913 (44 % menos; la meta era la mitad).
+  - Repetido por el orquestador: `tsc` sale 0, 913 palabras, capturas de
+    escritorio en tema claro revisadas.
+  - Abierto: `opengraph-image.tsx` en la raíz aplica a todas las rutas y el
+    build avisa que falta `metadataBase` fuera de `/` (se arregla en
+    `layout.tsx`); la anotación 3 del reporte dice "Consenso entre agentes" y
+    ya no "Desacuerdos a la vista"; tema oscuro del reporte y del pipeline sin
+    revisar.
+
 ## Pendientes
 
 - Error de lint previo en `/report` (fuera del alcance de esta rama).

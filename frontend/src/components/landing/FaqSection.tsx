@@ -1,9 +1,13 @@
+import { CaretDownIcon } from "@phosphor-icons/react/ssr";
 import ScrollReveal from "@/components/ScrollReveal";
 import SectionHeading from "@/components/landing/SectionHeading";
-import { CARD, CONTAINER, SECTION_PADDING } from "@/components/landing/styles";
+import { CONTAINER, FOCUS_RING, SECTION_PADDING, TRANSITION } from "@/components/landing/styles";
 
 /**
- * Frequently asked questions, in plain question and answer form.
+ * Frequently asked questions as an accordion, every item closed by default.
+ *
+ * Native `<details>`/`<summary>`: operable with the keyboard and without
+ * JavaScript, and the answers stay in the document for search engines.
  *
  * Every answer is verifiable in this repository; the source is noted beside
  * each entry. The same list feeds the FAQ structured data emitted by the
@@ -16,52 +20,34 @@ export interface FaqItem {
 
 export const FAQ_ITEMS: readonly FaqItem[] = [
   {
-    // Scope notice of the product (current landing, `.claude/CLAUDE.md`).
+    // Scope notice of the product (`.claude/CLAUDE.md`).
     question: "¿NEXUS emite diagnósticos?",
     answer:
-      "No. NEXUS genera hipótesis de investigación para que las evalúe el médico responsable. Las hipótesis son orientativas.",
+      "No. Genera hipótesis de investigación para que las evalúe el médico responsable.",
   },
   {
     // `backend/api/router.py` (protected endpoints), `app/cuenta/page.tsx`.
     question: "¿Quién puede usar NEXUS?",
     answer:
-      "Médicos registrados con su matrícula. Un administrador revisa cada solicitud y, mientras la cuenta está pendiente de revisión, no se pueden analizar casos.",
+      "Médicos registrados con su matrícula. Un administrador revisa cada solicitud.",
   },
   {
-    // `app/registro/page.tsx`: required fields and the consent text.
-    question: "¿Qué datos pide el registro?",
+    // `backend/pipeline/verification.py`, `recitation.py`, `evidence.py`.
+    question: "¿Qué pasa con una cita que no se puede verificar?",
     answer:
-      "Nombre y apellido, DNI, matrícula, jurisdicción de matriculación, email y una contraseña. El formulario pide además el consentimiento para tratar esos datos con el fin de verificar la habilitación profesional, conforme a la Ley 25.326.",
+      "No cuenta como respaldo. La hipótesis vuelve a su autor en una ronda de recitación, una sola vez, y si sigue sin respaldo no se descarta: queda marcada como especulativa, con nivel de evidencia III.",
   },
   {
     // `components/UploadForm.tsx` (file and text modes), `ingestion/extractor.py`.
     question: "¿Qué documentos se pueden analizar?",
     answer:
-      "Un archivo PDF, nativo o escaneado, del que se extrae el texto con OCR cuando hace falta. También se puede pegar el texto del caso clínico.",
+      "Un archivo PDF, nativo o escaneado. También se puede pegar el texto del caso clínico.",
   },
   {
-    // `backend/pipeline/verification.py`, `components/BeforeAfter.tsx`.
-    question: "¿Cómo se verifica una cita?",
+    // `backend/pipeline/report_builder.py`, `pdf_exporter.py`, `app/report/page.tsx`.
+    question: "¿Qué contiene el reporte?",
     answer:
-      "Cada PMID citado por un agente se consulta en PubMed y el título real del artículo se compara con el título citado. Si no coinciden, la referencia no cuenta como respaldo de la hipótesis.",
-  },
-  {
-    // `backend/pipeline/recitation.py`, `backend/pipeline/evidence.py`.
-    question: "¿Qué pasa con una hipótesis que queda sin respaldo?",
-    answer:
-      "Vuelve a su autor en una ronda de recitación, una sola vez, para que cite sobre la literatura recuperada. Si sigue sin respaldo no se descarta: queda marcada como especulativa, con nivel de evidencia III.",
-  },
-  {
-    // Current landing copy ("Es un caso medido, no una tasa general").
-    question: "¿La cifra de 14 de 18 citas es una tasa general?",
-    answer:
-      "No. Es el resultado de una corrida real del caso de prueba, del 22 de septiembre de 2026: 14 citas no coincidieron con PubMed, 3 coincidieron y 1 no traía PMID. Es un caso medido, no una tasa general.",
-  },
-  {
-    // `backend/pipeline/pdf_exporter.py`, `app/report/page.tsx` (download).
-    question: "¿El reporte se puede exportar?",
-    answer:
-      "Sí. El reporte se puede descargar en PDF, con las hipótesis, sus fuentes y el estado de verificación de cada una.",
+      "Hipótesis de consenso con su nivel de evidencia, el estado de verificación de cada fuente, las objeciones sin resolver y los ensayos clínicos compatibles. Se puede descargar en PDF.",
   },
 ];
 
@@ -72,27 +58,32 @@ export default function FaqSection() {
       aria-labelledby="preguntas-heading"
       className={`bg-bg ${SECTION_PADDING}`}
     >
-      <div className={CONTAINER}>
-        <ScrollReveal>
-          <SectionHeading
-            id="preguntas-heading"
-            eyebrow="Preguntas frecuentes"
-            title="Lo que conviene saber antes de solicitar acceso"
-          />
-        </ScrollReveal>
+      <div className={`${CONTAINER} grid gap-12 lg:grid-cols-12 lg:items-start`}>
+        <div className="lg:col-span-5">
+          <ScrollReveal>
+            <SectionHeading id="preguntas-heading" title="Preguntas frecuentes" />
+          </ScrollReveal>
+        </div>
 
-        <dl className="mt-12 grid gap-4 lg:grid-cols-2">
-          {FAQ_ITEMS.map((item, index) => (
-            // The reveal wrapper is the `<div>` group a `<dl>` allows around
-            // each `<dt>`/`<dd>` pair, so it carries the card styles itself.
-            <ScrollReveal key={item.question} delay={(index % 2) * 120} className={CARD}>
-              <dt className="text-lg font-semibold text-balance text-fg">
-                {item.question}
-              </dt>
-              <dd className="mt-2 text-base text-pretty text-fg-muted">{item.answer}</dd>
-            </ScrollReveal>
+        <ul className="grid gap-3 lg:col-span-7">
+          {FAQ_ITEMS.map((item) => (
+            <li key={item.question}>
+              <details className="group rounded-2xl border border-border bg-surface">
+                <summary
+                  className={`flex cursor-pointer list-none items-center justify-between gap-4 rounded-2xl p-6 text-lg font-semibold text-fg ${TRANSITION} hover:text-accent [&::-webkit-details-marker]:hidden ${FOCUS_RING}`}
+                >
+                  {item.question}
+                  <CaretDownIcon
+                    aria-hidden="true"
+                    weight="bold"
+                    className={`size-5 shrink-0 text-fg-muted ${TRANSITION} group-open:rotate-180`}
+                  />
+                </summary>
+                <p className="px-6 pb-6 text-base text-pretty text-fg-muted">{item.answer}</p>
+              </details>
+            </li>
           ))}
-        </dl>
+        </ul>
       </div>
     </section>
   );

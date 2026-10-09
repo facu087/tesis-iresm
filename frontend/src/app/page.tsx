@@ -1,15 +1,12 @@
 import type { Metadata } from "next";
-import ScrollReveal from "@/components/ScrollReveal";
-import ReportDemo from "@/components/ReportDemo";
 import AgentsSection from "@/components/landing/AgentsSection";
-import BenefitsSection from "@/components/landing/BenefitsSection";
 import FaqSection, { FAQ_ITEMS } from "@/components/landing/FaqSection";
 import FinalCta from "@/components/landing/FinalCta";
 import Hero, { HERO_ACTION_ID } from "@/components/landing/Hero";
 import HowItWorksSection from "@/components/landing/HowItWorksSection";
 import IslandNav, { type NavLink } from "@/components/landing/IslandNav";
 import LandingFooter from "@/components/landing/LandingFooter";
-import SectionHeading from "@/components/landing/SectionHeading";
+import ReportSection from "@/components/landing/ReportSection";
 import TaglineReveal from "@/components/landing/TaglineReveal";
 import VerificationSection from "@/components/landing/VerificationSection";
 import { CONTAINER, FOCUS_RING, SECTION_PADDING } from "@/components/landing/styles";
@@ -18,15 +15,15 @@ import { CONTAINER, FOCUS_RING, SECTION_PADDING } from "@/components/landing/sty
  * Public landing of NEXUS (`/`). One offer, one audience, one primary action:
  * licensed physicians request access (`/registro`).
  *
- * Long form story layout: the page has to educate and answer scepticism
- * about AI generated citations before asking for the registration, so the
- * argument runs problem and proof → core statement → benefits → the report →
- * how it works → the agents → questions → final call to action.
+ * Long form story layout, told with the product instead of prose: a report
+ * card in the hero → the measured citation mismatch → core statement → the
+ * annotated example report → the pipeline diagram → the agents → questions →
+ * final call to action.
  *
  * Server Component. Interactivity is isolated in small Client Components
- * under `components/landing/` (navigation, tagline reveal) and in
- * `ScrollReveal`. The `.landing` wrapper scopes the visual system: see
- * `globals.css`.
+ * under `components/landing/` (navigation, tagline reveal, pipeline diagram,
+ * agent tiles) and in `ScrollReveal`. The `.landing` wrapper scopes the
+ * visual system: see `globals.css`.
  */
 
 const TITLE = "NEXUS: hipótesis de investigación clínica con citas verificadas";
@@ -34,17 +31,11 @@ const DESCRIPTION =
   "Seis agentes de IA debaten un caso clínico, cada cita se contrasta con " +
   "PubMed y las hipótesis se ordenan por nivel de evidencia. NEXUS no emite " +
   "diagnósticos.";
-const OG_IMAGE = {
-  url: "/landing/og.jpg",
-  width: 1200,
-  height: 630,
-  alt: "Ilustración de seis nodos cuyas líneas convergen en una hoja de reporte.",
-};
-
 const LOCAL_ORIGIN = "http://localhost:3000";
 
 /**
- * Public origin of the deployment, used to resolve the sharing image. There is
+ * Public origin of the deployment, used to resolve the sharing image (the
+ * generated card of `opengraph-image.tsx`, which Next.js adds to the tags). There is
  * no production domain yet: set NEXT_PUBLIC_SITE_URL when there is one. An
  * empty or malformed value falls back to the local origin instead of throwing
  * while the route module is evaluated.
@@ -77,13 +68,11 @@ export const metadata: Metadata = {
     siteName: "NEXUS",
     title: TITLE,
     description: DESCRIPTION,
-    images: [OG_IMAGE],
   },
   twitter: {
     card: "summary_large_image",
     title: TITLE,
     description: DESCRIPTION,
-    images: [OG_IMAGE],
   },
 };
 
@@ -129,7 +118,6 @@ export default function LandingPage() {
         <Hero />
         <VerificationSection />
         <TaglineSection />
-        <BenefitsSection />
         <ReportSection />
         <HowItWorksSection />
         <AgentsSection />
@@ -159,32 +147,6 @@ function TaglineSection() {
           lines={TAGLINE_LINES}
           className="max-w-[680px] text-4xl font-semibold text-balance text-fg sm:text-5xl"
         />
-      </div>
-    </section>
-  );
-}
-
-/* ── The report: what the physician receives ───────────────────────────── */
-
-function ReportSection() {
-  return (
-    <section
-      id="reporte"
-      aria-labelledby="reporte-heading"
-      className={`bg-bg-subtle ${SECTION_PADDING}`}
-    >
-      <div className={CONTAINER}>
-        <ScrollReveal>
-          <SectionHeading
-            id="reporte-heading"
-            eyebrow="El reporte"
-            title="Esto es lo que recibe el médico"
-            lead="Hipótesis de consenso con su nivel de evidencia, el estado de verificación de cada fuente y los ensayos clínicos compatibles. El reporte se puede descargar en PDF."
-          />
-        </ScrollReveal>
-        <ScrollReveal className="mt-12">
-          <ReportDemo />
-        </ScrollReveal>
       </div>
     </section>
   );
