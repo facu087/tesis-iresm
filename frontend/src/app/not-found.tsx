@@ -22,7 +22,7 @@ export default function NotFound() {
         <Link
           href="/"
           aria-label="NEXUS, inicio"
-          className={`rounded-full px-3 py-2 text-base font-bold text-accent ${TRANSITION} hover:opacity-80 active:translate-y-px ${FOCUS_RING}`}
+          className={`inline-flex items-center rounded-full px-3 py-2 text-base font-bold text-accent ${TRANSITION} hover:opacity-80 active:translate-y-px ${FOCUS_RING}`}
         >
           <LandingLogo />
         </Link>
