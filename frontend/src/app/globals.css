@@ -470,6 +470,21 @@ body {
   }
 }
 
+/* Printing the page before the sequence has played must still show the
+   resolved comparison: it is the landing's central real data. */
+@media print {
+  .landing .landing-verify [data-step] {
+    opacity: 1 !important;
+    translate: none !important;
+  }
+  .landing .landing-verify-skeleton {
+    opacity: 0 !important;
+  }
+  .landing .landing-verify-replay {
+    display: none;
+  }
+}
+
 /* Forced colours drop background images: give the hero heading real ink. */
 @media (forced-colors: active) {
   .landing-hero-heading {

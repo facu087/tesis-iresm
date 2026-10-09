@@ -57,6 +57,7 @@ export default function VerificationSequence({
 }: VerificationSequenceProps) {
   const ref = useRef<HTMLElement>(null);
   const timers = useRef<number[]>([]);
+  const observerRef = useRef<IntersectionObserver | null>(null);
 
   const clearTimers = useCallback(() => {
     for (const timer of timers.current) window.clearTimeout(timer);
@@ -68,6 +69,10 @@ export default function VerificationSequence({
     const node = ref.current;
     if (!node) return;
     clearTimers();
+    // Any run, the replay button included, spends the automatic one: without
+    // this, replaying before the trigger point would play it twice.
+    observerRef.current?.disconnect();
+    observerRef.current = null;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       delete node.dataset.beat; // final state, at once
       return;
@@ -106,17 +111,28 @@ export default function VerificationSequence({
           latest.intersectionRatio >= TRIGGER_RATIO ||
           latest.intersectionRect.height >= viewport * TRIGGER_VIEWPORT_SHARE;
         if (!inView) return;
-        observer.disconnect(); // plays once: scrolling past never replays it
-        play();
+        play(); // disconnects: scrolling past never replays it
       },
       { threshold: THRESHOLDS },
     );
+    observerRef.current = observer;
 
     node.dataset.beat = "idle";
     observer.observe(node);
 
-    return () => {
+    // Failsafe: printing before the section was reached shows it resolved.
+    const resolve = () => {
+      clearTimers();
       observer.disconnect();
+      observerRef.current = null;
+      delete node.dataset.beat;
+    };
+    window.addEventListener("beforeprint", resolve);
+
+    return () => {
+      window.removeEventListener("beforeprint", resolve);
+      observer.disconnect();
+      observerRef.current = null;
       clearTimers();
       // Never leave the comparison unresolved behind an unmounted component.
       delete node.dataset.beat;

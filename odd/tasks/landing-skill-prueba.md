@@ -274,6 +274,19 @@ Excepción: el frontend no tiene corredor de tests (`package.json` solo define
     convivencia) y las dos variables `NEXT_PUBLIC_*`. Documentación pasiva:
     comprobación por lectura.
 
+- Revisión nativa del tramo `65c7d9f..220e2c8` (T7, T8, T9 y el arreglo de
+  las pestañas; 13 archivos, 1.140 líneas): riesgo medio, consentimiento
+  otorgado, **aprobada** y acusada.
+  - Arreglado después, en `VerificationSequence.tsx` y `globals.css`:
+    - Imprimir la página antes de llegar a la sección dejaba la comparación
+      invisible. Ahora la resuelven una regla `@media print` y el evento
+      `beforeprint`. Observado: opacidad 1 en los tres pasos por ambas vías.
+    - "Ver de nuevo" antes del punto de disparo hacía que la secuencia
+      corriera dos veces. Ahora cualquier corrida gasta la automática.
+      Observado: 1 corrida tras el clic y 1 tras llevar la sección al centro.
+  - Abierto: sin pruebas repetibles (URL del sitio, secuencia, pestañas,
+    selector de archivo); el frontend no tiene corredor de tests.
+
 ## Pendientes
 
 - ~~Error de lint previo en `/report`~~: resuelto por el PR #49, que entró con
