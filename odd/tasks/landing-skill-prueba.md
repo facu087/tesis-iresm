@@ -318,6 +318,27 @@ Los dos superan las 400 líneas: el corte sigue las unidades de trabajo y no se
 puede achicar más sin separar un rediseño de su propio CSS. El PR 1 se
 comprobó aislado en `aa89e99`: tipos y lint pasan.
 
+## Prueba contra el backend real (2026-10-09)
+
+Backend levantado con una base SQLite temporal y `NEXUS_MOCK_LLM=1` (sin gastar
+cuota de Groq); frontend en el servidor de desarrollo; navegador sin interfaz,
+sin interceptar ninguna respuesta. 20 de 20 comprobaciones pasan:
+
+- Registro: sin consentimiento no avanza; con consentimiento redirige a
+  `/ingresar?registrado=1`; un DNI repetido muestra el 409 del backend.
+- Ingreso: contraseña incorrecta muestra el detalle del 401; correcta va a
+  `/cuenta`.
+- Cuenta: pendiente → rechazada con el motivo del admin → reenvío corregido
+  (formulario precargado) → pendiente → verificada.
+- Guardas: `/analizar` con cuenta pendiente vuelve a `/cuenta`; sin sesión, a
+  `/ingresar`.
+- Análisis por texto y por PDF: `/analizar` → `/analyzing` → `/report` en unos
+  30 s, con la marca de modo mock y el aviso de no diagnóstico; el PDF del
+  reporte se descarga.
+
+No cubierto: el pipeline con el modelo real (Groq), el tema oscuro y
+dispositivos táctiles.
+
 ## Progreso
 
 - 2026-10-09: rama creada, T0 hecha. Espejo en Engram pendiente
