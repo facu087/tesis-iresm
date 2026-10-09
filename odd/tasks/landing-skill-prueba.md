@@ -246,6 +246,8 @@ Excepción: el frontend no tiene corredor de tests (`package.json` solo define
   - Cadenas nuevas: "Ver de nuevo" y "Consultando PubMed".
   - Abierto: al recargar con la sección ya en pantalla se ve un instante el
     estado final antes de que arranque la secuencia.
+  - Commit: `f9ee342`. Evaluación nativa: riesgo medio, 318 líneas,
+    `under_budget`; sin revisión debida, queda pendiente para el próximo corte.
 
 ## Pendientes
 
