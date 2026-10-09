@@ -21,6 +21,8 @@ Ejemplo de uso:
 
 from __future__ import annotations
 
+import os
+import sys
 from dataclasses import dataclass
 from typing import Optional
 
@@ -28,9 +30,68 @@ import chromadb
 
 from backend.rag.chroma_store import get_pubmed_collection
 
-# Score mínimo de similitud coseno (0–1). Por debajo de este umbral,
-# el artículo se considera irrelevante para el query.
-_MIN_RELEVANCE_SCORE = 0.3
+_ENV_MIN_SCORE_VAR = "NEXUS_RAG_MIN_SCORE"
+
+# Score mínimo por debajo del cual un artículo se descarta por irrelevante.
+#
+# OJO con la escala: el score NO es la similitud coseno. ChromaDB devuelve
+# distancia coseno en [0, 2] y acá se convierte con `1 - distancia/2`, o sea
+# `score = (1 + coseno) / 2`. Un score de 0,5 es coseno 0, y el 0,3 que estaba
+# antes equivale a un coseno de **-0,4**: para texto biomédico eso no filtraba
+# absolutamente nada (medido: 0 de 15 resultados quedaban por debajo).
+#
+# Medido el 2026-10-06 con scripts/demo_umbral_relevancia.py sobre el corpus de
+# scripts/demo_embeddings_comparacion.py (7 artículos de neuropatía + 1 fuera de
+# dominio como control) y las tres queries del caso de la tesis:
+#
+#   modelo                         control (máx)   relevante (mín)
+#   NeuML/pubmedbert-base-embed.       0,536            0,606
+#   all-MiniLM-L6-v2 (fallback)        0,549            0,571
+#
+# 0,55 es el único valor que separa con los dos modelos: descarta el artículo
+# fuera de dominio en las tres queries y no pierde ni un artículo relevante.
+#
+# Limitación: la banda sale de UN artículo de control. Es evidencia suficiente
+# para dejar de usar un umbral inerte, no para afinarlo. Por eso se puede
+# sobreescribir sin tocar código:
+#
+#     NEXUS_RAG_MIN_SCORE=0.6 python3 scripts/demo_motor_rag.py
+#
+# Al cambiar de modelo de embeddings hay que volver a medir: el umbral depende
+# del modelo, igual que los vectores.
+_DEFAULT_MIN_RELEVANCE_SCORE = 0.55
+
+
+def _resolver_min_score() -> float:
+    """
+    Lee el umbral del entorno, con el default medido como respaldo.
+
+    Un valor inválido o fuera de [0, 1] no rompe el pipeline: se avisa por
+    stderr y se usa el default, igual que hace chroma_store con el modelo.
+    """
+    crudo = os.getenv(_ENV_MIN_SCORE_VAR)
+    if not crudo:
+        return _DEFAULT_MIN_RELEVANCE_SCORE
+    try:
+        valor = float(crudo)
+    except ValueError:
+        print(
+            f"[NEXUS][RAG] {_ENV_MIN_SCORE_VAR}={crudo!r} no es un número: "
+            f"se usa {_DEFAULT_MIN_RELEVANCE_SCORE}.",
+            file=sys.stderr,
+        )
+        return _DEFAULT_MIN_RELEVANCE_SCORE
+    if not 0.0 <= valor <= 1.0:
+        print(
+            f"[NEXUS][RAG] {_ENV_MIN_SCORE_VAR}={valor} está fuera de [0, 1]: "
+            f"se usa {_DEFAULT_MIN_RELEVANCE_SCORE}.",
+            file=sys.stderr,
+        )
+        return _DEFAULT_MIN_RELEVANCE_SCORE
+    return valor
+
+
+_MIN_RELEVANCE_SCORE = _resolver_min_score()
 
 
 @dataclass
@@ -224,10 +285,15 @@ class PubMedRetriever:
         Returns:
             Lista de PMIDs reales (pueden ser vacía si no hay evidencia)
         """
+        # Usa el mismo umbral medido que el resto del módulo. Antes tenía un
+        # 0.35 propio, descrito como "más alto": con la escala real
+        # (score = (1 + coseno) / 2) eso era coseno -0,3, aún más permisivo que
+        # el default de entonces. Un umbral más estricto para hipótesis
+        # puntuales es defendible, pero hay que medirlo antes de elegirlo.
         articles = self.search(
             hypothesis_text,
             max_results=max_results,
-            min_score=0.35,  # Umbral más alto para hipótesis específicas
+            min_score=_MIN_RELEVANCE_SCORE,
         )
         return [a.pmid for a in articles]
 
