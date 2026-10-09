@@ -128,6 +128,16 @@ Excepción: el frontend no tiene corredor de tests (`package.json` solo define
     ya no "Desacuerdos a la vista"; tema oscuro del reporte y del pipeline sin
     revisar.
 
+  - Commit: `6710745`. Revisión nativa: riesgo medio, consentimiento
+    otorgado, **aprobada** y acusada (`review-60ddd6056ecaf956`).
+    - Arreglado después: el respaldo sin JavaScript de las fichas de agentes
+      estaba dentro de `@layer components` y lo pisaban las utilidades; ahora
+      va fuera de toda capa. Observado en el CSS compilado tras `npm run build`.
+    - Descartado: la estabilidad de `close` en `IslandNav.tsx` (es un
+      `useCallback` sin dependencias).
+    - Abierto: sin pruebas automáticas de interacción; tarjeta para compartir
+      en la raíz sin `metadataBase` fuera de `/`.
+
 ## Pendientes
 
 - Error de lint previo en `/report` (fuera del alcance de esta rama).

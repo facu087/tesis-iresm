@@ -278,17 +278,20 @@ body {
       opacity: 1;
     }
   }
-  /* Without JavaScript a tap cannot pin a tile: show every description under
-     its tile face instead of behind it. */
-  @media (scripting: none) {
-    .landing-agent-detail {
-      grid-area: 2 / 1;
-      padding-top: 0;
-      opacity: 1;
-    }
-    .landing-agent-toggle {
-      display: none;
-    }
+}
+
+/* Without JavaScript a tap cannot pin a tile: show every description under
+   its tile face instead of behind it. Declared outside any layer on purpose:
+   the element carries placement and padding utilities, and unlayered rules
+   are the only ones that win over the utilities layer. */
+@media (scripting: none) {
+  .landing .landing-agent-detail {
+    grid-area: 2 / 1;
+    padding-top: 0;
+    opacity: 1;
+  }
+  .landing .landing-agent-toggle {
+    display: none;
   }
 }
 
