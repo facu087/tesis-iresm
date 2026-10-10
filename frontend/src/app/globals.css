@@ -150,6 +150,11 @@ body {
      numbers keep AA contrast on the last nodes. */
   --landing-pipeline-from: var(--color-accent);
   --landing-pipeline-to: #4a6fa1;
+
+  /* Danger ink of the report view (`/report`): citations PubMed does not
+     confirm, objections left open and the recorded mode mark. Same reds as
+     the form error. On the surface and on its own 10 % tint it meets AA. */
+  --landing-danger: #b91c1c;
 }
 
 :root[data-theme="dark"] .landing {
@@ -174,6 +179,8 @@ body {
 
   --landing-mark-to: #dbe8f8;
   --landing-pipeline-to: #dbe8f8;
+
+  --landing-danger: #fca5a5;
 }
 
 /* The logo mark fades from the accent to this token; in the landing's dark

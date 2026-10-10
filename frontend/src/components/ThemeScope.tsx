@@ -3,8 +3,11 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 
-/** Rutas con colores fijos (sin tokens ni selector): siempre en claro. */
-const FIXED_LIGHT_ROUTES = ["/report"];
+/**
+ * Rutas con colores fijos (sin tokens ni selector): siempre en claro. Ya no
+ * queda ninguna: `/report` fue la última en pasar al sistema de la landing.
+ */
+const FIXED_LIGHT_ROUTES: string[] = [];
 
 /**
  * Marca en `<html>` que la ruta actual es de colores fijos. El atributo
