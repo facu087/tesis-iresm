@@ -39,10 +39,8 @@
 
 /*
  * Solo los tokens semánticos cambian en modo oscuro. `--background` y
- * `--foreground` alimentan el `body` de todas las rutas, y /analyzing y
- * /report todavía usan clases claras fijas: si cambiaran acá, esas vistas
- * heredarían texto claro sobre sus tarjetas blancas. Las páginas que sí
- * adoptan la paleta fijan su propio fondo con `bg-bg text-fg`.
+ * `--foreground` alimentan el `body` de todas las rutas y quedan en claro:
+ * cada página fija su propio fondo con `bg-bg text-fg`.
  *
  * El tema oscuro se compone aparte, no es una inversión: azul noche de fondo,
  * y versiones claras de la marca y del ocre. Se activa por selección del
@@ -67,19 +65,9 @@
   color-scheme: dark;
 }
 
-/* Las rutas de colores fijos nunca adoptan el esquema oscuro nativo. */
-:root[data-fixed-light] {
-  color-scheme: light;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  --font-serif: var(--font-newsreader), Georgia, serif;
-  /* Cuerpo de las pantallas con tokens (clase `font-body`); /report y /analyzing siguen en Geist. */
-  --font-body: var(--font-atkinson), var(--font-geist-sans), system-ui, sans-serif;
 
   --color-bg: var(--color-bg);
   --color-bg-subtle: var(--color-bg-subtle);
@@ -106,10 +94,10 @@ body {
 
 /* ── Landing scope ─────────────────────────────────────────────────────────
  *
- * Visual system of the public landing (`/`), the branded 404, the access
- * pages (`/registro`, `/ingresar`) and the signed in pages (`/cuenta`,
- * `/analizar`). Everything
- * below is scoped to the `.landing` wrapper, so the other routes keep the
+ * Visual system of every route: the public landing (`/`), the branded 404,
+ * the access pages (`/registro`, `/ingresar`) and the signed in pages
+ * (`/cuenta`, `/analizar`, `/analyzing`, `/report`, `/admin/pendientes`).
+ * Everything below is scoped to the `.landing` wrapper, which leaves the
  * tokens defined above untouched. The wrapper redefines the semantic tokens
  * for its own subtree: the Tailwind utilities (`bg-bg`, `text-fg`, …) resolve
  * through `var()`, so they pick up the scoped values without new class names.
