@@ -92,8 +92,11 @@ el backend real en modo grabado, en claro y oscuro, a 1440 px y 375 px.
 
 Estrategia: `ask-on-risk`. Pronóstico: más de 400 líneas (las tres páginas
 suman unas 1.600). Cadena: PRs apilados hacia `develop`, uno por pantalla, como
-los #57 a #59 del mismo día. Límites de cada PR: se registran acá al cerrar
-cada tarea.
+los #57 a #59 del mismo día. Límites de cada PR:
+
+- #61 `feature/s4-migracion-admin-pendientes`: `51b7c1e..35692e3` (T1).
+- #62 `feature/s4-migracion-analyzing`: `35692e3..0732291` (T2).
+- #63 `feature/s4-migracion-rutas-internas`: `0732291..` (T3, T4 y cierre).
 
 ## Verificación
 
@@ -169,4 +172,4 @@ cada tarea.
 
 - 2026-10-09: rama y documento creados.
 - 2026-10-09: T1 y T2 hechas, revisadas y acusadas. T3 delegada.
-- 2026-10-09: T3, T4 y T5 hechas. Falta la entrega.
+- 2026-10-09: T3, T4 y T5 hechas. PRs #61, #62 y #63 abiertos, sin mergear.
