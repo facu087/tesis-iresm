@@ -395,6 +395,8 @@ tesis-iresm/
 │   │   │   │   │                      `/ingresar`, `/cuenta` y `/analizar`
 │   │   │   │   ├── styles.ts       ← clases compartidas: botones, foco, transición
 │   │   │   │   ├── IslandNav.tsx   ← navegación flotante + menú móvil accesible
+│   │   │   │   ├── LandingSession.tsx ← sesión de la landing: una consulta por
+│   │   │   │   │                      montaje y la acción principal según la cuenta
 │   │   │   │   ├── AuthShell.tsx   ← marco de las pantallas de acceso y de cuenta
 │   │   │   │   ├── FormPrimitives.tsx ← campo, error y botón de envío
 │   │   │   │   ├── LandingMarkSprite.tsx, LandingMark.tsx, LandingLogo.tsx

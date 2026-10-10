@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { UserIcon } from "@phosphor-icons/react/ssr";
 import LandingLogo from "@/components/landing/LandingLogo";
+import {
+  ACCESS_HINT,
+  primaryActionFor,
+  useLandingSession,
+} from "@/components/landing/LandingSession";
 import ThemeToggle from "@/components/ThemeToggle";
 import {
   EASE,
@@ -16,9 +22,16 @@ import {
 /**
  * Floating navigation of the landing: a glass pill detached from the top.
  *
- * Desktop: section links, "Ingresar" as a plain link and the theme selector.
- * The primary action joins the pill only once the hero button has scrolled
- * out of view, so there is a single primary action above the fold.
+ * Desktop: section links, the account link and the theme selector. The
+ * primary action joins the pill only once the hero button has scrolled out of
+ * view, so there is a single primary action above the fold.
+ *
+ * The account link follows the landing session: "Ingresar" without one, the
+ * user's name linking to `/cuenta` with one, plus "Cuentas pendientes" for an
+ * admin. While the session loads the link is marked `data-session-pending`,
+ * which hides it only when scripting is enabled (see `globals.css`), so
+ * "Ingresar" never flashes into the name. The primary action comes from
+ * `primaryActionFor`, the same helper the hero uses.
  *
  * Mobile: a hamburger whose two lines rotate into an X opens a screen filling
  * glass overlay with the links revealed in a staggered slide up. The overlay
@@ -54,10 +67,46 @@ const STAGGER = [
 
 const DESKTOP_QUERY = "(min-width: 1024px)";
 
+/** A link that depends on the session, rendered by the pill and the overlay. */
+interface AccountLink {
+  href: string;
+  label: string;
+  /** Accessible name, when it says more than the visible label. */
+  ariaLabel?: string;
+  /** The link to the signed in user's account, drawn with a user icon. */
+  isUser?: boolean;
+}
+
 export default function IslandNav({ links, heroActionId }: IslandNavProps) {
   const [open, setOpen] = useState(false);
   const [heroActionVisible, setHeroActionVisible] = useState(true);
   const [activeHref, setActiveHref] = useState<string | null>(null);
+
+  const { status, cuenta } = useLandingSession();
+  const action = primaryActionFor(cuenta);
+  const sessionPending = status === "loading";
+
+  const accountLinks: AccountLink[] = [];
+  if (cuenta === null) {
+    accountLinks.push({ href: "/ingresar", label: "Ingresar" });
+  } else {
+    const nombre = cuenta.nombre?.trim() ?? "";
+    accountLinks.push({
+      href: "/cuenta",
+      label: nombre || "Mi cuenta",
+      ariaLabel: nombre ? `Mi cuenta, ${nombre}` : "Mi cuenta",
+      isUser: true,
+    });
+    if (cuenta.rol === "admin") {
+      accountLinks.push({ href: "/admin/pendientes", label: "Cuentas pendientes" });
+    }
+  }
+  // Overlay list: the section links first, then the session dependent ones.
+  const menuItems: AccountLink[] = [...links, ...accountLinks];
+  // When an account link already leads where the primary action does (an
+  // admin, a physician whose account is not verified), the action is not
+  // repeated next to it.
+  const actionIsAccountLink = accountLinks.some((link) => link.href === action.href);
 
   const headerRef = useRef<HTMLElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -135,7 +184,10 @@ export default function IslandNav({ links, heroActionId }: IslandNavProps) {
         header.querySelectorAll<HTMLElement>("a[href], button"),
       ).filter(
         (element) =>
-          element.closest("[inert]") === null && element.getClientRects().length > 0,
+          element.closest("[inert]") === null &&
+          element.getClientRects().length > 0 &&
+          // The account link is hidden, not removed, while the session loads.
+          getComputedStyle(element).visibility !== "hidden",
       );
       if (focusable.length === 0) return;
 
@@ -163,7 +215,7 @@ export default function IslandNav({ links, heroActionId }: IslandNavProps) {
     };
   }, [open, close]);
 
-  const showPillAction = !heroActionVisible;
+  const showPillAction = !heroActionVisible && !actionIsAccountLink;
 
   return (
     <header
@@ -194,9 +246,20 @@ export default function IslandNav({ links, heroActionId }: IslandNavProps) {
               {link.label}
             </a>
           ))}
-          <Link href="/ingresar" className={NAV_LINK}>
-            Ingresar
-          </Link>
+          {accountLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              aria-label={link.ariaLabel}
+              data-session-pending={sessionPending ? "" : undefined}
+              className={link.isUser ? `inline-flex items-center gap-2 ${NAV_LINK}` : NAV_LINK}
+            >
+              {link.isUser && (
+                <UserIcon aria-hidden="true" weight="bold" className="size-4 shrink-0" />
+              )}
+              {link.isUser ? <span className="max-w-32 truncate">{link.label}</span> : link.label}
+            </Link>
+          ))}
         </nav>
 
         <ThemeToggle />
@@ -209,8 +272,8 @@ export default function IslandNav({ links, heroActionId }: IslandNavProps) {
           }`}
         >
           <div className="min-w-0 overflow-hidden rounded-full">
-            <Link href="/registro" className={HEADER_BUTTON}>
-              Solicitar acceso
+            <Link href={action.href} className={HEADER_BUTTON}>
+              {action.label}
             </Link>
           </div>
         </div>
@@ -258,41 +321,56 @@ export default function IslandNav({ links, heroActionId }: IslandNavProps) {
           className="mx-auto flex min-h-full max-w-6xl flex-col justify-center px-6 pt-24 pb-12"
         >
           <ul className="flex flex-col gap-2">
-            {[...links, { href: "/ingresar", label: "Ingresar" }].map((link, index) => (
+            {menuItems.map((link, index) => (
               // The list item is the "invisible box" the link slides out of.
               <li key={link.href} className="overflow-hidden p-1">
                 <Link
                   ref={index === 0 ? firstItemRef : undefined}
                   href={link.href}
+                  aria-label={link.ariaLabel}
+                  data-session-pending={
+                    sessionPending && index >= links.length ? "" : undefined
+                  }
                   onClick={() => close(false)}
-                  className={`block rounded-lg py-2 text-3xl font-semibold text-fg ${TRANSITION} hover:text-accent ${FOCUS_RING} ${
+                  className={`${
+                    link.isUser ? "flex items-center gap-2" : "block"
+                  } rounded-lg py-2 text-3xl font-semibold text-fg ${TRANSITION} hover:text-accent ${FOCUS_RING} ${
                     open
                       ? `translate-y-0 opacity-100 ${STAGGER[index % STAGGER.length]}`
                       : "translate-y-12 opacity-0"
                   }`}
                 >
-                  {link.label}
+                  {link.isUser && (
+                    <UserIcon aria-hidden="true" weight="bold" className="size-6 shrink-0" />
+                  )}
+                  {link.isUser ? (
+                    <span className="min-w-0 truncate">{link.label}</span>
+                  ) : (
+                    link.label
+                  )}
                 </Link>
               </li>
             ))}
           </ul>
 
-          <div
-            className={`mt-10 p-1 ${TRANSITION} ${
-              open ? "translate-y-0 opacity-100 delay-500" : "translate-y-12 opacity-0"
-            }`}
-          >
-            <Link
-              href="/registro"
-              onClick={() => close(false)}
-              className={PRIMARY_BUTTON}
+          {!actionIsAccountLink && (
+            <div
+              className={`mt-10 p-1 ${TRANSITION} ${
+                open ? "translate-y-0 opacity-100 delay-500" : "translate-y-12 opacity-0"
+              }`}
             >
-              Solicitar acceso
-            </Link>
-            <p className="mt-3 text-sm text-pretty text-fg-muted">
-              Requiere matrícula médica. Un administrador revisa cada solicitud.
-            </p>
-          </div>
+              <Link
+                href={action.href}
+                onClick={() => close(false)}
+                className={PRIMARY_BUTTON}
+              >
+                {action.label}
+              </Link>
+              {action.showHint && (
+                <p className="mt-3 text-sm text-pretty text-fg-muted">{ACCESS_HINT}</p>
+              )}
+            </div>
+          )}
         </nav>
       </div>
     </header>
