@@ -70,12 +70,13 @@ el backend real en modo grabado, en claro y oscuro, a 1440 px y 375 px.
   El marco se extrajo a `ShellFrame` y el aviso a `DiagnosticNotice`.
 - [x] **T2 — `/analyzing` en el sistema nuevo, con los pasos de
   `pipelineSteps.ts`.** Ruta: delegada. Commit `79f1874`.
-- [ ] **T3 — `/report` en el sistema nuevo.** Ruta: delegada (archivo de 1.112
-  líneas).
-- [ ] **T4 — Retirar lo que quedó sin uso y actualizar la documentación.**
+- [x] **T3 — `/report` en el sistema nuevo.** Ruta: delegada (archivo de 1.112
+  líneas). Commit `6daf123`; arreglo posterior a la revisión en `ac19ea2`.
+- [x] **T4 — Retirar lo que quedó sin uso y actualizar la documentación.**
   Ruta: delegada. `ThemeScope`, fuentes y tokens anteriores, y la sección
-  "Identidad visual del frontend" de `.claude/CLAUDE.md`.
-- [ ] **T5 — Recorrido completo en navegador.** Ruta: en línea. Flujo de punta
+  "Identidad visual del frontend" de `.claude/CLAUDE.md`. Commits `edc4ee3`
+  y `dc2dd48`.
+- [x] **T5 — Recorrido completo en navegador.** Ruta: en línea. Flujo de punta
   a punta y recorrido de sesión y rol, más capturas de las tres pantallas.
 
 ## Criterios de aceptación
@@ -106,6 +107,16 @@ cada tarea.
   en navegador: 20 de 20 (1440 px claro hasta abrir el reporte, 375 px oscuro
   con movimiento reducido, error de red, visita directa sin caso). Un envío
   manda un solo `POST /api/analyze` en desarrollo (medido).
+- T3: tipos, lint y build sin errores (reportados por el escritor). Recorrido
+  en navegador: 22 de 22 (1440 px claro y 375 px oscuro): marco, cinco
+  pestañas con contenido y sin desborde, marca de modo grabado, advertencia
+  del consenso, aviso, sin emojis, flechas del teclado, pestañas fijas al
+  bajar y descarga del PDF.
+- T4: tipos, lint y build sin errores (reportados por el escritor; tipos
+  repetidos por el padre).
+- T5, con base y caché de desarrollo nuevas: flujo completo 20 de 20
+  (registro, rechazo con motivo, reenvío, aprobación, análisis, reporte, PDF,
+  cierre de sesión) y recorrido de sesión y rol 24 de 24.
 
 ## Revisión nativa
 
@@ -121,6 +132,11 @@ cada tarea.
   mapa de iconos y tiempos por id cae en silencio a un valor por defecto si la
   lista compartida cambia; la cancelación comparte una sola referencia entre
   ejecuciones del efecto (ya estaba en la base).
+- T3 (`0732291..4dbe5b3`): riesgo medio, consentida, **aprobada y acusada**
+  (linaje `review-bc3a3e527f5d18bd`). Sin bloqueantes. Corregido en `ac19ea2`:
+  un ensayo con un valor de compatibilidad fuera de los cuatro conocidos
+  rompía toda la vista (la tabla de insignias no tenía valor por defecto).
+  Abierto: el manejo de teclado de las pestañas no tiene prueba automática.
 
 ## Cambios aceptados después de delegar
 
@@ -131,6 +147,11 @@ cada tarea.
   el backend responde una sola vez con el reporte terminado y no manda eventos.
 - `/analyzing`: el botón del error pasó de "Volver al inicio" a "Volver a
   cargar el caso"; el destino (`/analizar`) no cambió.
+- `/report`: las pestañas son una lista de pestañas accesible (flechas,
+  Inicio, Fin); "Nuevo análisis" es un enlace en la píldora; el botón del PDF
+  dejó de estar en una barra fija y queda junto al título; los colores de
+  estado siguen la landing (especulativa en borde punteado, prioridad en
+  ocre).
 - La lista compartida tiene 8 pasos, no 9 como decía la auditoría.
 
 ## Pendientes
@@ -138,9 +159,14 @@ cada tarea.
 - El error de red de `/analyzing` muestra el mensaje crudo del navegador
   ("Failed to fetch"). Ya era así antes de la migración.
 - La visita directa a `/analyzing` sin caso redirige a `/` y no a `/analizar`.
-- `/analizar` sigue con su copia del aviso en vez de `DiagnosticNotice`.
+- En `/report`, la etiqueta "En PubMed este PMID es:" sale en rojo también en
+  las fuentes verificadas. Ya era así antes de la migración.
+- `body` en `layout.tsx` conserva `bg-gray-50 text-gray-900`, que la regla
+  global de `body` pisa: está muerto y no se ve.
+- Los recorridos de navegador siguen fuera del repositorio.
 
 ## Progreso
 
 - 2026-10-09: rama y documento creados.
 - 2026-10-09: T1 y T2 hechas, revisadas y acusadas. T3 delegada.
+- 2026-10-09: T3, T4 y T5 hechas. Falta la entrega.
