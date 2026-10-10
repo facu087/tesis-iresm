@@ -1,6 +1,12 @@
-# Traspaso de sesión — 2026-10-06
+# Traspaso de sesión — 2026-10-09
 
-Reemplaza al traspaso del 2026-10-04. Los seis agentes ya están en `develop`: el Agente 06
+Actualizado el 2026-10-09 sobre el traspaso del 2026-10-06. Lo nuevo: la landing rediseñada y
+las pantallas de acceso, cuenta y carga con la misma identidad (PR #57, #58 y #59, tarjeta
+#88 en QA), los cuatro PR de Fede mergeados y las tarjetas #76 y #77 en QA con evidencia.
+El detalle está en "Lo que se mergeó el 2026-10-07 y el 2026-10-09" (sección 2) y en 4.10.
+Las secciones 3 y 4.1 a 4.9 no se revisaron en esta actualización.
+
+Texto del 2026-10-06: reemplaza al traspaso del 2026-10-04. Los seis agentes ya están en `develop`: el Agente 06
 lo mergeó Facundo el 2026-10-06 (PR #35) y una revisión posterior encontró dos defectos que
 se arreglan en la rama `fix/s4-agente06-citas-y-pdf` (ver 4.1). El 2026-10-06 también se
 grabaron las respuestas del modo mock desde una corrida real y se encontró y arregló un
@@ -32,11 +38,17 @@ Lecciones prácticas:
   "porque la salida es corta" rompieron al Árbitro (ver sección 3).
 - **Antes de proponer algo, leer los comentarios de la tarjeta.** El Agente 06 ya tenía una
   propuesta de Facundo anunciada en un comentario.
-- **Adjuntos a Trello en la máquina Linux de Matías**: el conector solo adjunta desde una URL.
-  Para archivos locales, un script con `curl -F file=@...` contra
-  `POST /1/cards/{id}/attachments`, que Matías corre con `! bash <script>`. Las credenciales
-  están en `~/.claude.json`, dentro de `.projects["<ruta del repo>"].mcpServers.trello.env`,
-  **no** en el `.env` del repo. Claude tiene bloqueada la lectura de `.env` y `.env.example`.
+- **Adjuntos a Trello en la máquina Linux de Matías**: el conector sube archivos locales
+  pasando `fileUrl` como `file:///ruta/absoluta` (usado el 2026-10-06 y el 2026-10-09). Antes
+  de subir, confirmar el número de tarjeta contra el tablero. El conector no puede borrar ni
+  renombrar adjuntos: mirar cada captura antes de subirla. Plan B si falla: un script con
+  `curl -F file=@...` contra `POST /1/cards/{id}/attachments`, que Matías corre con
+  `! bash <script>`; las credenciales están en `~/.claude.json`, dentro de
+  `.projects["<ruta del repo>"].mcpServers.trello.env`, **no** en el `.env` del repo. Claude
+  tiene bloqueada la lectura de `.env` y `.env.example`.
+- **Capturas del frontend nuevo**: las pantallas entran con una animación; una captura tomada
+  apenas carga sale en blanco. Usar movimiento reducido en el navegador sin interfaz y esperar
+  unos 2 s.
 - **Trello MCP**: llamar `set_active_board` con `kdXM36sU` al empezar. Si da 401, el token
   venció: se regenera en https://trello.com/power-ups/admin con `expiration=never`.
 - **Python**: el venv está en la raíz del repo (`.venv/bin/python`). Los worktrees no tienen
@@ -50,7 +62,10 @@ Lecciones prácticas:
 
 ## 2. Estado al cierre
 
-`develop` está en `cc5105b` (PR #38). La suite tenía 1113 tests después del PR #32; con el
+**Al 2026-10-09 `develop` está en `fcef367` (PR #59).** La suite de Python no se corrió
+completa en esta actualización; el frontend pasa tipos, lint y build.
+
+Al 2026-10-06: `develop` estaba en `cc5105b` (PR #38). La suite tenía 1113 tests después del PR #32; con el
 PR #38 pasan 1150 en ~57 s, y esta rama deja 1186. Los fallos intermitentes de
 `tests/test_agent_05_trials.py` quedaron resueltos (ver 4.7).
 
@@ -84,6 +99,24 @@ Antes, el 2026-09-28, había entrado la landing explicativa (PR #21, tarjeta #82
 | #35 | Agente 06 (Sintetizador), de Facundo (merge `1f11917`); ver 4.1 |
 | #37 | Facundo: arregla el import circular entre el Agente 06 y el extractor de biomarcadores (el import de `_NON_GENE_TERMS` pasó a ser diferido) |
 | #38 | Los tests nunca llaman al proveedor real (merge `cc5105b`); ver 4.9 |
+
+### Lo que se mergeó el 2026-10-07 y el 2026-10-09
+| PR | Qué | Tarjeta |
+|----|-----|---------|
+| #55 | Facundo: el prompt del Agente 02 no nombra genes ni variantes | — |
+| #56 | Facundo: regrabación del modo mock con la corrida real del 2026-10-07 | — |
+| #47 | Fede: el test de hermeticidad del modo mock ya no falla en Windows | #86, sin evidencia |
+| #49 | Fede: lint del frontend limpio | #77, en QA |
+| #50 | Fede: el filtro de relevancia del RAG filtra (umbral 0,55, `NEXUS_RAG_MIN_SCORE`) | #76, en QA |
+| #54 | Fede: logo NEXUS en el frontend | — |
+| #57 | Landing rediseñada con la skill `landing-page-design`: el producto como imagen | #88, en QA |
+| #58 | `/registro`, `/ingresar`, `/cuenta` y `/analizar` con la identidad de la landing; pestañas en el hero y comparación de citas como secuencia | #88, en QA |
+| #59 | La landing reconoce la sesión; el admin llega a `/admin/pendientes` y ya no se le ofrece analizar | #88, en QA |
+
+Los PR #57, #58 y #59 se abrieron en cadena y se mergearon en ese orden, sin revisión de otro
+integrante. El detalle de cada uno está en `odd/tasks/landing-skill-prueba.md` y
+`odd/tasks/sesion-en-landing.md`; el estado del frontend, en "Identidad visual del frontend"
+de `.claude/CLAUDE.md`.
 
 ---
 
@@ -228,7 +261,9 @@ actualizarlos con cada regrabación. La corrida del 2026-10-07 (ya con el prompt
 sin genes) midió 84.867 tokens en 27 llamadas (5 reintentadas por 429) y 493 s, ninguna
 respuesta cortada. El PDF de respaldo para la demo, generado en mock con verificación real
 contra PubMed, quedó en `output/demo_respaldo/reporte_mock.pdf` (local, gitignoreado).
-Falta la captura real de la tarjeta #80.
+Falta la captura real de la tarjeta #80. Al 2026-10-09 sigue faltando: la tarjeta está en QA
+con datos de prueba y dos corridas reales (2026-10-06 y 2026-10-07) no produjeron el caso.
+No conviene gastar una corrida solo para buscarlo.
 
 La comparación de costo contra Claude, GPT-4o y Gemini que muestra `scripts/demo_costos.py`
 usa una **muestra sintética**. Con el `costos.jsonl` real ya se puede recalcular con
@@ -271,10 +306,18 @@ usa una **muestra sintética**. Con el `costos.jsonl` real ya se puede recalcula
 
 ### 4.6 De otros integrantes
 - **Facundo**: #71 cliente ClinVar — hecho (PR #41) y en QA desde el 2026-10-06.
-- **Fede**: #74 cliente Orphadata, #76 filtro de relevancia del RAG, #77 lint del frontend,
-  #78 portada del PDF.
-- Sin asignar: #79 (comentario en el `.env` que desactiva la verificación) y #80 (un agente
-  como sostén y objetor de la misma hipótesis).
+- **Fede**, al 2026-10-09:
+  - #76 (filtro de relevancia del RAG) y #77 (lint del frontend): mergeadas y en QA. La
+    evidencia la generó Matías sobre `develop`; está en `output/evidencia/76/` y `77/`.
+  - #86 (test de hermeticidad en Windows): mergeada (PR #47), sin evidencia. Hay que
+    generarla desde Windows.
+  - #79 (comentario en el `.env` que desactiva la verificación): PR #51 abierto, con cambios
+    pedidos por Facundo el 2026-10-07.
+  - #74 (cliente Orphadata) y #78 (portada del PDF): sin trabajo en el repo.
+  - #87 (vulnerabilidades del frontend): `npm audit` sigue dando 14 (1 crítica, 12 altas,
+    1 moderada).
+- #80 (un agente como sostén y objetor de la misma hipótesis): resuelta en el PR #52 y en QA;
+  ver la nota de 4.3.
 
 ### 4.7 Observaciones de la revisión nativa y tests intermitentes
 La revisión nativa de los PR #30 y #31 se aprobó con seis observaciones no bloqueantes; la 1 y
@@ -322,6 +365,36 @@ clave pone una falsa; ahora una llamada sin aislar falla fuerte. Tras el arreglo
 tests en ~57 s. Regla práctica: si la suite tarda mucho más o se cuelga, hay una llamada de
 red o de proveedor sin aislar.
 
+### 4.10 Frontend, después de la landing nueva (2026-10-09)
+En orden sugerido:
+- **Corredor de tests del frontend.** No existe. Es la observación que repitieron las seis
+  revisiones nativas de los PR #57 a #59. Todo lo interactivo se probó en un navegador sin
+  interfaz (44 comprobaciones entre los dos recorridos) y esos guiones no están en el repo.
+- **Migrar `/admin/pendientes`, `/analyzing` y `/report`** al sistema visual nuevo. Hoy
+  conviven dos identidades.
+- **Pantallas de admin que no existen**: cuentas aprobadas, historial de decisiones y baja de
+  cuentas. La auditoría se guarda en la base y no tiene vista.
+- `NEXT_PUBLIC_SITE_URL` no está definida: las etiquetas para compartir caen a
+  `http://localhost:3000` con un aviso.
+- No hay política de privacidad ni términos.
+- Detalles conocidos de la sesión en la landing: una página restaurada con el botón "atrás"
+  después de cerrar sesión puede mostrar la sesión vieja hasta recargar; un visitante sin
+  sesión genera un 401 de `/api/cuenta` en la consola.
+
+Cómo se probó contra el backend real sin gastar cuota: backend con una base temporal y el
+modelo en modo grabado, pasando las variables por línea de comandos (ganan sobre el `.env`,
+así que no hace falta leerlo):
+
+```bash
+env NEXUS_DB_PATH=<archivo temporal> NEXUS_MOCK_LLM=1 ALLOWED_ORIGINS=http://localhost:3000 \
+    SECRET_KEY=<valor aleatorio> .venv/bin/python -m uvicorn backend.main:app --port 8000
+env NEXUS_DB_PATH=<el mismo archivo> .venv/bin/python -m backend.cli crear-admin --email <email>
+```
+
+El validador de email rechaza dominios reservados (`.example`, `.test`): usar uno con forma
+real. En modo grabado un análisis tarda unos 30 s, porque PubMed y ClinicalTrials.gov se
+consultan de verdad.
+
 ---
 
 ## 5. Demo para el profesor
@@ -339,8 +412,8 @@ cd frontend && npm run dev                                   # :3000
 1. Definir `SECRET_KEY` en el `.env`.
 2. Crear el primer admin: `.venv/bin/python -m backend.cli crear-admin --email <email>`
    (pide la contraseña sin mostrarla).
-3. Registrar un médico en `/registro`, entrar como admin en `/ingresar` y aprobarlo en
-   `/admin/pendientes`.
+3. Registrar un médico en `/registro`, entrar como admin en `/ingresar` (desde el PR #59 el
+   ingreso de un admin lleva directo a `/admin/pendientes`) y aprobarlo ahí.
 
 Una corrida real tarda unos 8 minutos y gasta cerca de 40% de la cuota diaria (80.458 de 200.000 tokens): no hacer
 pruebas con Groq el mismo día de la demo.
@@ -353,8 +426,11 @@ anterior **no están en la máquina Linux de Matías**.
 
 ### Guion (~10 min)
 1. Qué es NEXUS: genera **hipótesis de investigación**, no diagnósticos. La landing en `/` lo
-   explica.
+   muestra con el producto: la tarjeta del reporte con sus tres estados, la comparación entre
+   la cita declarada y el título real de PubMed (14 de 18 no coincidieron en la corrida del
+   2026-09-22) y el pipeline.
 2. Registro e ingreso: solo un médico con matrícula verificada por un admin puede analizar.
+   Con la sesión iniciada, la landing muestra el nombre y el botón pasa a "Analizar un caso".
 3. Cargar el caso en `/analizar`.
 4. Vista de pipeline en tiempo real: ingesta → PICO → RAG → Ronda 1 → debate → verificación →
    Árbitro → Navegador de ensayos.
@@ -364,7 +440,8 @@ anterior **no están en la máquina Linux de Matías**.
 7. Costos: 80.458 tokens por caso, medidos; y cómo medir destapó defectos que el sistema
    escondía detrás de un fallback, entre ellos que las críticas del debate no llegaban a su
    destinatario.
-8. Qué sigue: el Sintetizador ya está mergeado; falta que el resumen se vea en mock (T4 de 4.1, necesita una llamada real).
+8. Qué sigue: los seis agentes están mergeados y el resumen del Sintetizador ya se ve en modo
+   mock (regrabación del 2026-10-07). Lo pendiente del frontend está en 4.10.
 
 ---
 
