@@ -1,15 +1,49 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import ThemeToggle from "@/components/ThemeToggle";
 import { useRouter } from "next/navigation";
+import { ArrowSquareOutIcon, ShieldCheckIcon } from "@phosphor-icons/react/ssr";
 import { aprobarCuenta, listarPendientes, logout, obtenerCuenta, rechazarCuenta } from "@/lib/api";
 import type { CuentaPendiente } from "@/lib/types";
-import BrandLockup from "@/components/NexusLogo";
+import AuthShell from "@/components/landing/AuthShell";
+import DiagnosticNotice from "@/components/landing/DiagnosticNotice";
+import { FormError, FormField } from "@/components/landing/FormPrimitives";
+import {
+  CARD,
+  NAV_LINK,
+  SECONDARY_SUBMIT_BUTTON,
+  SUBMIT_BUTTON,
+  TEXT_LINK,
+} from "@/components/landing/styles";
 
-const inputClass =
-  "w-full rounded-lg border border-fg-muted bg-bg px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-accent";
+const LIST_ERROR_ID = "pendientes-error";
+
+/** Inner card of one decision (approve or reject): a field and its button. */
+const DECISION_FORM = "flex flex-col gap-4 rounded-xl border border-border bg-bg-subtle p-4";
+
+/** External licence lookup link: opens in a new tab, marked with an icon. */
+const LOOKUP_LINK = `inline-flex items-center gap-1 text-sm ${TEXT_LINK}`;
+
+/** One labelled datum of the account under review. */
+function Dato({
+  label,
+  mono = false,
+  children,
+}: {
+  label: string;
+  /** Identifiers (DNI, licence number) are set in Geist Mono. */
+  mono?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-xs font-semibold text-fg-muted">{label}</dt>
+      <dd className={`mt-0.5 text-sm wrap-anywhere text-fg ${mono ? "font-mono" : ""}`}>
+        {children}
+      </dd>
+    </div>
+  );
+}
 
 function FilaPendiente({
   cuenta,
@@ -22,6 +56,9 @@ function FilaPendiente({
   const [motivo, setMotivo] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState<"aprobar" | "rechazar" | null>(null);
+
+  const errorId = `decision-error-${cuenta.id}`;
+  const describedBy = error ? errorId : undefined;
 
   const handleAprobar = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,87 +89,107 @@ function FilaPendiente({
   };
 
   return (
-    <li className="rounded-2xl border border-border bg-bg-subtle p-6">
-      <div className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
-        <p><span className="text-fg-muted">Nombre: </span>{cuenta.nombre} {cuenta.apellido}</p>
-        <p><span className="text-fg-muted">Email: </span>{cuenta.email}</p>
-        <p><span className="text-fg-muted">DNI: </span>{cuenta.dni}</p>
-        <p><span className="text-fg-muted">Matrícula: </span>{cuenta.matricula} ({cuenta.jurisdiccion})</p>
-        {cuenta.profesion && <p><span className="text-fg-muted">Profesión: </span>{cuenta.profesion}</p>}
-        <p><span className="text-fg-muted">Registrada: </span>{new Date(cuenta.creada_en).toLocaleString("es-AR")}</p>
+    <li className={`${CARD} flex flex-col gap-6 sm:p-8`}>
+      <div>
+        <p className="text-lg font-semibold wrap-anywhere text-fg">
+          {cuenta.nombre} {cuenta.apellido}
+        </p>
+        <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+          <Dato label="Email">{cuenta.email}</Dato>
+          <Dato label="DNI" mono>
+            {cuenta.dni}
+          </Dato>
+          <Dato label="Matrícula">
+            <span className="font-mono">{cuenta.matricula}</span> ({cuenta.jurisdiccion})
+          </Dato>
+          {cuenta.profesion && <Dato label="Profesión">{cuenta.profesion}</Dato>}
+          <Dato label="Registrada">{new Date(cuenta.creada_en).toLocaleString("es-AR")}</Dato>
+        </dl>
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-4 text-sm">
-        <a
-          href={cuenta.enlace_refeps}
-          target="_blank"
-          rel="noreferrer"
-          className="cursor-pointer font-medium text-fg underline underline-offset-2"
-        >
-          Buscador Nacional REFEPS ↗
+      <div className="flex flex-wrap gap-x-6 gap-y-2">
+        <a href={cuenta.enlace_refeps} target="_blank" rel="noreferrer" className={LOOKUP_LINK}>
+          Buscador Nacional REFEPS
+          <ArrowSquareOutIcon aria-hidden="true" weight="bold" className="size-4 shrink-0" />
+          <span className="sr-only">(se abre en una pestaña nueva)</span>
         </a>
         {cuenta.enlace_provincial && (
           <a
             href={cuenta.enlace_provincial}
             target="_blank"
             rel="noreferrer"
-            className="cursor-pointer font-medium text-fg underline underline-offset-2"
+            className={LOOKUP_LINK}
           >
-            Buscador provincial ↗
+            Buscador provincial
+            <ArrowSquareOutIcon aria-hidden="true" weight="bold" className="size-4 shrink-0" />
+            <span className="sr-only">(se abre en una pestaña nueva)</span>
           </a>
         )}
       </div>
 
-      <div className="mt-5 grid gap-4 sm:grid-cols-2">
-        <form onSubmit={handleAprobar} className="space-y-2 rounded-xl border border-border bg-bg p-4">
-          <label htmlFor={`fuente-${cuenta.id}`} className="block text-xs font-medium text-fg-muted">
-            Fuente consultada (obligatoria para aprobar)
-          </label>
-          <input
+      {/* Side by side while each form keeps a usable width: the main column
+          of the shell is narrower at `lg` than on a tablet. */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+        <form onSubmit={handleAprobar} className={DECISION_FORM}>
+          <FormField
             id={`fuente-${cuenta.id}`}
+            label="Fuente consultada (obligatoria para aprobar)"
             required
             value={fuenteConsultada}
             onChange={(e) => setFuenteConsultada(e.target.value)}
             placeholder="Ej: Buscador Nacional REFEPS"
-            className={inputClass}
           />
           <button
             type="submit"
             disabled={enviando !== null}
-            className="w-full cursor-pointer rounded-lg bg-accent py-2 text-sm font-semibold text-accent-fg transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-60"
+            aria-busy={enviando === "aprobar"}
+            aria-describedby={describedBy}
+            className={`mt-auto ${SUBMIT_BUTTON}`}
           >
             {enviando === "aprobar" ? "Aprobando..." : "Aprobar"}
           </button>
         </form>
 
-        <form onSubmit={handleRechazar} className="space-y-2 rounded-xl border border-border bg-bg p-4">
-          <label htmlFor={`motivo-${cuenta.id}`} className="block text-xs font-medium text-fg-muted">
-            Motivo (obligatorio para rechazar)
-          </label>
-          <input
+        <form onSubmit={handleRechazar} className={DECISION_FORM}>
+          <FormField
             id={`motivo-${cuenta.id}`}
+            label="Motivo (obligatorio para rechazar)"
             required
             value={motivo}
             onChange={(e) => setMotivo(e.target.value)}
             placeholder="Ej: los datos no coinciden con el buscador"
-            className={inputClass}
           />
           <button
             type="submit"
             disabled={enviando !== null}
-            className="w-full cursor-pointer rounded-lg border border-border py-2 text-sm font-semibold text-fg transition-colors duration-200 hover:bg-bg-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-60"
+            aria-busy={enviando === "rechazar"}
+            aria-describedby={describedBy}
+            className={`mt-auto ${SECONDARY_SUBMIT_BUTTON}`}
           >
             {enviando === "rechazar" ? "Rechazando..." : "Rechazar"}
           </button>
         </form>
       </div>
 
-      {error && (
-        <p role="alert" className="mt-3 rounded-lg border border-red-600/30 bg-red-600/10 px-4 py-2 text-sm text-red-700 dark:text-red-400">
-          {error}
-        </p>
-      )}
+      {error && <FormError id={errorId}>{error}</FormError>}
     </li>
+  );
+}
+
+/** Placeholder shaped like an account card, shown while the list loads. */
+function PendientesSkeleton() {
+  return (
+    <div className={`${CARD} sm:p-8`}>
+      <p role="status" className="text-sm text-fg-muted">
+        Cargando...
+      </p>
+      <div aria-hidden="true" className="mt-4 flex flex-col gap-4">
+        <span className="landing-skeleton h-6 w-1/2 rounded-full" />
+        <span className="landing-skeleton h-4 w-full rounded-full" />
+        <span className="landing-skeleton h-4 w-2/3 rounded-full" />
+        <span className="landing-skeleton h-24 w-full rounded-xl" />
+      </div>
+    </div>
   );
 }
 
@@ -167,60 +224,36 @@ export default function AdminPendientesPage() {
   const quitarDeLaLista = (id: number) => setPendientes((p) => (p ? p.filter((c) => c.id !== id) : p));
 
   return (
-    <div className="flex min-h-screen font-body flex-col bg-bg text-fg">
-      <header className="border-b border-border">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-5">
-          <Link
-            href="/"
-            className="cursor-pointer rounded-sm font-serif text-lg font-semibold tracking-tight text-accent transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
-          >
-            <BrandLockup />
-          </Link>
-          <div className="flex items-center gap-2 sm:gap-4">
-            <ThemeToggle />
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="cursor-pointer rounded-sm text-sm text-fg-muted transition-colors duration-200 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
-            >
-              Cerrar sesión
-            </button>
-          </div>
-        </div>
-      </header>
+    <AuthShell
+      headerAction={
+        <button type="button" onClick={handleLogout} className={`${NAV_LINK} cursor-pointer`}>
+          Cerrar sesión
+        </button>
+      }
+      icon={<ShieldCheckIcon aria-hidden="true" weight="bold" className="size-6" />}
+      title="Cuentas pendientes"
+      lead="Revisá cada matrícula contra los buscadores públicos antes de decidir."
+      footer={<DiagnosticNotice />}
+    >
+      <div className="flex flex-col gap-6">
+        {error && <FormError id={LIST_ERROR_ID}>{error}</FormError>}
 
-      <main className="flex-1">
-        <div className="mx-auto max-w-3xl px-6 py-14">
-          <h1 className="mb-1 font-serif text-2xl font-semibold">Cuentas pendientes</h1>
-          <p className="mb-8 text-sm text-fg-muted">
-            Revisá cada matrícula contra los buscadores públicos antes de decidir.
+        {pendientes === null && !error && <PendientesSkeleton />}
+
+        {pendientes !== null && pendientes.length === 0 && (
+          <p className={`${CARD} text-sm text-pretty text-fg-muted sm:p-8`}>
+            No hay cuentas pendientes de revisión.
           </p>
+        )}
 
-          {error && (
-            <p role="alert" className="mb-6 rounded-lg border border-red-600/30 bg-red-600/10 px-4 py-2 text-sm text-red-700 dark:text-red-400">
-              {error}
-            </p>
-          )}
-
-          {pendientes === null && !error && (
-            <p className="text-sm text-fg-muted">Cargando...</p>
-          )}
-
-          {pendientes !== null && pendientes.length === 0 && (
-            <p className="rounded-2xl border border-border bg-bg-subtle p-8 text-sm text-fg-muted">
-              No hay cuentas pendientes de revisión.
-            </p>
-          )}
-
-          {pendientes !== null && pendientes.length > 0 && (
-            <ul className="space-y-5">
-              {pendientes.map((cuenta) => (
-                <FilaPendiente key={cuenta.id} cuenta={cuenta} onDecidida={quitarDeLaLista} />
-              ))}
-            </ul>
-          )}
-        </div>
-      </main>
-    </div>
+        {pendientes !== null && pendientes.length > 0 && (
+          <ul className="flex flex-col gap-6">
+            {pendientes.map((cuenta) => (
+              <FilaPendiente key={cuenta.id} cuenta={cuenta} onDecidida={quitarDeLaLista} />
+            ))}
+          </ul>
+        )}
+      </div>
+    </AuthShell>
   );
 }

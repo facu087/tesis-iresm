@@ -41,6 +41,9 @@ export const NAV_LINK = `rounded-full px-3 py-2 text-sm font-semibold whitespace
 /** Full width submit button of a form, with its pending (disabled) state. */
 export const SUBMIT_BUTTON = `${PRIMARY_BUTTON} w-full cursor-pointer disabled:pointer-events-none disabled:opacity-60`;
 
+/** Full width outlined button of a form: the action beside the main one. */
+export const SECONDARY_SUBMIT_BUTTON = `inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-full border border-fg-muted px-3 py-2 text-base font-semibold text-fg ${BUTTON_STATES} hover:border-accent hover:text-accent disabled:pointer-events-none disabled:opacity-60 ${FOCUS_RING}`;
+
 /** Horizontal page container. */
 export const CONTAINER = "mx-auto w-full max-w-6xl px-4 sm:px-6";
 
