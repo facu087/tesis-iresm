@@ -1,9 +1,9 @@
-# Traspaso de sesión — 2026-10-09
+# Traspaso de sesión — 2026-10-10
 
-Actualizado el 2026-10-09 sobre el traspaso del 2026-10-06. Lo nuevo: la landing rediseñada y
-las pantallas de acceso, cuenta y carga con la misma identidad (PR #57, #58 y #59, tarjeta
-#88 en QA), los cuatro PR de Fede mergeados y las tarjetas #76 y #77 en QA con evidencia.
-El detalle está en "Lo que se mergeó el 2026-10-07 y el 2026-10-09" (sección 2) y en 4.10.
+Actualizado el 2026-10-10 sobre el traspaso del 2026-10-06. Lo nuevo: la landing rediseñada y
+todas las pantallas con la misma identidad (PR #57 a #59 y #61 a #63, tarjeta #88 en QA), los
+cuatro PR de Fede mergeados y las tarjetas #76 y #77 en QA con evidencia.
+El detalle está en "Lo que se mergeó entre el 2026-10-07 y el 2026-10-10" (sección 2) y en 4.10.
 Las secciones 3 y 4.1 a 4.9 no se revisaron en esta actualización.
 
 Texto del 2026-10-06: reemplaza al traspaso del 2026-10-04. Los seis agentes ya están en `develop`: el Agente 06
@@ -100,7 +100,7 @@ Antes, el 2026-09-28, había entrado la landing explicativa (PR #21, tarjeta #82
 | #37 | Facundo: arregla el import circular entre el Agente 06 y el extractor de biomarcadores (el import de `_NON_GENE_TERMS` pasó a ser diferido) |
 | #38 | Los tests nunca llaman al proveedor real (merge `cc5105b`); ver 4.9 |
 
-### Lo que se mergeó el 2026-10-07 y el 2026-10-09
+### Lo que se mergeó entre el 2026-10-07 y el 2026-10-10
 | PR | Qué | Tarjeta |
 |----|-----|---------|
 | #55 | Facundo: el prompt del Agente 02 no nombra genes ni variantes | — |
@@ -112,11 +112,23 @@ Antes, el 2026-09-28, había entrado la landing explicativa (PR #21, tarjeta #82
 | #57 | Landing rediseñada con la skill `landing-page-design`: el producto como imagen | #88, en QA |
 | #58 | `/registro`, `/ingresar`, `/cuenta` y `/analizar` con la identidad de la landing; pestañas en el hero y comparación de citas como secuencia | #88, en QA |
 | #59 | La landing reconoce la sesión; el admin llega a `/admin/pendientes` y ya no se le ofrece analizar | #88, en QA |
+| #61 | `/admin/pendientes` con la identidad de la landing; marco compartido `ShellFrame` | #88, en QA |
+| #62 | `/analyzing` con la identidad de la landing y los pasos de `lib/pipelineSteps.ts` | #88, en QA |
+| #63 | `/report` con la identidad de la landing y tema oscuro; se retira la identidad anterior | #88, en QA |
 
-Los PR #57, #58 y #59 se abrieron en cadena y se mergearon en ese orden, sin revisión de otro
-integrante. El detalle de cada uno está en `odd/tasks/landing-skill-prueba.md` y
-`odd/tasks/sesion-en-landing.md`; el estado del frontend, en "Identidad visual del frontend"
-de `.claude/CLAUDE.md`.
+Los PR #57 a #59 y #61 a #63 se abrieron en dos cadenas y se mergearon en orden, sin revisión
+de otro integrante. El detalle está en `odd/tasks/landing-skill-prueba.md`,
+`odd/tasks/sesion-en-landing.md` y `odd/tasks/migracion-rutas-internas.md`; el estado del
+frontend, en "Identidad visual del frontend" de `.claude/CLAUDE.md`.
+
+Con los PR #61 a #63 queda un solo sistema visual. Cambios que no son solo de aspecto:
+
+- `/analyzing`: el avance de los pasos es orientativo (el backend responde una sola vez, con
+  el reporte terminado) y la pantalla lo dice. El último paso queda "en curso" hasta que
+  llega la respuesta; antes mostraba 100 % con el análisis todavía corriendo.
+- `/report`: las pestañas se manejan con el teclado; el botón del PDF dejó la barra fija y
+  queda junto al título; los colores de estado siguen la landing.
+- Se eliminaron `ThemeScope`, las fuentes Newsreader y Atkinson y los iconos sin uso.
 
 ---
 
@@ -365,13 +377,18 @@ clave pone una falsa; ahora una llamada sin aislar falla fuerte. Tras el arreglo
 tests en ~57 s. Regla práctica: si la suite tarda mucho más o se cuelga, hay una llamada de
 red o de proveedor sin aislar.
 
-### 4.10 Frontend, después de la landing nueva (2026-10-09)
+### 4.10 Frontend, después de la landing nueva (2026-10-10)
 En orden sugerido:
-- **Corredor de tests del frontend.** No existe. Es la observación que repitieron las seis
-  revisiones nativas de los PR #57 a #59. Todo lo interactivo se probó en un navegador sin
-  interfaz (44 comprobaciones entre los dos recorridos) y esos guiones no están en el repo.
-- **Migrar `/admin/pendientes`, `/analyzing` y `/report`** al sistema visual nuevo. Hoy
-  conviven dos identidades.
+- **Corredor de tests del frontend.** No existe. Es la observación que repitieron todas las
+  revisiones nativas de los PR #57 a #63. Todo lo interactivo se probó en un navegador sin
+  interfaz (44 comprobaciones entre el flujo completo y el recorrido de sesión y rol, más 60
+  entre las tres pantallas migradas) y esos guiones no están en el repo. Lo que más pide una
+  prueba: el cierre de `/analyzing` (la respuesta llega antes o después del último paso, o
+  falla) y el teclado de las pestañas de `/report`.
+- **Detalles de las pantallas migradas**: el error de red de `/analyzing` muestra el mensaje
+  crudo del navegador ("Failed to fetch"); entrar a `/analyzing` sin caso lleva a `/` y no a
+  `/analizar`; en `/report`, "En PubMed este PMID es:" sale en rojo también en las fuentes
+  verificadas. Los tres ya estaban antes de la migración.
 - **Pantallas de admin que no existen**: cuentas aprobadas, historial de decisiones y baja de
   cuentas. La auditoría se guarda en la base y no tiene vista.
 - `NEXT_PUBLIC_SITE_URL` no está definida: las etiquetas para compartir caen a
@@ -394,6 +411,14 @@ env NEXUS_DB_PATH=<el mismo archivo> .venv/bin/python -m backend.cli crear-admin
 El validador de email rechaza dominios reservados (`.example`, `.test`): usar uno con forma
 real. En modo grabado un análisis tarda unos 30 s, porque PubMed y ClinicalTrials.gov se
 consultan de verdad.
+
+**Ojo con el servidor de desarrollo después de cambiar de rama.** Dos veces (2026-10-09 y
+2026-10-10) siguió sirviendo una hoja de estilos vieja después de un `git checkout` o un
+`git pull`: la primera vez sin ninguna regla de la landing, la segunda sin el token de color
+de peligro, con lo que el aviso de modo grabado de `/report` quedaba invisible (texto blanco
+sin fondo). El código y el build de producción estaban bien. Se arregla deteniendo el
+servidor, borrando `frontend/.next/dev` y volviéndolo a levantar; reiniciar solo no alcanza.
+Antes de una demo conviene hacerlo siempre.
 
 ---
 
