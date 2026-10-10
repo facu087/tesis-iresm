@@ -68,8 +68,8 @@ el backend real en modo grabado, en claro y oscuro, a 1440 px y 375 px.
 - [x] **T1 — `/admin/pendientes` en el sistema nuevo.** Ruta: delegada (lectura
   que prepara la escritura; puede tocar el marco compartido). Commit `716f52b`.
   El marco se extrajo a `ShellFrame` y el aviso a `DiagnosticNotice`.
-- [ ] **T2 — `/analyzing` en el sistema nuevo, con los pasos de
-  `pipelineSteps.ts`.** Ruta: delegada.
+- [x] **T2 — `/analyzing` en el sistema nuevo, con los pasos de
+  `pipelineSteps.ts`.** Ruta: delegada. Commit `79f1874`.
 - [ ] **T3 — `/report` en el sistema nuevo.** Ruta: delegada (archivo de 1.112
   líneas).
 - [ ] **T4 — Retirar lo que quedó sin uso y actualizar la documentación.**
@@ -102,6 +102,10 @@ cada tarea.
   oscuro (marco, Geist, botones en píldora, sin desborde, aviso, sin emojis,
   rechazo sin motivo no avanza, sin errores de consola). No se ejercitó la
   aprobación ni el rechazo efectivos: quedan para el recorrido de T5.
+- T2: tipos, lint y build sin errores (reportados por el escritor). Recorrido
+  en navegador: 20 de 20 (1440 px claro hasta abrir el reporte, 375 px oscuro
+  con movimiento reducido, error de red, visita directa sin caso). Un envío
+  manda un solo `POST /api/analyze` en desarrollo (medido).
 
 ## Revisión nativa
 
@@ -111,7 +115,32 @@ cada tarea.
   registrada arriba); el error de decisión pasa por `FormError` (comprobado:
   conserva `role="alert"` y el `id`); la clase `landing-skeleton` (comprobado:
   existe en `globals.css`).
+- T2 (`35692e3..0732291`): riesgo medio, consentida, **aprobada y acusada**
+  (linaje `review-f87e092a1b97285e`). Sin bloqueantes. Avisos: no hay prueba
+  automática de la máquina de estados del cierre (sin corredor de tests); el
+  mapa de iconos y tiempos por id cae en silencio a un valor por defecto si la
+  lista compartida cambia; la cancelación comparte una sola referencia entre
+  ejecuciones del efecto (ya estaba en la base).
+
+## Cambios aceptados después de delegar
+
+- `/analyzing`: el último paso queda "en curso" hasta que responde el backend.
+  Antes la lista mostraba 100 % y "Completado" con el análisis todavía
+  corriendo.
+- `/analyzing`: se agregó la aclaración de que el avance es orientativo, porque
+  el backend responde una sola vez con el reporte terminado y no manda eventos.
+- `/analyzing`: el botón del error pasó de "Volver al inicio" a "Volver a
+  cargar el caso"; el destino (`/analizar`) no cambió.
+- La lista compartida tiene 8 pasos, no 9 como decía la auditoría.
+
+## Pendientes
+
+- El error de red de `/analyzing` muestra el mensaje crudo del navegador
+  ("Failed to fetch"). Ya era así antes de la migración.
+- La visita directa a `/analyzing` sin caso redirige a `/` y no a `/analizar`.
+- `/analizar` sigue con su copia del aviso en vez de `DiagnosticNotice`.
 
 ## Progreso
 
 - 2026-10-09: rama y documento creados.
+- 2026-10-09: T1 y T2 hechas, revisadas y acusadas. T3 delegada.
