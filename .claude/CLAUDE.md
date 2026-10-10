@@ -374,30 +374,42 @@ tesis-iresm/
 │   │   │   ├── page.tsx            ← landing (S4) — Server Component; compone las
 │   │   │   │                          secciones de components/landing/
 │   │   │   ├── layout.tsx          ← fuentes, tema y `metadataBase` (lib/siteUrl.ts)
-│   │   │   ├── not-found.tsx       ← 404 propio con el sistema visual nuevo (S4)
+│   │   │   ├── not-found.tsx       ← 404 propio con el sistema visual de la landing (S4)
 │   │   │   ├── opengraph-image.tsx ← tarjeta para compartir generada con texto; al
 │   │   │   │                          estar en la raíz aplica a todas las rutas (S4)
 │   │   │   ├── icon.svg            ← favicon de marca (isotipo NEXUS, S4)
-│   │   │   ├── globals.css         ← tokens globales + el sistema visual nuevo,
+│   │   │   ├── globals.css         ← tokens globales + el sistema visual del producto,
 │   │   │   │                          acotado a la clase envoltorio `.landing` (S4)
 │   │   │   ├── analizar/
 │   │   │   │   ├── page.tsx        ← vista de carga (S4, movida desde `/`; guard de
 │   │   │   │   │                      sesión — capa de UX, no de seguridad)
 │   │   │   │   └── layout.tsx      ← metadata propia de la ruta (S4)
-│   │   │   ├── analyzing/page.tsx  ← vista de pipeline con progreso en tiempo real
-│   │   │   ├── report/page.tsx     ← vista de reporte (5 tabs)
+│   │   │   ├── analyzing/
+│   │   │   │   ├── page.tsx        ← vista de progreso del pipeline; los pasos salen
+│   │   │   │   │                      de lib/pipelineSteps.ts (S4)
+│   │   │   │   └── layout.tsx      ← metadata propia de la ruta (S4)
+│   │   │   ├── report/
+│   │   │   │   ├── page.tsx        ← vista de reporte (5 tabs); compone las piezas
+│   │   │   │   │                      de components/report/ (S4)
+│   │   │   │   └── layout.tsx      ← metadata propia de la ruta (S4)
 │   │   │   ├── registro/page.tsx   ← alta de médico + consentimiento Ley 25.326 (S4)
 │   │   │   ├── ingresar/page.tsx   ← login (S4)
 │   │   │   ├── cuenta/page.tsx     ← estado de cuenta + reenvío tras rechazo (S4)
 │   │   │   └── admin/pendientes/page.tsx ← revisión admin de cuentas pendientes (S4)
 │   │   ├── components/
-│   │   │   ├── landing/            ← sistema visual nuevo (S4): `/`, `/registro`,
-│   │   │   │   │                      `/ingresar`, `/cuenta` y `/analizar`
+│   │   │   ├── landing/            ← sistema visual del producto (S4): lo usan
+│   │   │   │   │                      todas las rutas
 │   │   │   │   ├── styles.ts       ← clases compartidas: botones, foco, transición
 │   │   │   │   ├── IslandNav.tsx   ← navegación flotante + menú móvil accesible
 │   │   │   │   ├── LandingSession.tsx ← sesión de la landing: una consulta por
 │   │   │   │   │                      montaje y la acción principal según la cuenta
-│   │   │   │   ├── AuthShell.tsx   ← marco de las pantallas de acceso y de cuenta
+│   │   │   │   ├── ShellFrame.tsx  ← marco de las rutas de acceso y con sesión: clase
+│   │   │   │   │                      `.landing`, píldora flotante (logo, una acción,
+│   │   │   │   │                      selector de tema), `main` y pie opcional
+│   │   │   │   ├── AuthShell.tsx   ← marco de dos columnas sobre ShellFrame; lo usan
+│   │   │   │   │                      todas esas rutas menos /report
+│   │   │   │   ├── DiagnosticNotice.tsx ← aviso "NEXUS no emite diagnósticos" del pie
+│   │   │   │   │                      de las rutas con sesión
 │   │   │   │   ├── FormPrimitives.tsx ← campo, error y botón de envío
 │   │   │   │   ├── LandingMarkSprite.tsx, LandingMark.tsx, LandingLogo.tsx
 │   │   │   │   │                   ← el isotipo se define UNA vez (sprite) y se
@@ -414,17 +426,22 @@ tesis-iresm/
 │   │   │   ├── ScrollReveal.tsx    ← animación de aparición al hacer scroll (S4)
 │   │   │   ├── ReportDemo.tsx      ← reporte de ejemplo (ilustrativo) de la landing (S4)
 │   │   │   ├── BeforeAfter.tsx     ← cita declarada vs. título real de PubMed (dato real, S4)
-│   │   │   ├── NexusLogo.tsx       ← isotipo y lockup de marca (S4), con nexus-mark-path.ts
+│   │   │   ├── report/             ← piezas de la vista de reporte (S4):
+│   │   │   │   │                      HypothesesTab, TrialsTab, CaseDebateTabs,
+│   │   │   │   │                      ReportNotices, sources, primitives
+│   │   │   ├── NexusLogo.tsx       ← isotipo de marca `NexusMark` (S4), con
+│   │   │   │                          nexus-mark-path.ts; lo usa landing/LandingLogo.tsx
 │   │   │   ├── ThemeToggle.tsx     ← selector claro/oscuro de la barra (S4)
-│   │   │   ├── ThemeScope.tsx      ← mantiene /report y /analyzing en claro (S4)
-│   │   │   └── icons.tsx           ← iconos SVG inline de las pantallas no migradas (S4)
+│   │   │   └── icons.tsx           ← sol y luna del selector de tema (S4); el resto
+│   │   │                              de los iconos son Phosphor
 │   │   └── lib/
 │   │       ├── api.ts              ← cliente HTTP al backend FastAPI (credentials: "include", S4)
 │   │       ├── types.ts            ← tipos TypeScript del reporte y de cuentas (S4)
 │   │       ├── inputStore.ts       ← estado compartido entre vistas
 │   │       ├── reportStore.ts      ← lectura del reporte guardado (useSyncExternalStore, S4)
 │   │       ├── siteUrl.ts          ← origen público validado (`NEXT_PUBLIC_SITE_URL`, S4)
-│   │       └── pipelineSteps.ts    ← pasos del pipeline (S4, fuente única landing + /analizar)
+│   │       └── pipelineSteps.ts    ← pasos del pipeline (S4, fuente única de la landing,
+│   │                                  /analizar y /analyzing)
 │   ├── next.config.ts
 │   └── package.json
 ├── scripts/
@@ -454,27 +471,33 @@ tesis-iresm/
 
 ### Identidad visual del frontend (S4)
 
-Conviven dos sistemas mientras se termina la migración:
+Hay un solo sistema visual, y lo usan todas las rutas: `/`, `/registro`,
+`/ingresar`, `/cuenta`, `/analizar`, `/analyzing`, `/report`,
+`/admin/pendientes` y el 404.
 
-- **Sistema nuevo** — `/`, `/registro`, `/ingresar`, `/cuenta` y `/analizar`.
-  Geist como única tipografía (Geist Mono solo para datos), azul marino y ocre
-  como colores de marca, fondos planos, iconos Phosphor
-  (`@phosphor-icons/react`) y el isotipo NEXUS como motivo. Vive bajo la clase
-  envoltorio `.landing` de `globals.css`: toda regla nueva va ahí adentro y no
-  toca los tokens globales. Sale de aplicar la skill externa
-  `landing-page-design` (elayadesign/ai-design-skills), subordinada a tres
-  reglas del proyecto: nada de testimonios, cifras ni garantías inventadas; el
-  aviso "NEXUS no emite diagnósticos" siempre visible; y se respeta
-  `prefers-reduced-motion`. No se usan imágenes generadas: lo visual es el
-  producto (tarjeta del reporte, comparación de citas, pipeline).
-- **Sistema anterior** — `/admin/pendientes`: azul marino y ocre, títulos en
-  Newsreader y cuerpo en Atkinson Hyperlegible, sobre los tokens globales.
-- `/report` y `/analyzing` siguen con colores fijos claros y Geist: se migran
-  en otra etapa.
+Geist como única tipografía (Geist Mono solo para datos), azul marino y ocre
+como colores de marca, fondos planos, iconos Phosphor
+(`@phosphor-icons/react`) y el isotipo NEXUS como motivo. Vive bajo la clase
+envoltorio `.landing` de `globals.css`: toda regla nueva va ahí adentro y no
+toca los tokens globales. Sale de aplicar la skill externa
+`landing-page-design` (elayadesign/ai-design-skills), subordinada a tres
+reglas del proyecto: nada de testimonios, cifras ni garantías inventadas; el
+aviso "NEXUS no emite diagnósticos" siempre visible; y se respeta
+`prefers-reduced-motion`. No se usan imágenes generadas: lo visual es el
+producto (tarjeta del reporte, comparación de citas, pipeline).
+
+Las rutas de acceso y las que piden sesión se arman sobre `ShellFrame`
+(píldora flotante con el logo a `/`, una acción y el selector de tema): todas
+menos `/report` pasan por `AuthShell`, que le agrega las dos columnas, y
+`/report` usa `ShellFrame` directo porque necesita el ancho completo. La
+landing y el 404 arman su propio marco. La única excepción a
+Phosphor son el sol y la luna del selector de tema (`components/icons.tsx`).
 
 El tema claro es el predeterminado; el oscuro se elige con el selector de la
 barra (atributo `data-theme` en `<html>`, clave `nexus-theme` en
 `localStorage`; la variante `dark:` de Tailwind está enlazada a ese atributo).
+Todas las rutas admiten los dos temas, `/report` y `/analyzing` incluidas: ya
+no queda ninguna de colores fijos.
 
 El frontend no tiene corredor de tests: lo interactivo se verifica en un
 navegador sin interfaz contra el servidor de desarrollo, simulando las
