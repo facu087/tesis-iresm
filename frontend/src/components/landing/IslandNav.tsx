@@ -8,6 +8,7 @@ import {
   EASE,
   FOCUS_RING,
   HEADER_BUTTON,
+  NAV_LINK,
   PRIMARY_BUTTON,
   TRANSITION,
 } from "@/components/landing/styles";
@@ -50,8 +51,6 @@ const STAGGER = [
   "delay-300",
   "delay-350",
 ] as const;
-
-const NAV_LINK = `rounded-full px-3 py-2 text-sm font-semibold text-fg-muted ${TRANSITION} hover:text-accent active:translate-y-px aria-[current=location]:text-accent ${FOCUS_RING}`;
 
 const DESKTOP_QUERY = "(min-width: 1024px)";
 

@@ -106,7 +106,9 @@ body {
 
 /* ── Landing scope ─────────────────────────────────────────────────────────
  *
- * Visual system of the public landing (`/`) and the branded 404. Everything
+ * Visual system of the public landing (`/`), the branded 404, the access
+ * pages (`/registro`, `/ingresar`) and the signed in pages (`/cuenta`,
+ * `/analizar`). Everything
  * below is scoped to the `.landing` wrapper, so the other routes keep the
  * tokens defined above untouched. The wrapper redefines the semantic tokens
  * for its own subtree: the Tailwind utilities (`bg-bg`, `text-fg`, …) resolve
@@ -335,6 +337,61 @@ body {
       opacity: 1;
     }
   }
+
+  /* Hero report tabs (see landing/HeroReportTabs.tsx). The panels share one
+     grid cell, so the card keeps the height of the tallest one. A panel
+     leaves at once; the transition lives on the selected state, which eases
+     in. */
+  .landing-hero-panel {
+    grid-area: 1 / 1;
+  }
+  .landing-hero-panel[data-selected="false"] {
+    visibility: hidden;
+    opacity: 0;
+    translate: 0 0.5rem;
+  }
+  .landing-hero-panel[data-selected="true"] {
+    transition:
+      opacity 500ms var(--landing-ease),
+      translate 500ms var(--landing-ease);
+  }
+
+  /* Verification sequence (see landing/VerificationSequence.tsx). Without a
+     `data-beat` the comparison is resolved: that is the server render and the
+     resting state. A beat only hides what has not happened yet, with opacity
+     and a small offset, so every part keeps its place and the card its
+     height. Hiding is instant; the transition lives on the resolved state. */
+  .landing-verify [data-step] {
+    transition:
+      opacity 600ms var(--landing-ease),
+      translate 600ms var(--landing-ease);
+  }
+  .landing-verify[data-beat="idle"] [data-step="cited"],
+  .landing-verify:is([data-beat="idle"], [data-beat="cited"], [data-beat="lookup"])
+    [data-step="real"],
+  .landing-verify[data-beat] [data-step="verdict"] {
+    opacity: 0;
+    translate: 0 0.5rem;
+    transition: none;
+  }
+  /* Lookup beat: flat bars over the place of the PubMed title. */
+  .landing-verify-skeleton {
+    opacity: 0;
+  }
+  .landing-verify[data-beat="lookup"] .landing-verify-skeleton {
+    opacity: 1;
+    transition: opacity 300ms var(--landing-ease);
+  }
+  .landing-verify[data-beat="lookup"] .landing-verify-bar {
+    animation: landing-verify-pulse 700ms var(--landing-ease) infinite alternate;
+  }
+
+  /* Loading placeholders of the signed in routes (`/cuenta`, `/analizar`):
+     flat bars shaped like the content, with the same pulse as the lookup. */
+  .landing .landing-skeleton {
+    background-color: var(--color-border);
+    animation: landing-verify-pulse 700ms var(--landing-ease) infinite alternate;
+  }
 }
 
 /* Without JavaScript a tap cannot pin a tile: show every description under
@@ -349,6 +406,23 @@ body {
   }
   .landing .landing-agent-toggle {
     display: none;
+  }
+  /* The hero tabs cannot switch either: the card shows its first hypothesis. */
+  .landing .landing-hero-tabs {
+    display: none;
+  }
+  /* The verification sequence never plays: there is nothing to replay. */
+  .landing .landing-verify-replay {
+    display: none;
+  }
+}
+
+@keyframes landing-verify-pulse {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.45;
   }
 }
 
@@ -382,6 +456,32 @@ body {
   }
   .landing .landing-tagline [data-word] {
     opacity: 1 !important;
+  }
+  /* The comparison stays resolved and its replay control has nothing to do. */
+  .landing .landing-verify [data-step] {
+    opacity: 1 !important;
+    translate: none !important;
+  }
+  .landing .landing-verify-skeleton {
+    opacity: 0 !important;
+  }
+  .landing .landing-verify-replay {
+    display: none;
+  }
+}
+
+/* Printing the page before the sequence has played must still show the
+   resolved comparison: it is the landing's central real data. */
+@media print {
+  .landing .landing-verify [data-step] {
+    opacity: 1 !important;
+    translate: none !important;
+  }
+  .landing .landing-verify-skeleton {
+    opacity: 0 !important;
+  }
+  .landing .landing-verify-replay {
+    display: none;
   }
 }
 

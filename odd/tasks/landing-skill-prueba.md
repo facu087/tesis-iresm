@@ -163,23 +163,181 @@ Excepción: el frontend no tiene corredor de tests (`package.json` solo define
     revisión debida. Los commits propios posteriores al merge quedan sin
     revisión nativa; los de `develop` se revisaron en sus PR.
 
+- [x] **T5 — `/registro` e `/ingresar` con el sistema visual de la landing** ·
+  ruta: delegada.
+  - Motivo (usuario, 2026-10-09): "Solicitar acceso" saca al médico de la
+    landing nueva y lo deja en una pantalla con la identidad anterior.
+  - Amplía el alcance original (solo `/`) a esas dos rutas. Solo presentación:
+    la lógica de los formularios, las llamadas al backend y el texto del
+    consentimiento Ley 25.326 no cambian.
+  - Fuera de alcance: `/cuenta`, `/admin/pendientes`, `/analizar`.
+  - Observado (escritor): `tsc`, `npm run lint` y `npm run build` salen 0;
+    las 21 cadenas de registro y las 12 de ingresar siguen presentes;
+    `src/lib` sin diferencias; mismas llamadas (`registrarMedico`, `login`) y
+    mismas redirecciones; sin desborde ni errores de consola en ambos temas a
+    1280 y 390 px. Con el backend caído, `/ingresar` muestra el error en línea.
+  - Repetido por el orquestador: `tsc` sale 0; `lib`, `cuenta`, `admin` y
+    `analizar` sin diferencias; capturas de registro (claro) e ingresar
+    (oscuro) revisadas.
+  - Cambios de texto: "Ya tengo cuenta — Ingresar" pasó de la cabecera a
+    debajo del botón; se agregaron los enlaces de la píldora y "Saltar al
+    contenido".
+  - Commit: `30e604d`. Revisión nativa del tramo `21e12dc..30e604d` (todo lo
+    posterior al merge, 907 líneas): riesgo medio, consentimiento otorgado,
+    **aprobada** y acusada (`review-119a7b3dd99e6e04`).
+  - Hallazgo 1 (cableado de formularios sin prueba), comprobado después en un
+    navegador con las respuestas del backend simuladas:
+    - `/registro` no envía sin el consentimiento marcado; con él, manda las
+      nueve claves de `RegistroMedicoPayload` con los valores cargados y
+      redirige a `/ingresar?registrado=1`.
+    - `/ingresar` manda `email` y `password`; ante un 401 muestra el `detail`
+      en línea y se queda en la página; ante un 200 redirige a `/cuenta`.
+  - Hallazgos abiertos: `LandingMark` no dibuja nada si la página no incluye
+    `LandingMarkSprite`, y nada lo avisa; `PipelineDiagram.tsx:56` divide por
+    cero si la lista tuviera una sola etapa (hoy tiene ocho).
+  - Sin verificar: el alta y el ingreso contra el backend real.
+
+- [x] **T6 — Hero interactivo** · ruta: delegada.
+  - La tarjeta del reporte del hero pasa a tener tres pestañas (respaldada,
+    pendiente, especulativa) con las tres hipótesis del reporte de ejemplo;
+    al cambiar se ven el nivel de evidencia y el estado de la cita.
+  - Sin texto nuevo: reutiliza el contenido de `ReportDemo.tsx`.
+  - Observado (escritor): `tsc`, lint y build salen 0. En navegador, ambos
+    temas a 1280 y 390 px: una sola pestaña seleccionada al cargar; clic y
+    teclado (flechas con vuelta, Inicio, Fin) cambian hipótesis, nivel y
+    estado; sin desplazamiento (botón del hero en 442,5 px y tarjeta de 481 px
+    en las tres pestañas a 1280); sin desborde ni errores de consola; sin
+    JavaScript se ve la primera hipótesis.
+  - Repetido por el orquestador: `tsc` sale 0; capturas de "Respaldada" y
+    "Especulativa" en claro revisadas.
+  - Única cadena nueva: el nombre accesible de las pestañas, "Estado de la
+    hipótesis". Palabras en el HTML: 961 (las dos hipótesis ocultas del hero).
+  - Abierto: las pestañas "Pendiente" y "Especulativa" dejan espacio vacío
+    abajo, porque el alto se reserva para la más larga.
+  - Commit: `65c7d9f`. Revisión nativa: riesgo medio, consentimiento
+    otorgado, **aprobada** y acusada (`review-d846c56400fa8787`).
+    - Arreglado después: las teclas con modificador (Alt, Ctrl, Meta, Mayús)
+      ya no cambian de pestaña. Observado: Alt+flecha deja "Respaldada",
+      flecha sola pasa a "Pendiente".
+    - Arreglado después: a 320 px se recortaban "Respaldada" (7 px) y
+      "Especulativa" (13 px). Con letra más chica y menos margen bajo 360 px,
+      el recorte medido es 0 a 320 y a 360 px.
+    - Descartado: la transición con movimiento reducido; la regla global de
+      `.landing` ya anula las transiciones.
+    - Abierto: sin pruebas automáticas de las pestañas.
+
+- [x] **T7 — La verificación como secuencia** · ruta: delegada.
+  - Al entrar en pantalla, la comparación de citas se reproduce en tres
+    tiempos: el título citado, la consulta a PubMed y el título real con el
+    veredicto "no coincide". Se reproduce una vez; hay un control para verla
+    de nuevo.
+  - Sin texto nuevo salvo el control de repetición y un estado de consulta;
+    los títulos y la nota de medición quedan literales.
+  - Observado (escritor): `tsc`, lint y build salen 0; las 12 cadenas
+    protegidas siguen literales. En navegador: no arranca antes del scroll;
+    pasa por citado (0 ms), consulta (800), resultado (1900) y veredicto
+    (2600), 3197 ms en total; no se repite al volver a pasar; "Ver de nuevo"
+    la reinicia con clic y con teclado; dos clics seguidos dejan una sola
+    corrida; alto del bloque idéntico en todos los muestreos (355 px a 1280,
+    628 px a 390); con movimiento reducido o sin JavaScript se ve el estado
+    final de entrada.
+  - Repetido por el orquestador: `tsc` sale 0; capturas de la consulta y del
+    estado final en claro revisadas.
+  - Cadenas nuevas: "Ver de nuevo" y "Consultando PubMed".
+  - Abierto: al recargar con la sección ya en pantalla se ve un instante el
+    estado final antes de que arranque la secuencia.
+  - Commit: `f9ee342`. Evaluación nativa: riesgo medio, 318 líneas,
+    `under_budget`; sin revisión debida, queda pendiente para el próximo corte.
+
+- [x] **T8 — `/cuenta` y `/analizar` con el sistema visual nuevo, y URL base
+  en el layout** · ruta: delegada.
+  - Pedido del usuario (2026-10-09): cerrar los pendientes. Solo
+    presentación en las dos rutas; lógica, llamadas y textos sin cambios.
+  - `metadataBase` pasa al layout raíz para que la tarjeta para compartir
+    resuelva bien en todas las rutas.
+  - Fuera de alcance: `/admin/pendientes`, `/analyzing`, `/report`.
+  - Observado (escritor): `tsc`, lint y build salen 0; el aviso de
+    `metadataBase` ya no aparece; el build termina bien con
+    `NEXT_PUBLIC_SITE_URL` vacía y malformada. Todas las cadenas previas
+    siguen presentes (18 en cuenta, 6 y 2 en analizar, 9 en `UploadForm`).
+    Con el backend simulado, 174 comprobaciones pasan: estados de cuenta,
+    reenvío por `PUT /api/registro`, cierre de sesión, guardias de
+    `/analizar` y paso a `/analyzing`, en ambos temas a 1280 y 390 px.
+  - Repetido por el orquestador: `tsc` sale 0; el cambio en `layout.tsx` son
+    un import y un campo; capturas de cuenta rechazada y de analizar revisadas.
+  - Cambio de comportamiento visible: el título y el marco de ambas páginas
+    ya se ven durante la carga (antes solo el texto de carga).
+  - Abierto: los dos mensajes de "campo requerido" de `UploadForm` siguen
+    inalcanzables porque el botón se deshabilita con el formulario vacío.
+- [x] **T9 — `.claude/CLAUDE.md` describe el frontend actual** · ruta: en línea.
+  - Árbol del frontend, sección de identidad visual (dos sistemas en
+    convivencia) y las dos variables `NEXT_PUBLIC_*`. Documentación pasiva:
+    comprobación por lectura.
+
+- Revisión nativa del tramo `65c7d9f..220e2c8` (T7, T8, T9 y el arreglo de
+  las pestañas; 13 archivos, 1.140 líneas): riesgo medio, consentimiento
+  otorgado, **aprobada** y acusada.
+  - Arreglado después, en `VerificationSequence.tsx` y `globals.css`:
+    - Imprimir la página antes de llegar a la sección dejaba la comparación
+      invisible. Ahora la resuelven una regla `@media print` y el evento
+      `beforeprint`. Observado: opacidad 1 en los tres pasos por ambas vías.
+    - "Ver de nuevo" antes del punto de disparo hacía que la secuencia
+      corriera dos veces. Ahora cualquier corrida gasta la automática.
+      Observado: 1 corrida tras el clic y 1 tras llevar la sección al centro.
+  - Abierto: sin pruebas repetibles (URL del sitio, secuencia, pestañas,
+    selector de archivo); el frontend no tiene corredor de tests.
+
 ## Pendientes
 
 - ~~Error de lint previo en `/report`~~: resuelto por el PR #49, que entró con
   el merge de `develop` (`21e12dc`). `npm run lint` sale 0.
 - `NEXT_PUBLIC_SITE_URL` sin definir: las etiquetas para compartir resuelven a
-  `http://localhost:3000`.
+  `http://localhost:3000` hasta que haya un dominio. La validación y el
+  `metadataBase` ya están en el layout raíz (T8).
 - ~~Favicon por defecto~~: resuelto por el PR #54 (`icon.svg`). Sigue sin
   política de privacidad ni términos.
-- `.claude/CLAUDE.md` sigue describiendo la identidad Newsreader + Atkinson; se
-  actualiza solo si la prueba se adopta.
+- ~~`.claude/CLAUDE.md` desactualizado~~: resuelto en T9.
+- `/admin/pendientes` sigue con la identidad anterior; `/analyzing` y
+  `/report` siguen pendientes de otra etapa.
 - Confirmar el CTA "Solicitar acceso" → `/registro`.
 
 ## Entrega
 
 Estrategia: `ask-on-risk`. Pronóstico: más de 400 líneas cambiadas (reescritura
-de `page.tsx`, 442 líneas). La estrategia de cadena queda pendiente de decidir
-con el usuario si la prueba se convierte en PR.
+de `page.tsx`, 442 líneas).
+
+El usuario pidió abrir el PR partido en dos (2026-10-09). Cadena apilada: el
+primero apunta a `develop` y el segundo a la rama del primero.
+
+| PR | Rama | Base | Commits | Líneas |
+|----|------|------|---------|--------|
+| 1 — landing | `feature/s4-landing-rediseno` | `develop` | `665c947`..`aa89e99` | 2427 + 716 |
+| 2 — pantallas de acceso y cuenta, landing interactiva | `feature/s4-landing-skill-prueba` | rama del PR 1 | `30e604d`..`HEAD` | 1531 + 652 |
+
+Los dos superan las 400 líneas: el corte sigue las unidades de trabajo y no se
+puede achicar más sin separar un rediseño de su propio CSS. El PR 1 se
+comprobó aislado en `aa89e99`: tipos y lint pasan.
+
+## Prueba contra el backend real (2026-10-09)
+
+Backend levantado con una base SQLite temporal y `NEXUS_MOCK_LLM=1` (sin gastar
+cuota de Groq); frontend en el servidor de desarrollo; navegador sin interfaz,
+sin interceptar ninguna respuesta. 20 de 20 comprobaciones pasan:
+
+- Registro: sin consentimiento no avanza; con consentimiento redirige a
+  `/ingresar?registrado=1`; un DNI repetido muestra el 409 del backend.
+- Ingreso: contraseña incorrecta muestra el detalle del 401; correcta va a
+  `/cuenta`.
+- Cuenta: pendiente → rechazada con el motivo del admin → reenvío corregido
+  (formulario precargado) → pendiente → verificada.
+- Guardas: `/analizar` con cuenta pendiente vuelve a `/cuenta`; sin sesión, a
+  `/ingresar`.
+- Análisis por texto y por PDF: `/analizar` → `/analyzing` → `/report` en unos
+  30 s, con la marca de modo mock y el aviso de no diagnóstico; el PDF del
+  reporte se descarga.
+
+No cubierto: el pipeline con el modelo real (Groq), el tema oscuro y
+dispositivos táctiles.
 
 ## Progreso
 

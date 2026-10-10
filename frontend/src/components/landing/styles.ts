@@ -35,6 +35,12 @@ export const HEADER_BUTTON = `inline-flex items-center justify-center gap-2 roun
 /** Plain text link (navigation, footer, inline references). */
 export const TEXT_LINK = `rounded-sm font-semibold text-accent underline-offset-4 ${TRANSITION} hover:underline active:translate-y-px ${FOCUS_RING}`;
 
+/** Navigation link inside the header pill. */
+export const NAV_LINK = `rounded-full px-3 py-2 text-sm font-semibold whitespace-nowrap text-fg-muted ${TRANSITION} hover:text-accent active:translate-y-px aria-[current=location]:text-accent ${FOCUS_RING}`;
+
+/** Full width submit button of a form, with its pending (disabled) state. */
+export const SUBMIT_BUTTON = `${PRIMARY_BUTTON} w-full cursor-pointer disabled:pointer-events-none disabled:opacity-60`;
+
 /** Horizontal page container. */
 export const CONTAINER = "mx-auto w-full max-w-6xl px-4 sm:px-6";
 

@@ -1,15 +1,17 @@
+import HeroReportTabs from "@/components/landing/HeroReportTabs";
 import {
-  CheckCircleIcon,
-  ClockIcon,
-  SealCheckIcon,
-  WarningIcon,
-} from "@phosphor-icons/react/ssr";
+  EXAMPLE_HYPOTHESES,
+  ExampleHypothesis,
+  Mark,
+} from "@/components/landing/reportExample";
 
 /**
  * Example NEXUS report, built in code, used by the landing as its product
- * visual: the full report in `#reporte` (`ReportDemo`) and a single
- * hypothesis card in the hero (`ReportSnippet`). Both render the same lead
- * hypothesis through `LeadHypothesis`, so the markup lives in one place.
+ * visual: the full report in `#reporte` (`ReportDemo`) and the hypothesis
+ * card of the hero (`ReportSnippet`), whose tabs switch between the three
+ * hypotheses. Both read the hypotheses from `landing/reportExample.tsx` and
+ * render them through `ExampleHypothesis`, so texts and markup live in one
+ * place.
  *
  * Everything is real text, not an image: screen readers read it whole. The
  * hypotheses are an illustrative example and both views carry the "Ejemplo
@@ -20,53 +22,12 @@ import {
  * the grid, so no panel carries a border on a single side.
  */
 
-/**
- * What the numbered marks on the annotated report point at. The landing
- * renders this list as the legend, in the same order as the marks.
- */
-export const REPORT_ANNOTATIONS = [
-  "Cita contrastada con PubMed",
-  "Orden por nivel de evidencia",
-  "Consenso entre agentes",
-  "Ensayos activos para el caso",
-] as const;
-
-const BADGE =
-  "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-semibold";
+/** Re-exported for the legend of the report section. */
+export { ANNOTATION_DOT, REPORT_ANNOTATIONS } from "@/components/landing/reportExample";
 
 const PANEL_LABEL = "text-sm font-semibold text-fg-muted";
 
 const FRAME = "m-0 grid gap-px overflow-hidden rounded-2xl border border-border bg-border";
-
-/** Numbered circle shared by the marks on the report and by their legend. */
-export const ANNOTATION_DOT =
-  "inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-ochre font-mono text-xs font-bold text-bg";
-
-/** Numbered mark placed beside the part of the report an annotation is about. */
-function Mark({ note }: { note: 1 | 2 | 3 | 4 }) {
-  return (
-    <span className={ANNOTATION_DOT}>
-      <span className="sr-only">
-        Nota {note}: {REPORT_ANNOTATIONS[note - 1]}
-      </span>
-      <span aria-hidden="true">{note}</span>
-    </span>
-  );
-}
-
-function Level({ level }: { level: "II" | "III" }) {
-  return (
-    <span
-      className={`rounded-md border px-2 py-1 font-mono text-xs font-semibold ${
-        level === "II"
-          ? "border-accent bg-accent text-accent-fg"
-          : "border-fg-muted text-fg-muted"
-      }`}
-    >
-      Nivel {level}
-    </span>
-  );
-}
 
 function ExampleBadge() {
   return (
@@ -87,57 +48,14 @@ function ReportTitle() {
   );
 }
 
-/**
- * Lead hypothesis of the example: statement, evidence level, status and its
- * citation verified against PubMed. `annotated` adds the numbered marks and
- * the agents that hold the hypothesis (full report only).
- */
-function LeadHypothesis({ annotated = false }: { annotated?: boolean }) {
-  return (
-    <>
-      <p className="font-mono text-sm font-semibold text-fg-muted">H1</p>
-      <p className="mt-1 text-xl font-semibold text-pretty text-fg">
-        El déficit de vitamina B12 asociado al uso crónico de metformina
-        podría contribuir a la neuropatía axonal sensitivomotora del
-        paciente.
-      </p>
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <Level level="II" />
-        <span className={`${BADGE} border-accent text-accent`}>
-          <CheckCircleIcon aria-hidden="true" weight="bold" className="size-4" />
-          Respaldada
-        </span>
-        {annotated && <Mark note={2} />}
-      </div>
-      {/* Nested radius: 16 px card minus the 24 px gap is below 2, so
-          this inner block keeps its own small radius. */}
-      <div className="mt-4 flex items-start justify-between gap-3 rounded-lg bg-bg-subtle p-4">
-        <div>
-          <p className="text-sm font-semibold text-fg">
-            Metformin-associated vitamin B12 deficiency
-          </p>
-          <p className="mt-0.5 font-mono text-sm text-fg-muted">PMID 22439958</p>
-          <p className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-accent">
-            <SealCheckIcon aria-hidden="true" weight="bold" className="size-4" />
-            Título verificado contra PubMed
-          </p>
-        </div>
-        {annotated && <Mark note={1} />}
-      </div>
-      {annotated && (
-        <p className="mt-4 flex items-start gap-2 text-sm text-pretty text-fg-muted">
-          <Mark note={3} />
-          <span>
-            <strong className="font-semibold text-fg">Sostenida por:</strong>{" "}
-            Agente 01 · Analista de Literatura, Agente 03 · Consultor Clínico
-          </span>
-        </p>
-      )}
-    </>
-  );
-}
+const [LEAD, ...OTHER_HYPOTHESES] = EXAMPLE_HYPOTHESES;
 
-/** Hero visual: one hypothesis of the example report, as a single card. */
+/**
+ * Hero visual: one hypothesis of the example report at a time, as a single
+ * card. The frame and the title are rendered on the server; the tabs and the
+ * panels are the `HeroReportTabs` Client Component, whose server render
+ * already shows the first hypothesis.
+ */
 export function ReportSnippet() {
   return (
     <figure
@@ -147,9 +65,7 @@ export function ReportSnippet() {
       <div className="bg-bg-subtle px-6 py-4">
         <ReportTitle />
       </div>
-      <div className="bg-surface p-6">
-        <LeadHypothesis />
-      </div>
+      <HeroReportTabs />
     </figure>
   );
 }
@@ -176,44 +92,21 @@ export default function ReportDemo() {
             <p className={`${PANEL_LABEL} mb-6`}>
               Hipótesis de investigación · no son diagnósticos
             </p>
-            <LeadHypothesis annotated />
-          </article>
-
-          <article className="bg-surface p-6">
-            <p className="font-mono text-sm font-semibold text-fg-muted">H2</p>
-            <p className="mt-1 text-lg font-semibold text-pretty text-fg">
-              Posible neuropatía asociada a deficiencia de cobre.
-            </p>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <Level level="II" />
-              <span className={`${BADGE} border-ochre text-ochre`}>
-                <ClockIcon aria-hidden="true" weight="bold" className="size-4" />
-                Pendiente
+            <ExampleHypothesis hypothesis={LEAD} lead annotated />
+            <p className="mt-4 flex items-start gap-2 text-sm text-pretty text-fg-muted">
+              <Mark note={3} />
+              <span>
+                <strong className="font-semibold text-fg">Sostenida por:</strong>{" "}
+                Agente 01 · Analista de Literatura, Agente 03 · Consultor Clínico
               </span>
-            </div>
-            <p className="mt-3 text-sm text-pretty text-fg-muted">
-              La cita no pudo verificarse: PubMed no respondió. Se mantiene
-              hasta poder contrastarla.
             </p>
           </article>
 
-          <article className="bg-surface p-6">
-            <p className="font-mono text-sm font-semibold text-fg-muted">H3</p>
-            <p className="mt-1 text-lg font-semibold text-pretty text-fg">
-              Origen autoinmune de la neuropatía.
-            </p>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <Level level="III" />
-              <span className={`${BADGE} border-dashed border-fg-muted text-fg-muted`}>
-                <WarningIcon aria-hidden="true" weight="bold" className="size-4" />
-                Especulativa
-              </span>
-            </div>
-            <p className="mt-3 text-sm text-pretty text-fg-muted">
-              Sin referencia verificable: se conserva, con el nivel de
-              evidencia más bajo.
-            </p>
-          </article>
+          {OTHER_HYPOTHESES.map((hypothesis) => (
+            <article key={hypothesis.id} className="bg-surface p-6">
+              <ExampleHypothesis hypothesis={hypothesis} />
+            </article>
+          ))}
         </div>
 
         {/* Compatible trial */}

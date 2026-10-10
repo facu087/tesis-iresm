@@ -2,14 +2,104 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import ThemeToggle from "@/components/ThemeToggle";
 import { useRouter } from "next/navigation";
+import { FileArrowUpIcon } from "@phosphor-icons/react/ssr";
 import UploadForm from "@/components/UploadForm";
+import AuthShell from "@/components/landing/AuthShell";
+import { FORM_CARD } from "@/components/landing/FormPrimitives";
+import { CONTAINER, NAV_LINK } from "@/components/landing/styles";
 import { inputStore } from "@/lib/inputStore";
 import type { AnalysisInput } from "@/lib/inputStore";
 import { PIPELINE_STEPS } from "@/lib/pipelineSteps";
 import { obtenerCuenta } from "@/lib/api";
-import BrandLockup from "@/components/NexusLogo";
+
+/** Page frame shared by the session check and the upload view. */
+function AnalizarShell({ aside, children }: { aside: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <AuthShell
+      headerAction={
+        <Link href="/" className={NAV_LINK}>
+          ← Volver al inicio
+        </Link>
+      }
+      icon={<FileArrowUpIcon aria-hidden="true" weight="bold" className="size-6" />}
+      title="Cargar caso clínico"
+      lead="Subí la historia clínica en PDF o pegá el texto directamente."
+      aside={aside}
+      footer={
+        <footer className={`${CONTAINER} pb-12`}>
+          <p className="rounded-2xl border border-border bg-bg-subtle p-4 text-sm text-pretty text-fg-muted">
+            <span className="font-semibold text-fg">NEXUS</span> no emite
+            diagnósticos clínicos. Las hipótesis generadas son orientativas y
+            deben ser evaluadas por el médico responsable.
+          </p>
+        </footer>
+      }
+    >
+      {children}
+    </AuthShell>
+  );
+}
+
+const STEP_BADGE =
+  "inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-border bg-bg-subtle";
+
+/** Static explanation of the pipeline, driven by `pipelineSteps.ts`. */
+function PipelineSteps() {
+  return (
+    <section aria-labelledby="pipeline-heading">
+      <h2 id="pipeline-heading" className="text-sm font-semibold text-ochre">
+        Pipeline de análisis
+      </h2>
+      <ol className="mt-4 flex flex-col gap-4">
+        {PIPELINE_STEPS.map((step) => (
+          <li key={step.id} className="flex items-start gap-3">
+            <span className={`${STEP_BADGE} font-mono text-xs font-semibold text-accent`}>
+              {step.id}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-fg">{step.label}</p>
+              <p className="text-sm text-pretty text-fg-muted">{step.description}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+/** Placeholders shaped like the upload card and the steps list. */
+function PipelineStepsSkeleton() {
+  return (
+    <div aria-hidden="true" className="flex flex-col gap-4">
+      <span className="landing-skeleton h-4 w-40 rounded-full" />
+      {PIPELINE_STEPS.map((step) => (
+        <div key={step.id} className="flex items-start gap-3">
+          <span className="landing-skeleton size-8 shrink-0 rounded-full" />
+          <div className="flex flex-1 flex-col gap-2 py-1">
+            <span className="landing-skeleton h-4 w-1/3 rounded-full" />
+            <span className="landing-skeleton h-4 w-full rounded-full" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function UploadSkeleton() {
+  return (
+    <div className={FORM_CARD}>
+      <p role="status" className="text-sm text-fg-muted">
+        Verificando sesión...
+      </p>
+      <div aria-hidden="true" className="flex flex-col gap-6">
+        <span className="landing-skeleton h-12 w-full rounded-xl" />
+        <span className="landing-skeleton h-48 w-full rounded-xl" />
+        <span className="landing-skeleton h-10 w-full rounded-full" />
+      </div>
+    </div>
+  );
+}
 
 export default function AnalizarPage() {
   const router = useRouter();
@@ -47,80 +137,17 @@ export default function AnalizarPage() {
 
   if (!autorizado) {
     return (
-      <div className="flex min-h-screen font-body items-center justify-center bg-bg text-sm text-fg-muted">
-        Verificando sesión...
-      </div>
+      <AnalizarShell aside={<PipelineStepsSkeleton />}>
+        <UploadSkeleton />
+      </AnalizarShell>
     );
   }
 
   return (
-    <div className="flex min-h-screen font-body flex-col bg-bg text-fg">
-      {/* ── Header ────────────────────────────────────────────────────── */}
-      <header className="border-b border-border">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
-          <Link
-            href="/"
-            className="cursor-pointer rounded-sm font-serif text-lg font-semibold tracking-tight text-accent transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
-          >
-            <BrandLockup />
-          </Link>
-          <div className="flex items-center gap-2 sm:gap-4">
-            <ThemeToggle />
-            <Link
-              href="/"
-              className="cursor-pointer rounded-sm text-sm text-fg-muted transition-colors duration-200 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
-            >
-              ← Volver al inicio
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      {/* ── Contenido principal ───────────────────────────────────────── */}
-      <main className="flex-1">
-        <div className="mx-auto grid max-w-5xl gap-10 px-6 py-14 md:grid-cols-2 md:items-start">
-          {/* Carga de caso */}
-          <div className="rounded-2xl border border-border bg-bg-subtle p-8">
-            <h1 className="mb-1 font-serif text-2xl font-semibold">Cargar caso clínico</h1>
-            <p className="mb-6 text-sm text-fg-muted">
-              Subí la historia clínica en PDF o pegá el texto directamente.
-            </p>
-            <UploadForm onReady={handleReady} />
-          </div>
-
-          {/* Pasos del pipeline */}
-          <div className="space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-widest text-accent">
-              Pipeline de análisis
-            </h2>
-            <ol className="space-y-3">
-              {PIPELINE_STEPS.map((step) => (
-                <li
-                  key={step.id}
-                  className="flex items-start gap-4 rounded-xl border border-border bg-bg px-5 py-3"
-                >
-                  <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent font-serif text-sm font-semibold text-accent-fg">
-                    {step.id}
-                  </span>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{step.label}</p>
-                    <p className="text-xs text-fg-muted">{step.description}</p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </div>
-        </div>
-      </main>
-
-      {/* ── Footer ────────────────────────────────────────────────────── */}
-      <footer className="border-t border-border">
-        <div className="mx-auto max-w-5xl px-6 py-5 text-xs text-fg-muted">
-          <span className="font-medium text-fg">NEXUS</span> no emite
-          diagnósticos clínicos. Las hipótesis generadas son orientativas y
-          deben ser evaluadas por el médico responsable.
-        </div>
-      </footer>
-    </div>
+    <AnalizarShell aside={<PipelineSteps />}>
+      <div className={FORM_CARD}>
+        <UploadForm onReady={handleReady} />
+      </div>
+    </AnalizarShell>
   );
 }
