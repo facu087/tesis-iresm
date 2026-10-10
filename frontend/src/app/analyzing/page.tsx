@@ -2,36 +2,121 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  ChatsCircleIcon,
+  CheckIcon,
+  CircleNotchIcon,
+  ClipboardTextIcon,
+  CompassIcon,
+  DotsThreeIcon,
+  FileTextIcon,
+  HourglassIcon,
+  ListChecksIcon,
+  ScalesIcon,
+  TextAaIcon,
+  UsersThreeIcon,
+  WarningCircleIcon,
+} from "@phosphor-icons/react/ssr";
+import type { Icon } from "@phosphor-icons/react";
 import { analyzeFile, analyzeText } from "@/lib/api";
 import { inputStore } from "@/lib/inputStore";
 import { reportStore } from "@/lib/reportStore";
+import { PIPELINE_STEPS } from "@/lib/pipelineSteps";
 import type { StructuredReport } from "@/lib/types";
+import AuthShell from "@/components/landing/AuthShell";
+import DiagnosticNotice from "@/components/landing/DiagnosticNotice";
+import { FORM_CARD, FormError } from "@/components/landing/FormPrimitives";
+import { SUBMIT_BUTTON } from "@/components/landing/styles";
 
-const STEPS = [
-  { icon: "📄", label: "Ingesta y extracción de texto",    sub: "PDF nativo · OCR Tesseract",        minMs: 1500  },
-  { icon: "🔤", label: "Normalización terminológica",      sub: "Nombres INN · unidades de medida",  minMs: 1000  },
-  { icon: "🧠", label: "Síntesis PICO",                    sub: "Construcción del contexto clínico", minMs: 4000  },
-  { icon: "🔬", label: "Análisis paralelo — Ronda 1",      sub: "Agentes 01, 02 y 03 en simultáneo",     minMs: 8000  },
-  { icon: "⚖️", label: "Debate adversarial — Rondas 2–4", sub: "Crítica cruzada y revisión",        minMs: 12000 },
-  { icon: "🔎", label: "Verificación bibliográfica",       sub: "Los PMID citados se contrastan contra PubMed",  minMs: 5000  },
-  { icon: "🧑‍⚖️", label: "Arbitraje — Ronda 5",             sub: "Agente 04: consenso, contradicciones y recitación", minMs: 9000  },
-  { icon: "📋", label: "Generación del reporte",           sub: "Agente 05: ensayos y compatibilidad · bibliografía", minMs: 1500 },
-];
+/**
+ * Progress view shown while `POST /api/analyze` runs, in the landing visual
+ * system.
+ *
+ * The steps, their order and their texts come from `PIPELINE_STEPS` (shared
+ * with the landing and `/analizar`, not edited here). This file only adds, by
+ * step `id`, what the view needs on top: an icon and the pacing of the
+ * simulated progress.
+ *
+ * The backend answers once, with the finished report: it sends no progress
+ * events. The steps therefore advance on timers, and the page says so. The
+ * last step stays in progress until the request resolves, so the list never
+ * reads as complete while the analysis is still running.
+ */
+
+/** Icon and simulated duration per step, keyed by the shared step `id`. */
+const STEP_DETAILS: Record<string, { Icon: Icon; ms: number }> = {
+  "01": { Icon: FileTextIcon, ms: 1500 },
+  "02": { Icon: TextAaIcon, ms: 1000 },
+  "03": { Icon: ListChecksIcon, ms: 4000 },
+  "04": { Icon: UsersThreeIcon, ms: 8000 },
+  "05": { Icon: ChatsCircleIcon, ms: 12000 },
+  "06": { Icon: ScalesIcon, ms: 9000 },
+  "07": { Icon: CompassIcon, ms: 5000 },
+  "08": { Icon: ClipboardTextIcon, ms: 1500 },
+};
+
+/** Pacing of a shared step this file has no entry for yet. */
+const DEFAULT_STEP_MS = 4000;
+
+/** Pause between steps once the report is back and the rest only catch up. */
+const CATCH_UP_MS = 350;
+
+const TOTAL_STEPS = PIPELINE_STEPS.length;
+const LAST_STEP = TOTAL_STEPS - 1;
+
+const ERROR_ID = "analisis-error";
 
 type Status = "pending" | "active" | "done";
 
+/** State of a step for assistive technology: the badge itself is decorative. */
+const STATUS_LABEL: Record<Status, string> = {
+  pending: "Pendiente",
+  active: "En curso",
+  done: "Completado",
+};
+
+const STEP_BADGE = "inline-flex size-8 shrink-0 items-center justify-center rounded-full border";
+
+/** Round marker of a step: its number, a spinner or a check. */
+function StepBadge({ id, status }: { id: string; status: Status }) {
+  if (status === "done") {
+    return (
+      <span aria-hidden="true" className={`${STEP_BADGE} border-accent bg-accent text-accent-fg`}>
+        <CheckIcon weight="bold" className="size-4" />
+      </span>
+    );
+  }
+  if (status === "active") {
+    return (
+      <span aria-hidden="true" className={`${STEP_BADGE} border-accent text-accent`}>
+        {/* Under reduced motion the spinner gives way to a still icon. */}
+        <CircleNotchIcon weight="bold" className="size-4 animate-spin motion-reduce:hidden" />
+        <DotsThreeIcon weight="bold" className="size-4 motion-safe:hidden" />
+      </span>
+    );
+  }
+  return (
+    <span
+      aria-hidden="true"
+      className={`${STEP_BADGE} border-border bg-bg-subtle font-mono text-xs font-semibold text-fg-muted`}
+    >
+      {id}
+    </span>
+  );
+}
+
 export default function AnalyzingPage() {
   const router = useRouter();
-  const [statuses, setStatuses] = useState<Status[]>(STEPS.map(() => "pending"));
+  const [statuses, setStatuses] = useState<Status[]>(PIPELINE_STEPS.map(() => "pending"));
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  const canceledRef  = useRef(false);
-  const apiDoneRef   = useRef(false);
-  const animDoneRef  = useRef(false);
-  const reportRef    = useRef<StructuredReport | null>(null);
+  const canceledRef = useRef(false);
+  const apiDoneRef = useRef(false);
+  const animDoneRef = useRef(false);
+  const reportRef = useRef<StructuredReport | null>(null);
 
-  /* ── Timer ─────────────────────────────────────────────────────────── */
+  /* Elapsed time. */
   useEffect(() => {
     const start = Date.now();
     const id = setInterval(() => {
@@ -40,15 +125,18 @@ export default function AnalyzingPage() {
     return () => clearInterval(id);
   }, []);
 
-  /* ── Animación + llamada a la API ──────────────────────────────────── */
+  /* Simulated progress and the request. */
   useEffect(() => {
-    // Resetear refs para el double-invoke de StrictMode en desarrollo
+    // Reset the refs: StrictMode invokes the effect twice in development.
     canceledRef.current = false;
     apiDoneRef.current = false;
     animDoneRef.current = false;
 
     const input = inputStore.get();
-    if (!input) { router.replace("/"); return; }
+    if (!input) {
+      router.replace("/");
+      return;
+    }
 
     const navigate = () => {
       if (canceledRef.current) return;
@@ -56,206 +144,188 @@ export default function AnalyzingPage() {
       router.push("/report");
     };
 
-    /* Avanza los pasos restantes rápido (cuando la API ya terminó) */
+    /* The report is back and every step was shown: close the list and leave. */
+    const finish = () => {
+      if (canceledRef.current) return;
+      setStatuses((prev) => prev.map(() => "done"));
+      navigate();
+    };
+
+    /* Runs through the remaining steps quickly (the request already resolved). */
     const finishFast = (from: number) => {
       if (canceledRef.current) return;
       let delay = 0;
-      for (let i = from; i < STEPS.length; i++) {
+      for (let i = from; i < TOTAL_STEPS; i++) {
         const idx = i;
-        delay += 350;
+        delay += CATCH_UP_MS;
         setTimeout(() => {
           if (canceledRef.current) return;
-          setStatuses((prev) =>
-            prev.map((s, j) => (j <= idx ? "done" : s))
-          );
-          if (idx === STEPS.length - 1) navigate();
+          setStatuses((prev) => prev.map((s, j) => (j <= idx ? "done" : s)));
+          if (idx === LAST_STEP) navigate();
         }, delay);
       }
     };
 
-    /* Animación secuencial normal */
+    /* Regular pacing, one step after the other. */
     const runStep = (idx: number) => {
       if (canceledRef.current) return;
       setStatuses((prev) =>
-        prev.map((_, j) => (j < idx ? "done" : j === idx ? "active" : "pending"))
+        prev.map((_, j) => (j < idx ? "done" : j === idx ? "active" : "pending")),
       );
       setTimeout(() => {
         if (canceledRef.current) return;
-        setStatuses((prev) => prev.map((s, j) => (j <= idx ? "done" : s)));
 
-        if (idx === STEPS.length - 1) {
+        if (idx === LAST_STEP) {
           animDoneRef.current = true;
-          if (apiDoneRef.current) navigate();
-          /* Si la API aún no terminó, el último paso queda "done" y
-             navigate() se llama desde el bloque de la API (abajo). */
-        } else if (apiDoneRef.current) {
-          /* API ya terminó mientras animábamos — saltamos los pasos restantes */
+          // Without the report yet, the last step stays in progress: the
+          // request block below closes the list when it resolves.
+          if (apiDoneRef.current) finish();
+          return;
+        }
+
+        setStatuses((prev) => prev.map((s, j) => (j <= idx ? "done" : s)));
+        if (apiDoneRef.current) {
+          // The request resolved during this step: catch up with the rest.
           finishFast(idx + 1);
         } else {
           runStep(idx + 1);
         }
-      }, STEPS[idx].minMs);
+      }, STEP_DETAILS[PIPELINE_STEPS[idx].id]?.ms ?? DEFAULT_STEP_MS);
     };
 
     runStep(0);
 
-    /* Llamada real a la API */
+    /* The actual request. */
     (async () => {
       try {
         const report =
-          input.mode === "file"
-            ? await analyzeFile(input.file)
-            : await analyzeText(input.text);
+          input.mode === "file" ? await analyzeFile(input.file) : await analyzeText(input.text);
         if (canceledRef.current) return;
         reportRef.current = report;
         apiDoneRef.current = true;
         inputStore.clear();
-        if (animDoneRef.current) navigate();
-        /* Si la animación ya terminó → navegar; si no, la animación
-           detectará apiDoneRef y acelerará los pasos restantes. */
+        // If the steps are still running, the pacing above notices
+        // `apiDoneRef` and catches up; otherwise leave now.
+        if (animDoneRef.current) finish();
       } catch (err) {
         if (canceledRef.current) return;
         setError(err instanceof Error ? err.message : "Error inesperado.");
       }
     })();
 
-    return () => { canceledRef.current = true; };
+    return () => {
+      canceledRef.current = true;
+    };
   }, [router]);
 
-  /* ── Error ──────────────────────────────────────────────────────────── */
   if (error) {
     return (
-      <div className="min-h-screen flex flex-col">
-        <NexusHeader />
-        <main className="flex-1 flex items-center justify-center px-4">
-          <div className="w-full max-w-md rounded-2xl border border-red-200 bg-white p-8 text-center space-y-4">
-            <p className="text-4xl">⚠️</p>
-            <p className="text-lg font-semibold text-slate-800">
-              Error en el análisis
-            </p>
-            <p className="text-sm text-red-600 bg-red-50 rounded-lg px-4 py-2">
-              {error}
-            </p>
-            <button
-              onClick={() => router.push("/analizar")}
-              className="rounded-xl bg-slate-900 px-6 py-2 text-sm font-semibold text-white hover:bg-slate-700"
-            >
-              Volver al inicio
-            </button>
-          </div>
-        </main>
-      </div>
+      <AuthShell
+        icon={<WarningCircleIcon aria-hidden="true" weight="bold" className="size-6" />}
+        title="Error en el análisis"
+        footer={<DiagnosticNotice />}
+      >
+        <div className={FORM_CARD}>
+          <FormError id={ERROR_ID}>{error}</FormError>
+          <button
+            type="button"
+            onClick={() => router.push("/analizar")}
+            aria-describedby={ERROR_ID}
+            className={SUBMIT_BUTTON}
+          >
+            Volver a cargar el caso
+          </button>
+        </div>
+      </AuthShell>
     );
   }
 
   const activeIdx = statuses.findLastIndex((s) => s === "active");
   const doneCount = statuses.filter((s) => s === "done").length;
-  const progress  = Math.round((doneCount / STEPS.length) * 100);
+  const progress = Math.round((doneCount / TOTAL_STEPS) * 100);
+  const statusText =
+    doneCount === TOTAL_STEPS
+      ? "Completado — redirigiendo…"
+      : activeIdx >= 0
+        ? `Paso ${activeIdx + 1} de ${TOTAL_STEPS}`
+        : "Iniciando…";
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <NexusHeader />
-
-      <main className="flex-1 bg-slate-50 flex items-center justify-center px-4 py-12">
-        <div className="w-full max-w-xl space-y-6">
-
-          {/* Título + progreso */}
-          <div className="text-center space-y-1">
-            <p className="text-2xl font-bold text-slate-800">
-              Analizando caso clínico
+    <AuthShell
+      icon={<HourglassIcon aria-hidden="true" weight="bold" className="size-6" />}
+      title="Analizando caso clínico"
+      lead="El pipeline multi-agente está procesando el documento…"
+      footer={<DiagnosticNotice />}
+    >
+      <div className={FORM_CARD}>
+        <div>
+          {/* The seconds tick outside the live region: only a change of step
+              is announced. */}
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm">
+            <p role="status" className="font-semibold text-fg">
+              {statusText}
             </p>
-            <p className="text-sm text-slate-400">
-              El pipeline multi-agente está procesando el documento…
+            <p className="text-fg-muted">
+              <span className="font-mono tabular-nums">{elapsed}</span> s transcurridos
             </p>
           </div>
-
-          {/* Barra de progreso */}
-          <div className="h-1.5 w-full rounded-full bg-slate-200 overflow-hidden">
+          <div
+            role="progressbar"
+            aria-label="Avance del análisis"
+            aria-valuemin={0}
+            aria-valuemax={TOTAL_STEPS}
+            aria-valuenow={doneCount}
+            aria-valuetext={statusText}
+            className="mt-3 h-2 w-full overflow-hidden rounded-full bg-border"
+          >
             <div
-              className="h-full rounded-full bg-slate-900 transition-all duration-500"
+              className="h-full rounded-full bg-accent transition-[width] duration-500"
               style={{ width: `${progress}%` }}
             />
           </div>
-
-          {/* Pasos */}
-          <div className="rounded-2xl border border-slate-200 bg-white divide-y divide-slate-100">
-            {STEPS.map((step, i) => {
-              const status = statuses[i];
-              return (
-                <div
-                  key={step.label}
-                  className={`flex items-center gap-4 px-6 py-4 transition-colors ${
-                    status === "active" ? "bg-slate-50" : ""
-                  }`}
-                >
-                  {/* Indicador de estado */}
-                  <div className="shrink-0 w-8 h-8 flex items-center justify-center">
-                    {status === "done" && (
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 text-white text-sm font-bold">
-                        ✓
-                      </span>
-                    )}
-                    {status === "active" && (
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-slate-900 border-t-transparent animate-spin" />
-                    )}
-                    {status === "pending" && (
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-slate-200 text-xs font-medium text-slate-400">
-                        {i + 1}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Texto */}
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium truncate ${
-                      status === "pending" ? "text-slate-400" : "text-slate-800"
-                    }`}>
-                      {step.label}
-                    </p>
-                    <p className={`text-xs truncate ${
-                      status === "active"
-                        ? "text-blue-500"
-                        : "text-slate-400"
-                    }`}>
-                      {status === "active" ? "Procesando…" : step.sub}
-                    </p>
-                  </div>
-
-                  {/* Emoji del paso */}
-                  <span className={`text-lg transition-opacity ${
-                    status === "pending" ? "opacity-30" : "opacity-100"
-                  }`}>
-                    {step.icon}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Footer de estado */}
-          <div className="flex items-center justify-between text-xs text-slate-400 px-1">
-            <span>
-              {doneCount === STEPS.length
-                ? "Completado — redirigiendo…"
-                : activeIdx >= 0
-                ? `Paso ${activeIdx + 1} de ${STEPS.length}`
-                : "Iniciando…"}
-            </span>
-            <span>{elapsed}s transcurridos</span>
-          </div>
-
+          <p className="mt-3 text-xs text-pretty text-fg-muted">
+            El avance de los pasos es orientativo: esta pantalla no recibe el
+            progreso real del servidor. El reporte se abre cuando termina el
+            análisis.
+          </p>
         </div>
-      </main>
-    </div>
-  );
-}
 
-function NexusHeader() {
-  return (
-    <header className="bg-slate-900 text-white px-6 py-4 flex items-center gap-3">
-      <span className="text-xl font-bold">NEXUS</span>
-      <span className="text-slate-500 text-sm">·</span>
-      <span className="text-slate-400 text-sm">Sistema de Soporte Investigativo Clínico</span>
-    </header>
+        <ol className="flex flex-col gap-4">
+          {PIPELINE_STEPS.map((step, i) => {
+            const status = statuses[i];
+            const StepIcon = STEP_DETAILS[step.id]?.Icon;
+            return (
+              <li
+                key={step.id}
+                aria-current={status === "active" ? "step" : undefined}
+                className="flex items-start gap-3"
+              >
+                <StepBadge id={step.id} status={status} />
+                <div className="min-w-0 flex-1">
+                  <p
+                    className={`text-sm font-semibold ${status === "pending" ? "text-fg-muted" : "text-fg"}`}
+                  >
+                    {step.label}
+                    <span className="sr-only"> ({STATUS_LABEL[status]})</span>
+                  </p>
+                  <p className="text-sm text-pretty text-fg-muted">{step.description}</p>
+                  {status === "active" && (
+                    <p aria-hidden="true" className="mt-1 text-sm font-semibold text-accent">
+                      Procesando…
+                    </p>
+                  )}
+                </div>
+                {StepIcon && (
+                  <StepIcon
+                    aria-hidden="true"
+                    className={`mt-1 size-5 shrink-0 ${status === "pending" ? "text-fg-muted opacity-50" : "text-accent"}`}
+                  />
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+    </AuthShell>
   );
 }
