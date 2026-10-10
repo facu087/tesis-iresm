@@ -17,7 +17,7 @@ Auditoría del 2026-10-09 (claro y oscuro, 1440 px):
 - `/analyzing` no tiene la barra compartida, ni logo, ni selector de tema; usa
   emojis como iconos, queda siempre en claro y no muestra el aviso "NEXUS no
   emite diagnósticos". Además lleva su propia lista de 8 pasos, distinta de
-  `frontend/src/lib/pipelineSteps.ts` (9 pasos, la que usan la landing y
+  `frontend/src/lib/pipelineSteps.ts` (8 pasos, la que usan la landing y
   `/analizar`): le falta la navegación de ensayos y le atribuye el reporte al
   Agente 05 en vez del Sintetizador (06).
 - `/report` no tiene la barra compartida, ni logo, ni selector de tema; usa
@@ -65,8 +65,9 @@ el backend real en modo grabado, en claro y oscuro, a 1440 px y 375 px.
 
 ## Tareas
 
-- [ ] **T1 — `/admin/pendientes` en el sistema nuevo.** Ruta: delegada (lectura
-  que prepara la escritura; puede tocar el marco compartido).
+- [x] **T1 — `/admin/pendientes` en el sistema nuevo.** Ruta: delegada (lectura
+  que prepara la escritura; puede tocar el marco compartido). Commit `716f52b`.
+  El marco se extrajo a `ShellFrame` y el aviso a `DiagnosticNotice`.
 - [ ] **T2 — `/analyzing` en el sistema nuevo, con los pasos de
   `pipelineSteps.ts`.** Ruta: delegada.
 - [ ] **T3 — `/report` en el sistema nuevo.** Ruta: delegada (archivo de 1.112
@@ -95,7 +96,21 @@ cada tarea.
 
 ## Verificación
 
-Pendiente.
+- T1: `npx tsc --noEmit`, `npm run lint` y `npm run build` sin errores
+  (reportados por el escritor). Recorrido en navegador sin interfaz contra el
+  backend real en modo grabado: 18 de 18, a 1440 px y 375 px, en claro y
+  oscuro (marco, Geist, botones en píldora, sin desborde, aviso, sin emojis,
+  rechazo sin motivo no avanza, sin errores de consola). No se ejercitó la
+  aprobación ni el rechazo efectivos: quedan para el recorrido de T5.
+
+## Revisión nativa
+
+- T1 (`51b7c1e..35692e3`): riesgo medio, consentida, **aprobada y acusada**
+  (linaje `review-6fdb589d9a38713c`). Tres avisos informativos, ninguno
+  bloqueante: la verificación figuraba pendiente en este documento (ya
+  registrada arriba); el error de decisión pasa por `FormError` (comprobado:
+  conserva `role="alert"` y el `id`); la clase `landing-skeleton` (comprobado:
+  existe en `globals.css`).
 
 ## Progreso
 
