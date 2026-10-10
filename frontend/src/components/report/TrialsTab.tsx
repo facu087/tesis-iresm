@@ -174,10 +174,10 @@ function TrialCard({ t, evaluado }: { t: ClinicalTrial; evaluado: boolean }) {
           <div className="flex flex-wrap gap-2">
             {evaluado && (
               <Badge
-                tone={COMPATIBILITY_BADGE[compatibilidad].tone}
-                Icon={COMPATIBILITY_BADGE[compatibilidad].Icon}
+                tone={COMPATIBILITY_BADGE[compatibilidad]?.tone ?? "neutral"}
+                Icon={COMPATIBILITY_BADGE[compatibilidad]?.Icon}
               >
-                {COMPATIBILITY_LABEL[compatibilidad]}
+                {COMPATIBILITY_LABEL[compatibilidad] ?? compatibilidad}
               </Badge>
             )}
             <Badge tone="neutral">
