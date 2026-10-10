@@ -84,7 +84,8 @@ export const EXAMPLE_HYPOTHESES: readonly ExampleHypothesisData[] = [
   },
 ];
 
-const BADGE =
+/** Badge of the report card; the real report view (`/report`) reuses it. */
+export const BADGE =
   "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-semibold";
 
 const STATUS_STYLES = {

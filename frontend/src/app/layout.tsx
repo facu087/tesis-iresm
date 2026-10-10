@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
-import { Atkinson_Hyperlegible, Geist, Geist_Mono, Newsreader } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import ThemeScope from "@/components/ThemeScope";
 import { resolveSiteUrl } from "@/lib/siteUrl";
 
 /**
@@ -22,17 +21,6 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const atkinson = Atkinson_Hyperlegible({
-  variable: "--font-atkinson",
-  weight: ["400", "700"],
-  subsets: ["latin"],
-});
-
-const newsreader = Newsreader({
-  variable: "--font-newsreader",
-  subsets: ["latin"],
-});
-
 export const metadata: Metadata = {
   // Base of every URL based metadata field, sharing image included.
   metadataBase: resolveSiteUrl(),
@@ -49,13 +37,12 @@ export default function RootLayout({
     <html
       lang="es"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} ${newsreader.variable} ${atkinson.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className="min-h-full flex flex-col bg-gray-50 text-gray-900">
-        <ThemeScope />
         {children}
       </body>
     </html>

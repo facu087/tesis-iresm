@@ -32,13 +32,3 @@ export function NexusMark({ className }: { className?: string }) {
     </svg>
   );
 }
-
-/** Marca de cabecera: isotipo + nombre, con el mismo tipo de letra de siempre. */
-export default function BrandLockup() {
-  return (
-    <span className="inline-flex items-center gap-2.5">
-      <NexusMark className="h-7 w-auto" />
-      <span>NEXUS</span>
-    </span>
-  );
-}

@@ -6,8 +6,9 @@ import { useRouter } from "next/navigation";
 import { FileArrowUpIcon } from "@phosphor-icons/react/ssr";
 import UploadForm from "@/components/UploadForm";
 import AuthShell from "@/components/landing/AuthShell";
+import DiagnosticNotice from "@/components/landing/DiagnosticNotice";
 import { FORM_CARD } from "@/components/landing/FormPrimitives";
-import { CONTAINER, NAV_LINK } from "@/components/landing/styles";
+import { NAV_LINK } from "@/components/landing/styles";
 import { inputStore } from "@/lib/inputStore";
 import type { AnalysisInput } from "@/lib/inputStore";
 import { PIPELINE_STEPS } from "@/lib/pipelineSteps";
@@ -26,15 +27,7 @@ function AnalizarShell({ aside, children }: { aside: React.ReactNode; children: 
       title="Cargar caso clínico"
       lead="Subí la historia clínica en PDF o pegá el texto directamente."
       aside={aside}
-      footer={
-        <footer className={`${CONTAINER} pb-12`}>
-          <p className="rounded-2xl border border-border bg-bg-subtle p-4 text-sm text-pretty text-fg-muted">
-            <span className="font-semibold text-fg">NEXUS</span> no emite
-            diagnósticos clínicos. Las hipótesis generadas son orientativas y
-            deben ser evaluadas por el médico responsable.
-          </p>
-        </footer>
-      }
+      footer={<DiagnosticNotice />}
     >
       {children}
     </AuthShell>
