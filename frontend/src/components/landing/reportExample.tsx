@@ -14,8 +14,10 @@ import {
  * This module has no state and no hooks on purpose: it is imported from a
  * Server Component and from a Client Component alike.
  *
- * The hypotheses are an illustrative example. PMID 22439958 is the one the
- * project tests already use.
+ * The hypotheses are an illustrative example, but the citation marked as
+ * verified is real: PMID 26900641 is a randomized trial whose title PubMed
+ * returns verbatim (checked 2026-10-15). It has to stay that way: the card
+ * claims the title was verified against PubMed.
  */
 
 /**
@@ -57,8 +59,9 @@ export const EXAMPLE_HYPOTHESES: readonly ExampleHypothesisData[] = [
     status: "Respaldada",
     citation: {
       kind: "verified",
-      title: "Metformin-associated vitamin B12 deficiency",
-      pmid: "PMID 22439958",
+      title:
+        "Long-term Metformin Use and Vitamin B12 Deficiency in the Diabetes Prevention Program Outcomes Study",
+      pmid: "PMID 26900641",
       note: "Título verificado contra PubMed",
     },
   },
