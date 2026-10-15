@@ -14,6 +14,8 @@ Endpoints usados:
 from __future__ import annotations
 
 import os
+import re
+import sys
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from typing import Optional
@@ -24,12 +26,87 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 _BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 _PUBMED_URL_TEMPLATE = "https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
 
+_ENV_API_KEY_VAR = "PUBMED_API_KEY"
+
+# Las claves de NCBI son alfanuméricas. El patrón es deliberadamente laxo —no
+# valida el largo exacto— porque el objetivo no es adivinar el formato de NCBI
+# sino descartar lo que evidentemente NO es una clave: un comentario, una ruta,
+# una frase con espacios.
+_API_KEY_VALIDA = re.compile(r"^[A-Za-z0-9]{8,64}$")
+
+
+def _leer_api_key() -> Optional[str]:
+    """
+    Lee PUBMED_API_KEY del entorno y la descarta si no parece una clave.
+
+    Por qué hace falta validar algo "opcional": si en el `.env` la variable
+    quedó escrita con el comentario en la misma línea —
+
+        PUBMED_API_KEY=            # Opcional: aumenta el rate limit
+
+    — python-dotenv carga el comentario entero como valor. Ese texto viajaba
+    como `api_key` a PubMed, la API respondía 400 y `verify_report_sources()`
+    caía al `except`, marcando **todas** las fuentes como `no_verificable`.
+
+    El efecto era desproporcionado y silencioso: la verificación bibliográfica
+    es lo que detecta que los agentes alucinan PMIDs, y un typo en el `.env` la
+    desactivaba entera sin un solo error visible. El reporte salía igual, con
+    HTTP 200, con todas las hipótesis en `pendiente` en vez de `respaldada` o
+    `especulativa`, y sin Ronda 5 de recitación. Una corrida real de 450 s y su
+    cuota de Groq se perdieron así, y solo se notó leyendo el log del backend.
+
+    Ante una clave con formato inválido se avisa por stderr y se sigue **sin
+    clave**: PubMed funciona igual a 3 req/s en vez de 10. Degradar el rate
+    limit es mucho mejor que apagar la verificación.
+    """
+    crudo = os.getenv(_ENV_API_KEY_VAR)
+    if crudo is None:
+        return None
+
+    clave = crudo.strip()
+    if not clave:
+        return None
+
+    if not _API_KEY_VALIDA.match(clave):
+        # No se loguea el valor completo: puede ser una clave real mal copiada.
+        print(
+            f"[NEXUS][PubMed] {_ENV_API_KEY_VAR} no parece una clave válida "
+            f"(se leyeron {len(clave)} caracteres, empieza con {clave[:4]!r}). "
+            f"Revisá que en el .env el comentario no esté en la misma línea. "
+            f"Se continúa SIN clave: la verificación sigue funcionando, a 3 "
+            f"req/s en vez de 10.",
+            file=sys.stderr,
+        )
+        return None
+
+    return clave
+
+
 # Pausa entre reintentos: 2s → 4s → 8s (máx 3 intentos)
 _RETRY_KWARGS = dict(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=2, min=2, max=8),
     reraise=True,
 )
+
+
+def _verificar_respuesta(response: httpx.Response) -> None:
+    """
+    Levanta si la respuesta no fue exitosa, nombrando la causa más probable.
+
+    Un 400 de E-utilities casi siempre significa que un parámetro viajó mal, y
+    el candidato número uno es `api_key`. Decirlo acá ahorra el rastreo que
+    costó una corrida entera: desde arriba solo se veía "todas las fuentes
+    no_verificable".
+    """
+    if response.status_code == 400:
+        print(
+            "[NEXUS][PubMed] La API devolvió 400 (parámetros inválidos). "
+            f"Si hay {_ENV_API_KEY_VAR} definida, revisá su valor: una clave "
+            "mal formada es la causa más común.",
+            file=sys.stderr,
+        )
+    response.raise_for_status()
 
 
 @dataclass
@@ -66,7 +143,7 @@ class PubMedClient:
     """
 
     def __init__(self) -> None:
-        self._api_key: Optional[str] = os.getenv("PUBMED_API_KEY")
+        self._api_key: Optional[str] = _leer_api_key()
         self._client: Optional[httpx.AsyncClient] = None
 
     async def __aenter__(self) -> "PubMedClient":
@@ -108,7 +185,7 @@ class PubMedClient:
         })
 
         response = await self._client.get(f"{_BASE_URL}/esearch.fcgi", params=params)
-        response.raise_for_status()
+        _verificar_respuesta(response)
 
         data = response.json()
         return data.get("esearchresult", {}).get("idlist", [])
@@ -139,7 +216,7 @@ class PubMedClient:
         params["retmode"] = "xml"
 
         response = await self._client.get(f"{_BASE_URL}/efetch.fcgi", params=params)
-        response.raise_for_status()
+        _verificar_respuesta(response)
 
         return _parse_abstracts_xml(response.text)
 
@@ -171,7 +248,7 @@ class PubMedClient:
         })
 
         response = await self._client.get(f"{_BASE_URL}/esummary.fcgi", params=params)
-        response.raise_for_status()
+        _verificar_respuesta(response)
 
         data = response.json()
         result: dict[str, dict] = {}
