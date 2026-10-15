@@ -15,8 +15,9 @@ import {
  *
  * Everything is real text, not an image: screen readers read it whole. The
  * hypotheses are an illustrative example and both views carry the "Ejemplo
- * ilustrativo" marker; PMID 22439958 is the one the project tests already use
- * and the trial is a public record that appeared in a real run.
+ * ilustrativo" marker; the verified citation (PMID 26900641) is real and its
+ * title matches PubMed, and the trial is a public record that appeared in a
+ * real run.
  *
  * Layout: one bordered card whose panels are separated by the 1 px gaps of
  * the grid, so no panel carries a border on a single side.
