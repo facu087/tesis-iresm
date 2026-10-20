@@ -72,5 +72,17 @@ Strategy: ask-on-risk. Forecast ~400 authored lines (lockfile excluded).
   `npm run lint` clean; `npm run build` ok (13 static pages).
   Commit: see git log (`docs(s4): corredor de tests del frontend`).
 
+## Review
+Native review of the range `develop..6803c95`: risk medium (slice budget reached; ~9,000
+lines are the lockfile), consent granted, one lens (reliability), **approved and
+acknowledged** (lineage `review-f97cbb809c9ed7d1`). Two non-blocking findings:
+- `R3-reportstore-leak` (WARNING): not reproducible. `beforeEach` runs
+  `sessionStorage.clear()` and `reportStore.getSnapshot()` rereads `sessionStorage` on every
+  call, so no report survives between tests. No change.
+- `R3-step-timing-duplicated` (SUGGESTION): the test hardcodes the step durations. Open as
+  follow-up: export them from the page or `lib/pipelineSteps.ts` and import them in the test.
+
+Parent spot check: `npm test` 14/14 pass.
+
 ## Next step
 All tasks done. Push and PR to `develop` are the user's decision.
