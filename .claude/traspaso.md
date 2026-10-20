@@ -281,6 +281,16 @@ La comparación de costo contra Claude, GPT-4o y Gemini que muestra `scripts/dem
 usa una **muestra sintética**. Con el `costos.jsonl` real ya se puede recalcular con
 `usage.recalculate()` y una tabla de tarifas.
 
+**Modo mock determinista (2026-10-20, rama `feature/s4-mock-rag-grabado`).** El 2026-10-15 el
+mock dejó de mostrar el resumen del Agente 06: la Ronda 1 consultaba PubMed en vivo, PubMed ya
+devolvía otros artículos y las recitaciones grabadas citaban PMIDs que no se ofrecían. Ahora
+`--grabar` guarda también lo que ofreció el RAG (bloque `rag` de `grabadas.json`) y en modo mock
+la Ronda 1 usa eso. Regrabado el 2026-10-20 (87.320 tokens, 30 llamadas, 8 reintentadas por 429,
+495 s): dos pasadas del mock dan el mismo consenso y el mismo resumen. **Hallazgo**: en esa
+corrida los Agentes 01 y 02 respondieron la Ronda 5 con `{"hypotheses": [...]}` en vez de
+`{"recitations": [...]}`; el parser las rechaza y su recitación falla sin aviso visible. Pasa
+también en análisis reales: hay que arreglar el prompt o el parseo de la recitación y regrabar.
+
 ### 4.4 Decisiones abiertas
 - **Recorte de la Ronda 4**: ahorraría hasta un tercio del consumo. Hace falta más de una
   corrida para decidirlo.
