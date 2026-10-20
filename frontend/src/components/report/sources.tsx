@@ -40,11 +40,18 @@ function VerdictLabel({ status }: { status: string }) {
   );
 }
 
-/** The title PubMed returns for the cited PMID, beside the cited one. */
-function ActualTitle({ title }: { title: string }) {
+/**
+ * The title PubMed returns for the cited PMID, beside the cited one. The label
+ * is red only when the source was refuted; a confirmed source keeps it neutral.
+ */
+function ActualTitle({ title, status }: { title: string; status?: string | null }) {
+  const refuted = status ? SOURCE_VERDICT[status]?.tachado === true : false;
   return (
     <span className="mt-1 block text-fg">
-      <span className={`font-semibold ${DANGER_INK}`}>En PubMed este PMID es:</span> {title}
+      <span className={`font-semibold ${refuted ? DANGER_INK : "text-fg-muted"}`}>
+        En PubMed este PMID es:
+      </span>{" "}
+      {title}
     </span>
   );
 }
@@ -83,7 +90,7 @@ export function BibliografiaTab({ sources }: { sources: Source[] }) {
               </p>
               {s.actual_title && (
                 <p className="text-xs wrap-anywhere">
-                  <ActualTitle title={s.actual_title} />
+                  <ActualTitle title={s.actual_title} status={s.verification_status} />
                 </p>
               )}
               <p className="text-xs wrap-anywhere text-fg-muted">
@@ -150,7 +157,9 @@ export function SourceRow({ source }: { source: Source }) {
           </span>
         )}
         {/* El título real es la prueba: el PMID existe, pero es de otra cosa. */}
-        {source.actual_title && <ActualTitle title={source.actual_title} />}
+        {source.actual_title && (
+          <ActualTitle title={source.actual_title} status={source.verification_status} />
+        )}
       </span>
       {source.url && (
         <a href={source.url} target="_blank" rel="noopener noreferrer" className={SOURCE_LINK}>
