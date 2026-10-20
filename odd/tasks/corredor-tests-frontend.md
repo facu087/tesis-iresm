@@ -28,7 +28,7 @@ Out of scope: Playwright / end-to-end tests, CI workflow, other screens.
 - [x] T1 — Runner setup: dev deps, `vitest.config.mts`, setup file with jest-dom matchers, `npm test` script, `src/test/` helpers if needed, one smoke test. Route: delegated (writer, 2+ files).
 - [x] T2 — `/analyzing` tests: response before the last step, response after the last step, backend error, network error (TypeError message), no case → `/analizar`. Route: delegated.
 - [x] T3 — `/report` tab keyboard tests: ArrowRight/ArrowLeft wrap, Home/End, Alt+Arrow ignored, aria-selected/tabIndex/focus move with selection. Route: delegated.
-- [ ] T4 — Docs: `.claude/CLAUDE.md` (how to run frontend tests), `.claude/traspaso.md` 4.10 (runner exists; remove the three details fixed in PR #66). Route: delegated.
+- [x] T4 — Docs: `.claude/CLAUDE.md` (how to run frontend tests), `.claude/traspaso.md` 4.10 (runner exists; remove the three details fixed in PR #66). Route: delegated.
 
 ## Acceptance criteria
 - `npm test` in `frontend/` runs and passes, deterministically, offline.
@@ -63,7 +63,14 @@ Strategy: ask-on-risk. Forecast ~400 authored lines (lockfile excluded).
   Alt+ArrowLeft, Ctrl+ArrowRight and Shift+End change nothing; click selects. Each move
   asserts aria-selected, tabindex 0/-1, focus and the panel's aria-labelledby. No bug found.
   Checks: `npm test` 14/14 pass; `npx tsc --noEmit` exit 0; `npm run lint` clean.
-  Commit: see git log (`test(s4): teclado de las pestañas del reporte`).
+  Commit: 34cc53a.
+
+- T4 — done. `.claude/CLAUDE.md`: frontend test command under "Testing" and the new files
+  in the folder tree. `.claude/traspaso.md` 4.10: runner bullet rewritten (what is covered,
+  what is not) and the "Detalles de las pantallas migradas" bullet removed (fixed in PR #66).
+  Checks (final, in `frontend/`): `npm test` 14/14 pass; `npx tsc --noEmit` exit 0;
+  `npm run lint` clean; `npm run build` ok (13 static pages).
+  Commit: see git log (`docs(s4): corredor de tests del frontend`).
 
 ## Next step
-T4.
+All tasks done. Push and PR to `develop` are the user's decision.
