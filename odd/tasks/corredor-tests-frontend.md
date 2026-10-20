@@ -27,7 +27,7 @@ Out of scope: Playwright / end-to-end tests, CI workflow, other screens.
 ## Tasks
 - [x] T1 — Runner setup: dev deps, `vitest.config.mts`, setup file with jest-dom matchers, `npm test` script, `src/test/` helpers if needed, one smoke test. Route: delegated (writer, 2+ files).
 - [x] T2 — `/analyzing` tests: response before the last step, response after the last step, backend error, network error (TypeError message), no case → `/analizar`. Route: delegated.
-- [ ] T3 — `/report` tab keyboard tests: ArrowRight/ArrowLeft wrap, Home/End, Alt+Arrow ignored, aria-selected/tabIndex/focus move with selection. Route: delegated.
+- [x] T3 — `/report` tab keyboard tests: ArrowRight/ArrowLeft wrap, Home/End, Alt+Arrow ignored, aria-selected/tabIndex/focus move with selection. Route: delegated.
 - [ ] T4 — Docs: `.claude/CLAUDE.md` (how to run frontend tests), `.claude/traspaso.md` 4.10 (runner exists; remove the three details fixed in PR #66). Route: delegated.
 
 ## Acceptance criteria
@@ -55,7 +55,15 @@ Strategy: ask-on-risk. Forecast ~400 authored lines (lockfile excluded).
   navigation even after all timers; TypeError shows the readable network message, never
   "Failed to fetch"; no case → replace("/analizar"). No bug found.
   Checks: `npm test` 7/7 pass; `npx tsc --noEmit` exit 0; `npm run lint` clean.
-  Commit: see git log (`test(s4): cierre de la vista de progreso del análisis`).
+  Commit: f45c3b8.
+
+- T3 — done. `src/app/report/page.test.tsx` (7 cases, user-event, report seeded through
+  `reportStore.save()`): five tabs with the first selected and no redirect; ArrowRight walks
+  and wraps last→first; ArrowLeft wraps first→last; End/Home; the panel follows the tab;
+  Alt+ArrowLeft, Ctrl+ArrowRight and Shift+End change nothing; click selects. Each move
+  asserts aria-selected, tabindex 0/-1, focus and the panel's aria-labelledby. No bug found.
+  Checks: `npm test` 14/14 pass; `npx tsc --noEmit` exit 0; `npm run lint` clean.
+  Commit: see git log (`test(s4): teclado de las pestañas del reporte`).
 
 ## Next step
-T3.
+T4.
