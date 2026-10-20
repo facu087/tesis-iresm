@@ -134,7 +134,8 @@ export default function AnalyzingPage() {
 
     const input = inputStore.get();
     if (!input) {
-      router.replace("/");
+      // No case to analyze: send the user to the upload view, not the landing.
+      router.replace("/analizar");
       return;
     }
 
@@ -209,7 +210,15 @@ export default function AnalyzingPage() {
         if (animDoneRef.current) finish();
       } catch (err) {
         if (canceledRef.current) return;
-        setError(err instanceof Error ? err.message : "Error inesperado.");
+        // fetch() rejects with a TypeError when the server cannot be reached;
+        // its message ("Failed to fetch") is browser jargon, so replace it.
+        setError(
+          err instanceof TypeError
+            ? "No se pudo conectar con el servidor. Revisá tu conexión e intentá de nuevo."
+            : err instanceof Error
+              ? err.message
+              : "Error inesperado.",
+        );
       }
     })();
 
