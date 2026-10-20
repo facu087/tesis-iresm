@@ -387,11 +387,14 @@ tesis-iresm/
 │   │   │   ├── analyzing/
 │   │   │   │   ├── page.tsx        ← vista de progreso del pipeline; los pasos salen
 │   │   │   │   │                      de lib/pipelineSteps.ts (S4)
-│   │   │   │   └── layout.tsx      ← metadata propia de la ruta (S4)
+│   │   │   │   ├── layout.tsx      ← metadata propia de la ruta (S4)
+│   │   │   │   └── page.test.tsx   ← cierre de la vista: respuesta antes o después
+│   │   │   │                          del último paso, error y caso ausente (S4)
 │   │   │   ├── report/
 │   │   │   │   ├── page.tsx        ← vista de reporte (5 tabs); compone las piezas
 │   │   │   │   │                      de components/report/ (S4)
-│   │   │   │   └── layout.tsx      ← metadata propia de la ruta (S4)
+│   │   │   │   ├── layout.tsx      ← metadata propia de la ruta (S4)
+│   │   │   │   └── page.test.tsx   ← teclado de las pestañas (S4)
 │   │   │   ├── registro/page.tsx   ← alta de médico + consentimiento Ley 25.326 (S4)
 │   │   │   ├── ingresar/page.tsx   ← login (S4)
 │   │   │   ├── cuenta/page.tsx     ← estado de cuenta + reenvío tras rechazo (S4)
@@ -434,6 +437,10 @@ tesis-iresm/
 │   │   │   ├── ThemeToggle.tsx     ← selector claro/oscuro de la barra (S4)
 │   │   │   └── icons.tsx           ← sol y luna del selector de tema (S4); el resto
 │   │   │                              de los iconos son Phosphor
+│   │   ├── test/                   ← soporte de los tests del frontend (S4)
+│   │   │   ├── setup.ts            ← matchers de jest-dom + limpieza de RTL
+│   │   │   ├── fixtures.ts         ← reporte mínimo válido para las vistas
+│   │   │   └── smoke.test.tsx      ← prueba de que el corredor y el alias `@/` andan
 │   │   └── lib/
 │   │       ├── api.ts              ← cliente HTTP al backend FastAPI (credentials: "include", S4)
 │   │       ├── types.ts            ← tipos TypeScript del reporte y de cuentas (S4)
@@ -443,6 +450,7 @@ tesis-iresm/
 │   │       └── pipelineSteps.ts    ← pasos del pipeline (S4, fuente única de la landing,
 │   │                                  /analizar y /analyzing)
 │   ├── next.config.ts
+│   ├── vitest.config.mts       ← corredor de tests del frontend (Vitest + jsdom, S4)
 │   └── package.json
 ├── scripts/
 │   ├── poc_test.py             ← script de prueba end-to-end Sprint 1
@@ -694,6 +702,10 @@ ClinicalTrials.gov sigan devolviendo lo mismo.
 ### Testing
 - Cada módulo nuevo requiere su test en `tests/`
 - Caso de prueba base: neuropatía axonal sensitivomotora, paciente masculino 42 años
+- Frontend: `cd frontend && npm test` (Vitest + React Testing Library sobre jsdom; `npm run
+  test:watch` para el modo observador). Los tests van junto al código como `*.test.tsx`,
+  sin red: la API y `next/navigation` se reemplazan con mocks y los tiempos se controlan
+  con temporizadores falsos.
 
 ---
 

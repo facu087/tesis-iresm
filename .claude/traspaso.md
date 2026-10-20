@@ -379,16 +379,14 @@ red o de proveedor sin aislar.
 
 ### 4.10 Frontend, después de la landing nueva (2026-10-10)
 En orden sugerido:
-- **Corredor de tests del frontend.** No existe. Es la observación que repitieron todas las
-  revisiones nativas de los PR #57 a #63. Todo lo interactivo se probó en un navegador sin
-  interfaz (44 comprobaciones entre el flujo completo y el recorrido de sesión y rol, más 60
-  entre las tres pantallas migradas) y esos guiones no están en el repo. Lo que más pide una
-  prueba: el cierre de `/analyzing` (la respuesta llega antes o después del último paso, o
-  falla) y el teclado de las pestañas de `/report`.
-- **Detalles de las pantallas migradas**: el error de red de `/analyzing` muestra el mensaje
-  crudo del navegador ("Failed to fetch"); entrar a `/analyzing` sin caso lleva a `/` y no a
-  `/analizar`; en `/report`, "En PubMed este PMID es:" sale en rojo también en las fuentes
-  verificadas. Los tres ya estaban antes de la migración.
+- **Corredor de tests del frontend.** Ya existe: Vitest con React Testing Library sobre
+  jsdom (`cd frontend && npm test`). Cubre el cierre de `/analyzing` (la respuesta llega antes
+  o después del último paso, error del backend, error de red y entrada sin caso) y el teclado
+  de las pestañas de `/report` (flechas con vuelta, Inicio/Fin, atajos con modificador
+  ignorados, foco y `aria-selected`). Falta: las demás pantallas (carga, registro, ingreso,
+  cuenta, admin y la landing), la descarga del PDF, pruebas de punta a punta en un navegador
+  real y un flujo de CI que corra los tests. Los guiones del navegador sin interfaz con los que
+  se probó lo interactivo siguen fuera del repo.
 - **Pantallas de admin que no existen**: cuentas aprobadas, historial de decisiones y baja de
   cuentas. La auditoría se guarda en la base y no tiene vista.
 - `NEXT_PUBLIC_SITE_URL` no está definida: las etiquetas para compartir caen a
