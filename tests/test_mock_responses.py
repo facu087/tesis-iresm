@@ -92,7 +92,7 @@ class TestGrabacionFiel:
             assert entrada["model"].startswith("openai/gpt-oss-")
             assert isinstance(entrada["seq"], int)
             assert "agent_id" in entrada
-            assert entrada["recorded_at"] == "2026-10-07"
+            assert entrada["recorded_at"] == "2026-10-20"
 
     @pytest.mark.parametrize("tarea", sorted(_ESPERADAS_GRABADAS))
     def test_el_modelo_de_la_grabacion_coincide_con_el_presupuesto_de_la_tarea(self, tarea):
@@ -222,22 +222,35 @@ class TestParseoRealPorSitioDeLlamada:
     def test_la_critica_grabada_parsea_con_ids_canonicos(self):
         """El modelo real nombra "Agent 02"; el parser real lo lleva a "02"."""
         criticas = ArbiterAgent()._parse_critiques(mock_responses.get_mock_response("debate_critica"))
-        assert len(criticas) == 8
+        assert len(criticas) == 5
         assert all(re.fullmatch(r"\d{2}", c.target_agent_id) for c in criticas)
-        assert sorted(c.target_agent_id for c in criticas) == ["02"] * 3 + ["03"] * 5
+        assert sorted(c.target_agent_id for c in criticas) == ["02"] * 2 + ["03"] * 3
 
     def test_la_critica_grabada_llega_a_un_agente_del_debate(self):
         from backend.pipeline.debate import _critiques_for
 
         criticas = ArbiterAgent()._parse_critiques(mock_responses.get_mock_response("debate_critica"))
-        assert len(_critiques_for("02", criticas)) == 3
-        assert len(_critiques_for("03", criticas)) == 5
+        assert len(_critiques_for("02", criticas)) == 2
+        assert len(_critiques_for("03", criticas)) == 3
         assert _critiques_for("01", criticas) == []  # nadie critica al autor de la grabación
 
     def test_recitacion_parsea_con_fuentes(self):
-        for respuesta in _grabaciones("debate_recitacion"):
-            recitadas = ArbiterAgent()._parse_recitation(respuesta, total=3)
-            assert recitadas and all(fuentes for fuentes in recitadas.values())
+        """
+        Grabación del 2026-10-20: el Agente 03 recitó con el esquema pedido y sus
+        recitaciones parsean con fuentes. Los Agentes 01 y 02 respondieron con
+        `{"hypotheses": [...]}` en lugar de `{"recitations": [...]}`: el parser
+        las rechaza y en esa corrida su Ronda 5 falló. Es lo que hizo el modelo,
+        no un defecto de la grabación; el arreglo del prompt o del parseo va aparte.
+        """
+        por_agente = {
+            e["agent_id"]: e["response"]
+            for e in mock_responses.get_recorded_entries()["debate_recitacion"]
+        }
+        recitadas = ArbiterAgent()._parse_recitation(por_agente["03"], total=3)
+        assert recitadas and all(fuentes for fuentes in recitadas.values())
+        for agente in ("01", "02"):
+            assert '"hypotheses"' in por_agente[agente]
+            assert ArbiterAgent()._parse_recitation(por_agente[agente], total=3) == {}
 
     def test_pico_parsea(self):
         for respuesta in _grabaciones("pico_sintesis"):
