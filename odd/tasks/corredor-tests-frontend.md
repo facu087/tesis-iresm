@@ -26,7 +26,7 @@ Out of scope: Playwright / end-to-end tests, CI workflow, other screens.
 
 ## Tasks
 - [x] T1 — Runner setup: dev deps, `vitest.config.mts`, setup file with jest-dom matchers, `npm test` script, `src/test/` helpers if needed, one smoke test. Route: delegated (writer, 2+ files).
-- [ ] T2 — `/analyzing` tests: response before the last step, response after the last step, backend error, network error (TypeError message), no case → `/analizar`. Route: delegated.
+- [x] T2 — `/analyzing` tests: response before the last step, response after the last step, backend error, network error (TypeError message), no case → `/analizar`. Route: delegated.
 - [ ] T3 — `/report` tab keyboard tests: ArrowRight/ArrowLeft wrap, Home/End, Alt+Arrow ignored, aria-selected/tabIndex/focus move with selection. Route: delegated.
 - [ ] T4 — Docs: `.claude/CLAUDE.md` (how to run frontend tests), `.claude/traspaso.md` 4.10 (runner exists; remove the three details fixed in PR #66). Route: delegated.
 
@@ -46,7 +46,16 @@ Strategy: ask-on-risk. Forecast ~400 authored lines (lockfile excluded).
   (Vite warns the plugin is redundant). Tests live next to the code as `src/**/*.test.tsx`.
   Checks: `npm test` 1/1 pass; `npx tsc --noEmit` exit 0; `npm run lint` clean;
   `npm run build` ok. `npm audit` reports 12 findings, all pre-existing (next, eslint-config-next).
-  Commit: see git log (`test(s4): corredor de tests del frontend con Vitest`).
+  Commit: 9908047.
+
+- T2 — done. `src/app/analyzing/page.test.tsx` (6 cases, fake timers, mocked router and API;
+  shared fixture in `src/test/fixtures.ts`): early response waits for the catch-up and
+  navigates at 1500 + 7×350 ms; late response navigates right after it resolves (last step
+  held "Paso 8 de 8"); file input uses analyzeFile; backend Error message shown, no
+  navigation even after all timers; TypeError shows the readable network message, never
+  "Failed to fetch"; no case → replace("/analizar"). No bug found.
+  Checks: `npm test` 7/7 pass; `npx tsc --noEmit` exit 0; `npm run lint` clean.
+  Commit: see git log (`test(s4): cierre de la vista de progreso del análisis`).
 
 ## Next step
-T2.
+T3.
