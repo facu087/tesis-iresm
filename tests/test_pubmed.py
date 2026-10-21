@@ -297,3 +297,104 @@ async def test_fetch_metadata_incluye_tipos_de_publicacion_en_una_sola_consulta(
     assert len(urls) == 1
     assert result["30000001"]["pubtypes"] == ["Journal Article", "Meta-Analysis"]
     assert result["30000002"]["pubtypes"] == []
+
+
+# ---------------------------------------------------------------------------
+# Lectura de PUBMED_API_KEY (tarjeta #79)
+# ---------------------------------------------------------------------------
+
+from backend.external.pubmed import (  # noqa: E402  (agrupado con el resto del fix)
+    _ENV_API_KEY_VAR,
+    _leer_api_key,
+    _verificar_respuesta,
+)
+
+
+class TestLecturaDeLaApiKey:
+    """
+    Una clave mal formada apagaba la verificación bibliográfica entera, en
+    silencio: viajaba como `api_key`, PubMed devolvía 400 y todas las fuentes
+    quedaban `no_verificable`. El caso real fue el comentario del `.env`
+    escrito en la misma línea que la variable.
+    """
+
+    def test_sin_variable(self, monkeypatch):
+        monkeypatch.delenv(_ENV_API_KEY_VAR, raising=False)
+        assert _leer_api_key() is None
+
+    @pytest.mark.parametrize("valor", ["", "   ", "\t"])
+    def test_vacia_o_en_blanco(self, valor, monkeypatch):
+        monkeypatch.setenv(_ENV_API_KEY_VAR, valor)
+        assert _leer_api_key() is None
+
+    def test_el_comentario_del_env_no_viaja_como_clave(self, monkeypatch, capsys):
+        """El caso que se llevó puesta una corrida de 450 s."""
+        monkeypatch.setenv(
+            _ENV_API_KEY_VAR,
+            "            # Opcional: aumenta rate limit de 3 a 10 req/seg",
+        )
+        assert _leer_api_key() is None
+        assert _ENV_API_KEY_VAR in capsys.readouterr().err
+
+    @pytest.mark.parametrize("valor", [
+        "clave con espacios",
+        "/ruta/a/un/archivo",
+        "abc",                      # demasiado corta para ser una clave
+        "clave-con-guiones-1234567890",
+    ])
+    def test_formatos_que_no_son_clave(self, valor, monkeypatch):
+        monkeypatch.setenv(_ENV_API_KEY_VAR, valor)
+        assert _leer_api_key() is None
+
+    @pytest.mark.parametrize("valor", [
+        "abc123def456abc123def456abc123def456",   # 36 alfanuméricos, formato NCBI
+        "A1B2C3D4E5F6",
+    ])
+    def test_clave_valida_se_conserva(self, valor, monkeypatch):
+        monkeypatch.setenv(_ENV_API_KEY_VAR, valor)
+        assert _leer_api_key() == valor
+
+    def test_se_recortan_los_espacios(self, monkeypatch):
+        monkeypatch.setenv(_ENV_API_KEY_VAR, "  abc123def456abc123  ")
+        assert _leer_api_key() == "abc123def456abc123"
+
+    def test_una_clave_invalida_no_llega_a_los_parametros(self, monkeypatch):
+        """
+        Degradar a 3 req/s es aceptable; apagar la verificación no. El cliente
+        tiene que quedar SIN clave, no con una rota.
+        """
+        monkeypatch.setenv(_ENV_API_KEY_VAR, "# comentario")
+        cliente = PubMedClient()
+        assert cliente._api_key is None
+        assert "api_key" not in cliente._base_params()
+
+    def test_una_clave_valida_si_llega_a_los_parametros(self, monkeypatch):
+        monkeypatch.setenv(_ENV_API_KEY_VAR, "abc123def456abc123def456abc123def456")
+        assert PubMedClient()._base_params()["api_key"] == "abc123def456abc123def456abc123def456"
+
+
+class TestAvisoAnte400:
+    """Un 400 de E-utilities casi siempre es un parámetro mal formado."""
+
+    def _respuesta(self, status: int):
+        import httpx
+        return httpx.Response(
+            status_code=status,
+            request=httpx.Request("GET", "https://eutils.ncbi.nlm.nih.gov/x"),
+        )
+
+    def test_400_nombra_la_causa_probable(self, capsys):
+        import httpx
+        with pytest.raises(httpx.HTTPStatusError):
+            _verificar_respuesta(self._respuesta(400))
+        assert _ENV_API_KEY_VAR in capsys.readouterr().err
+
+    def test_otros_errores_no_culpan_a_la_clave(self, capsys):
+        import httpx
+        with pytest.raises(httpx.HTTPStatusError):
+            _verificar_respuesta(self._respuesta(503))
+        assert _ENV_API_KEY_VAR not in capsys.readouterr().err
+
+    def test_200_no_levanta_ni_avisa(self, capsys):
+        _verificar_respuesta(self._respuesta(200))
+        assert capsys.readouterr().err == ""
