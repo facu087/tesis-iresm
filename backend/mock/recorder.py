@@ -45,6 +45,7 @@ class ResponseRecorder:
 
     def __init__(self) -> None:
         self.entries: list[dict] = []
+        self.rag: dict | None = None
         self._lock = threading.Lock()
 
     def record(self, entry: dict) -> None:
@@ -102,6 +103,21 @@ def record_response(
     })
 
 
+def record_rag(*, context: str, articles: list[dict]) -> None:
+    """
+    Registra lo que el RAG le ofreció a los agentes en la Ronda 1.
+
+    Sin esto, el modo mock consulta PubMed en vivo y, cuando PubMed devuelve
+    otros artículos, las recitaciones grabadas citan PMIDs que ya no se ofrecen.
+    El contexto solo contiene datos de artículos de PubMed, nunca texto del caso.
+    No hace nada si no hay un grabador abierto.
+    """
+    grabador = _current.get()
+    if grabador is None:
+        return
+    grabador.rag = {"context": context, "articles": articles}
+
+
 def close_recorder(
     token: contextvars.Token,
     *,
@@ -122,10 +138,12 @@ def close_recorder(
         return None
 
     entradas = list(grabador.entries)
-    contenido = {
+    contenido: dict = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "entries": entradas,
     }
+    if grabador.rag is not None:
+        contenido["rag"] = grabador.rag
     destino = Path(output_path)
     try:
         destino.parent.mkdir(parents=True, exist_ok=True)

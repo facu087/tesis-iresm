@@ -1,15 +1,16 @@
 /**
  * Pasos del pipeline de análisis de NEXUS.
  *
- * Fuente única de verdad para la landing (`/`, sección "Cómo funciona") y para
- * la lista compacta que se muestra en `/analizar`. Refleja el flujo real
- * descrito en `.claude/architecture.md`, no una versión simplificada aparte:
- * evita que ambas vistas describan el pipeline de forma distinta con el
- * tiempo (design D4 de `openspec/changes/archive/2026-10-04-landing-explicativa/design.md`).
+ * Fuente única de verdad para la landing (`/`, sección "Cómo funciona"), para
+ * la lista compacta que se muestra en `/analizar` y para la vista de progreso
+ * de `/analyzing`. Refleja el flujo real descrito en
+ * `.claude/architecture.md`, no una versión simplificada aparte: evita que las
+ * vistas describan el pipeline de forma distinta con el tiempo (design D4 de
+ * `openspec/changes/archive/2026-10-04-landing-explicativa/design.md`).
  *
- * No confundir con los `STEPS` de `app/analyzing/page.tsx`: esa vista anima
- * el progreso mientras la API corre y necesita una granularidad de tiempos
- * (`minMs`) propia; esta lista es la explicación estática del flujo.
+ * Lo que una vista necesita además de esta lista (el ícono y el ritmo del
+ * avance simulado de `/analyzing`, los agentes del diagrama de la landing) se
+ * agrega en esa vista, indexado por `id`: acá no hay una segunda lista.
  */
 
 export interface PipelineStep {

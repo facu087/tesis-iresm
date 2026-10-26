@@ -108,8 +108,8 @@ class TestElModoMockEjercitaElParseoReal:
     def test_critica_parsea(self):
         agente = ArbiterAgent()  # cualquier BaseAgent sirve, _parse_critiques no usa self
         criticas = agente._parse_critiques(mock_responses.get_mock_response("debate_critica"))
-        # La grabación real trae cinco críticas: dos a "Agent 02" y tres a "Agent 03".
-        assert [c.target_agent_id for c in criticas] == ["02", "02", "03", "03", "03"]
+        # Crítica del Agente 02 en la grabación del 2026-10-26: dos a "01" y dos a "03".
+        assert [c.target_agent_id for c in criticas] == ["01"] * 2 + ["03"] * 2
 
     def test_pico_parsea(self):
         sintesis = pico._parse_pico(mock_responses.get_mock_response("pico_sintesis"))
@@ -268,6 +268,47 @@ class TestAnalisisCompletoEnModoMock:
         assert response.status_code == 200
         assert response.json()["metadata"]["mock"] is True
 
+    def test_cada_analisis_abre_y_cierra_su_sesion_de_reproduccion(
+        self, monkeypatch, client_medico_verificado_sin_relanzar
+    ):
+        """
+        El conteo de llamadas del modo mock es por análisis: el endpoint abre
+        la sesión antes de la primera llamada al modelo, todas las llamadas del
+        análisis la ven y al terminar queda cerrada.
+        """
+        abiertas: list[object] = []
+        vistas: list[object] = []
+        cerradas: list[object] = []
+        abrir, cerrar = mock_responses.open_replay_session, mock_responses.close_replay_session
+        elegir = mock_responses.get_mock_response
+
+        def abrir_espiado():
+            token = abrir()
+            abiertas.append(mock_responses.current_replay_session())
+            return token
+
+        def cerrar_espiado(token):
+            cerradas.append(mock_responses.current_replay_session())
+            cerrar(token)
+
+        def elegir_espiado(task, **kwargs):
+            vistas.append(mock_responses.current_replay_session())
+            return elegir(task, **kwargs)
+
+        monkeypatch.setattr(mock_responses, "open_replay_session", abrir_espiado)
+        monkeypatch.setattr(mock_responses, "close_replay_session", cerrar_espiado)
+        monkeypatch.setattr("backend.agents.base_agent.get_mock_response", elegir_espiado)
+
+        for _ in range(2):
+            assert self._correr(
+                monkeypatch, client_medico_verificado_sin_relanzar
+            ).status_code == 200
+
+        assert len(abiertas) == 2 and abiertas[0] is not abiertas[1]  # una por análisis
+        assert cerradas == abiertas
+        assert vistas and all(v is not None for v in vistas)
+        assert {id(v) for v in vistas} == {id(a) for a in abiertas}
+
     def test_sin_modo_mock_el_reporte_no_esta_marcado(self, monkeypatch):
         """Complemento: un reporte real (aquí, con todo mockeado igual) no lo declara."""
         monkeypatch.delenv(ENV_VAR, raising=False)
@@ -294,7 +335,17 @@ def test_hermetico_sin_red_analisis_completo_en_modo_mock():
     """
     import re
 
-    entorno = dict(os.environ, PYTHONPATH=str(_RAIZ / "scripts"))
+    # PYTHONIOENCODING es obligatorio, no decorativo: abajo se lee la salida del
+    # subproceso con encoding="utf-8", y en Windows el hijo escribe en cp1252 si
+    # no se le dice otra cosa. La decodificación falla en el hilo lector, stdout
+    # queda en None y el test revienta con un TypeError que no tiene nada que ver
+    # con lo que se está probando. Mismo criterio que
+    # scripts/demo_tests_rag_hermeticos.py, de donde sale este patrón.
+    entorno = dict(
+        os.environ,
+        PYTHONPATH=str(_RAIZ / "scripts"),
+        PYTHONIOENCODING="utf-8",
+    )
 
     proceso = subprocess.run(
         [sys.executable, "-m", "pytest",

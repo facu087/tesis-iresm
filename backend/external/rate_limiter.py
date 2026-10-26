@@ -81,7 +81,6 @@ class RateLimiter:
         self._burst = burst or int(requests_per_second)
         self._min_interval = 1.0 / requests_per_second
         self._timestamps: deque[float] = deque()
-        self._lock = asyncio.Lock()
 
     async def __aenter__(self) -> "RateLimiter":
         await self.acquire()
@@ -94,23 +93,38 @@ class RateLimiter:
         """
         Espera hasta que haya capacidad para hacer una nueva solicitud.
         Bloquea si se superó el rate limit.
+
+        Primero reserva el turno y recién después duerme. La reserva no tiene
+        ningún `await`, así que es atómica dentro del event loop y no necesita
+        un `asyncio.Lock`: un lock con contención queda ligado al loop donde se
+        disputó y, como los limitadores globales son objetos de módulo, un
+        segundo `asyncio.run()` recibía un `RuntimeError` que los clientes
+        tomaban por una caída de la API.
+
+        Si la espera se cancela, el turno queda reservado: se pierde capacidad
+        durante ese segundo, pero nunca se supera el límite.
         """
-        async with self._lock:
-            now = time.monotonic()
-            window_start = now - 1.0  # ventana de 1 segundo
+        wait_time = self._reserve() - time.monotonic()
+        if wait_time > 0:
+            await asyncio.sleep(wait_time)
 
-            # Limpiar timestamps viejos
-            while self._timestamps and self._timestamps[0] < window_start:
-                self._timestamps.popleft()
+    def _reserve(self) -> float:
+        """Anota el próximo turno libre y devuelve su instante (reloj monotónico)."""
+        now = time.monotonic()
+        window_start = now - 1.0  # ventana de 1 segundo
 
-            if len(self._timestamps) >= self._burst:
-                # Calcular cuánto tiempo esperar
-                oldest = self._timestamps[0]
-                wait_time = (oldest + 1.0) - now
-                if wait_time > 0:
-                    await asyncio.sleep(wait_time)
+        # Limpiar timestamps viejos
+        while self._timestamps and self._timestamps[0] < window_start:
+            self._timestamps.popleft()
 
-            self._timestamps.append(time.monotonic())
+        slot = now
+        if len(self._timestamps) >= self._burst:
+            # El turno número `burst` contando desde el final libera su lugar
+            # un segundo después: antes de eso la ventana sigue llena.
+            slot = max(now, self._timestamps[-self._burst] + 1.0)
+
+        self._timestamps.append(slot)
+        return slot
 
 
 # ---------------------------------------------------------------------------

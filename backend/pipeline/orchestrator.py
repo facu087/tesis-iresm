@@ -26,6 +26,9 @@ from ..agents.agent_03_clinical import ClinicalConsultantAgent
 from ..agents.base_agent import BaseAgent
 from ..ingestion.biomarker_extractor import extract as extract_biomarkers
 from ..ingestion.normalizer import normalize
+from ..mock import recorder
+from ..mock.mode import is_mock_active
+from ..mock.responses import get_recorded_rag
 from ..models.case import ClinicalCase
 from ..models.hypothesis import Hypothesis
 from ..models.report import AgentOutput, Report, RetrievedArticleRef
@@ -71,6 +74,15 @@ async def _enrich_context_with_rag(
     literatura que se les ofreció, y para armar la ronda de recitación sobre
     PMIDs reales. Ante cualquier fallo la lista queda vacía y el pipeline sigue.
     """
+    if is_mock_active():
+        grabado = get_recorded_rag()
+        if grabado is not None:
+            # Reproduce lo que se ofreció en la corrida grabada en vez de
+            # consultar PubMed: si PubMed devuelve otros artículos, las
+            # recitaciones grabadas citan PMIDs que ya no se ofrecen.
+            articulos = [RetrievedArticleRef(**a) for a in grabado["articles"]]
+            return f"{base_context}\n\n{grabado['context']}", articulos
+
     genes: list[str] = []
     conditions: list[str] = []
     drugs: list[str] = []
@@ -124,6 +136,7 @@ async def _enrich_context_with_rag(
             "Usá evidence_level: 'III' para hipótesis sin respaldo bibliográfico verificado."
         )
 
+    recorder.record_rag(context=rag_context, articles=[a.model_dump() for a in articles])
     return f"{base_context}\n\n{rag_context}", articles
 
 

@@ -70,12 +70,13 @@ def _limitadores_aislados():
     """
     Deja los limitadores y breakers globales como recién creados antes de CADA test.
 
-    Son objetos de módulo y cada test asíncrono corre en su propio event loop:
-    un `asyncio.Lock` que tuvo contención en un test queda ligado a ese loop, y
-    el siguiente que vuelva a disputarlo recibe un `RuntimeError` que los
-    clientes externos toman por una caída de la API. Tampoco se arrastran los
-    turnos consumidos, que hacían depender el resultado de la velocidad de los
-    tests anteriores (ver `tests/test_aislamiento_limitadores.py`).
+    Son objetos de módulo y cada test asíncrono corre en su propio event loop.
+    No se arrastran los turnos consumidos, que hacían depender el resultado de
+    la velocidad de los tests anteriores (ver
+    `tests/test_aislamiento_limitadores.py`), ni el estado de los breakers. El
+    lock de cada breaker se renueva por precaución: un `asyncio.Lock` que tuvo
+    contención queda ligado al loop donde se disputó. `RateLimiter` ya no usa
+    lock (reserva el turno y duerme después).
     """
     for limitador in (
         rate_limiter.pubmed_limiter,
@@ -84,7 +85,6 @@ def _limitadores_aislados():
         rate_limiter.clinical_trials_limiter,
     ):
         limitador._timestamps.clear()
-        limitador._lock = asyncio.Lock()
     for breaker in (
         rate_limiter.pubmed_breaker,
         rate_limiter.orphanet_breaker,

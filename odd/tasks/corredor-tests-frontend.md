@@ -1,0 +1,88 @@
+# Feature: corredor de tests del frontend
+
+## Objective
+Give the frontend an automated test runner and cover the two behaviors that every
+native review of PRs #57–#63 flagged as untested: how `/analyzing` finishes and the
+keyboard behavior of the `/report` tabs.
+
+## Problem / why
+The frontend has no test runner. Interactive behavior was checked in a headless
+browser with scripts that are not in the repo (traspaso 4.10).
+
+## Scope
+- Vitest + React Testing Library + jsdom, following
+  `frontend/node_modules/next/dist/docs/01-app/02-guides/testing/vitest.md`.
+- `npm test` script in `frontend/package.json`.
+- Tests for `/analyzing` and the `/report` tab keyboard.
+- Docs: test section in `.claude/CLAUDE.md`, traspaso 4.10 updated.
+
+Out of scope: Playwright / end-to-end tests, CI workflow, other screens.
+
+## Constraints
+- No network: `fetch` and API calls are mocked; no backend needed.
+- Timing tests use fake timers, never real sleeps.
+- Test code and comments in English; existing UI strings stay as they are.
+- Do not change production behavior; if a test exposes a bug, report it instead of fixing it silently.
+
+## Tasks
+- [x] T1 — Runner setup: dev deps, `vitest.config.mts`, setup file with jest-dom matchers, `npm test` script, `src/test/` helpers if needed, one smoke test. Route: delegated (writer, 2+ files).
+- [x] T2 — `/analyzing` tests: response before the last step, response after the last step, backend error, network error (TypeError message), no case → `/analizar`. Route: delegated.
+- [x] T3 — `/report` tab keyboard tests: ArrowRight/ArrowLeft wrap, Home/End, Alt+Arrow ignored, aria-selected/tabIndex/focus move with selection. Route: delegated.
+- [x] T4 — Docs: `.claude/CLAUDE.md` (how to run frontend tests), `.claude/traspaso.md` 4.10 (runner exists; remove the three details fixed in PR #66). Route: delegated.
+
+## Acceptance criteria
+- `npm test` in `frontend/` runs and passes, deterministically, offline.
+- `npm run build`, `npx tsc --noEmit` and `npm run lint` still pass.
+
+## Delivery
+Strategy: ask-on-risk. Forecast ~400 authored lines (lockfile excluded).
+
+## Progress
+(updated per task with commit hash and checks)
+
+- T1 — done. Vitest 4.1 (not 5: vitest 5 needs `@types/node` >= 22 and the repo pins ^20),
+  RTL 16, user-event 14, jest-dom 7, jsdom 29, @vitejs/plugin-react 6. The `@/` alias uses
+  Vite's native `resolve.tsconfigPaths` instead of the guide's vite-tsconfig-paths plugin
+  (Vite warns the plugin is redundant). Tests live next to the code as `src/**/*.test.tsx`.
+  Checks: `npm test` 1/1 pass; `npx tsc --noEmit` exit 0; `npm run lint` clean;
+  `npm run build` ok. `npm audit` reports 12 findings, all pre-existing (next, eslint-config-next).
+  Commit: 9908047.
+
+- T2 — done. `src/app/analyzing/page.test.tsx` (6 cases, fake timers, mocked router and API;
+  shared fixture in `src/test/fixtures.ts`): early response waits for the catch-up and
+  navigates at 1500 + 7×350 ms; late response navigates right after it resolves (last step
+  held "Paso 8 de 8"); file input uses analyzeFile; backend Error message shown, no
+  navigation even after all timers; TypeError shows the readable network message, never
+  "Failed to fetch"; no case → replace("/analizar"). No bug found.
+  Checks: `npm test` 7/7 pass; `npx tsc --noEmit` exit 0; `npm run lint` clean.
+  Commit: f45c3b8.
+
+- T3 — done. `src/app/report/page.test.tsx` (7 cases, user-event, report seeded through
+  `reportStore.save()`): five tabs with the first selected and no redirect; ArrowRight walks
+  and wraps last→first; ArrowLeft wraps first→last; End/Home; the panel follows the tab;
+  Alt+ArrowLeft, Ctrl+ArrowRight and Shift+End change nothing; click selects. Each move
+  asserts aria-selected, tabindex 0/-1, focus and the panel's aria-labelledby. No bug found.
+  Checks: `npm test` 14/14 pass; `npx tsc --noEmit` exit 0; `npm run lint` clean.
+  Commit: 34cc53a.
+
+- T4 — done. `.claude/CLAUDE.md`: frontend test command under "Testing" and the new files
+  in the folder tree. `.claude/traspaso.md` 4.10: runner bullet rewritten (what is covered,
+  what is not) and the "Detalles de las pantallas migradas" bullet removed (fixed in PR #66).
+  Checks (final, in `frontend/`): `npm test` 14/14 pass; `npx tsc --noEmit` exit 0;
+  `npm run lint` clean; `npm run build` ok (13 static pages).
+  Commit: see git log (`docs(s4): corredor de tests del frontend`).
+
+## Review
+Native review of the range `develop..6803c95`: risk medium (slice budget reached; ~9,000
+lines are the lockfile), consent granted, one lens (reliability), **approved and
+acknowledged** (lineage `review-f97cbb809c9ed7d1`). Two non-blocking findings:
+- `R3-reportstore-leak` (WARNING): not reproducible. `beforeEach` runs
+  `sessionStorage.clear()` and `reportStore.getSnapshot()` rereads `sessionStorage` on every
+  call, so no report survives between tests. No change.
+- `R3-step-timing-duplicated` (SUGGESTION): the test hardcodes the step durations. Open as
+  follow-up: export them from the page or `lib/pipelineSteps.ts` and import them in the test.
+
+Parent spot check: `npm test` 14/14 pass.
+
+## Next step
+All tasks done. Push and PR to `develop` are the user's decision.

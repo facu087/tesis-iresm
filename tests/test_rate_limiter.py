@@ -1,6 +1,8 @@
 """Tests para RateLimiter, CircuitBreaker y with_fallback."""
 
 import asyncio
+import time
+
 import pytest
 
 from backend.external.rate_limiter import (
@@ -34,6 +36,61 @@ async def test_rate_limiter_como_context_manager():
     limiter = RateLimiter(requests_per_second=100)
     async with limiter:
         pass  # No debe explotar
+
+
+def test_rate_limiter_con_contencion_sirve_en_un_segundo_event_loop():
+    """
+    Los limitadores globales son objetos de módulo: tienen que servir aunque se
+    los use desde más de un `asyncio.run()`. Con un `asyncio.Lock` tomado
+    durante la espera, el segundo loop recibía `RuntimeError: ... is bound to a
+    different event loop`.
+    """
+    limiter = RateLimiter(requests_per_second=2)
+
+    async def _dos_turnos_con_rafaga_agotada() -> list[object]:
+        casi_vencido = time.monotonic() - 0.95  # la espera ronda los 50 ms
+        limiter._timestamps.clear()
+        limiter._timestamps.extend([casi_vencido] * limiter._burst)
+        return await asyncio.gather(
+            limiter.acquire(), limiter.acquire(), return_exceptions=True
+        )
+
+    assert asyncio.run(_dos_turnos_con_rafaga_agotada()) == [None, None]
+    assert asyncio.run(_dos_turnos_con_rafaga_agotada()) == [None, None]
+
+
+@pytest.mark.asyncio
+async def test_rate_limiter_reserva_el_turno_antes_de_esperar():
+    """
+    Cada solicitud anota su turno apenas entra, sin esperar a que terminen de
+    dormir las anteriores, y los turnos reservados respetan la ráfaga: nunca
+    hay más de `burst` dentro de un mismo segundo.
+    """
+    limiter = RateLimiter(requests_per_second=2)
+    tareas = [asyncio.create_task(limiter.acquire()) for _ in range(6)]
+    await asyncio.sleep(0)  # deja que cada tarea llegue hasta su espera
+    try:
+        turnos = list(limiter._timestamps)
+        assert len(turnos) == 6
+        assert turnos == sorted(turnos)
+        for i in range(limiter._burst, len(turnos)):
+            assert turnos[i] - turnos[i - limiter._burst] >= 1.0
+    finally:
+        for tarea in tareas:
+            tarea.cancel()
+        await asyncio.gather(*tareas, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_rate_limiter_espera_cuando_la_rafaga_esta_agotada():
+    limiter = RateLimiter(requests_per_second=2)
+    casi_vencido = time.monotonic() - 0.9
+    limiter._timestamps.extend([casi_vencido] * limiter._burst)
+
+    inicio = time.monotonic()
+    await limiter.acquire()
+
+    assert time.monotonic() - inicio >= 0.05
 
 
 # ---------------------------------------------------------------------------

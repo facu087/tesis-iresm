@@ -1,6 +1,18 @@
-# Traspaso de sesión — 2026-10-06
+# Traspaso de sesión — 2026-10-26
 
-Reemplaza al traspaso del 2026-10-04. Los seis agentes ya están en `develop`: el Agente 06
+Actualizado el 2026-10-26. Lo nuevo: PR #65 a #70 (ver "Lo que se mergeó entre el 2026-10-15 y
+el 2026-10-26", sección 2). `npm audit` del frontend quedó en 0 (tarjeta #87, en QA) y la
+Ronda 5 ya no falla en silencio cuando el modelo responde con otro esquema (tarjeta #90, en
+QA); el modo mock se regrabó el 2026-10-26 con ese arreglo. Las demás secciones no se
+revisaron en esta actualización.
+
+Texto del 2026-10-10, sobre el traspaso del 2026-10-06. Lo nuevo: la landing rediseñada y
+todas las pantallas con la misma identidad (PR #57 a #59 y #61 a #63, tarjeta #88 en QA), los
+cuatro PR de Fede mergeados y las tarjetas #76 y #77 en QA con evidencia.
+El detalle está en "Lo que se mergeó entre el 2026-10-07 y el 2026-10-10" (sección 2) y en 4.10.
+Las secciones 3 y 4.1 a 4.9 no se revisaron en esta actualización.
+
+Texto del 2026-10-06: reemplaza al traspaso del 2026-10-04. Los seis agentes ya están en `develop`: el Agente 06
 lo mergeó Facundo el 2026-10-06 (PR #35) y una revisión posterior encontró dos defectos que
 se arreglan en la rama `fix/s4-agente06-citas-y-pdf` (ver 4.1). El 2026-10-06 también se
 grabaron las respuestas del modo mock desde una corrida real y se encontró y arregló un
@@ -32,11 +44,17 @@ Lecciones prácticas:
   "porque la salida es corta" rompieron al Árbitro (ver sección 3).
 - **Antes de proponer algo, leer los comentarios de la tarjeta.** El Agente 06 ya tenía una
   propuesta de Facundo anunciada en un comentario.
-- **Adjuntos a Trello en la máquina Linux de Matías**: el conector solo adjunta desde una URL.
-  Para archivos locales, un script con `curl -F file=@...` contra
-  `POST /1/cards/{id}/attachments`, que Matías corre con `! bash <script>`. Las credenciales
-  están en `~/.claude.json`, dentro de `.projects["<ruta del repo>"].mcpServers.trello.env`,
-  **no** en el `.env` del repo. Claude tiene bloqueada la lectura de `.env` y `.env.example`.
+- **Adjuntos a Trello en la máquina Linux de Matías**: el conector sube archivos locales
+  pasando `fileUrl` como `file:///ruta/absoluta` (usado el 2026-10-06 y el 2026-10-09). Antes
+  de subir, confirmar el número de tarjeta contra el tablero. El conector no puede borrar ni
+  renombrar adjuntos: mirar cada captura antes de subirla. Plan B si falla: un script con
+  `curl -F file=@...` contra `POST /1/cards/{id}/attachments`, que Matías corre con
+  `! bash <script>`; las credenciales están en `~/.claude.json`, dentro de
+  `.projects["<ruta del repo>"].mcpServers.trello.env`, **no** en el `.env` del repo. Claude
+  tiene bloqueada la lectura de `.env` y `.env.example`.
+- **Capturas del frontend nuevo**: las pantallas entran con una animación; una captura tomada
+  apenas carga sale en blanco. Usar movimiento reducido en el navegador sin interfaz y esperar
+  unos 2 s.
 - **Trello MCP**: llamar `set_active_board` con `kdXM36sU` al empezar. Si da 401, el token
   venció: se regenera en https://trello.com/power-ups/admin con `expiration=never`.
 - **Python**: el venv está en la raíz del repo (`.venv/bin/python`). Los worktrees no tienen
@@ -50,7 +68,10 @@ Lecciones prácticas:
 
 ## 2. Estado al cierre
 
-`develop` está en `cc5105b` (PR #38). La suite tenía 1113 tests después del PR #32; con el
+**Al 2026-10-09 `develop` está en `fcef367` (PR #59).** La suite de Python no se corrió
+completa en esta actualización; el frontend pasa tipos, lint y build.
+
+Al 2026-10-06: `develop` estaba en `cc5105b` (PR #38). La suite tenía 1113 tests después del PR #32; con el
 PR #38 pasan 1150 en ~57 s, y esta rama deja 1186. Los fallos intermitentes de
 `tests/test_agent_05_trials.py` quedaron resueltos (ver 4.7).
 
@@ -84,6 +105,53 @@ Antes, el 2026-09-28, había entrado la landing explicativa (PR #21, tarjeta #82
 | #35 | Agente 06 (Sintetizador), de Facundo (merge `1f11917`); ver 4.1 |
 | #37 | Facundo: arregla el import circular entre el Agente 06 y el extractor de biomarcadores (el import de `_NON_GENE_TERMS` pasó a ser diferido) |
 | #38 | Los tests nunca llaman al proveedor real (merge `cc5105b`); ver 4.9 |
+
+### Lo que se mergeó entre el 2026-10-07 y el 2026-10-10
+| PR | Qué | Tarjeta |
+|----|-----|---------|
+| #55 | Facundo: el prompt del Agente 02 no nombra genes ni variantes | — |
+| #56 | Facundo: regrabación del modo mock con la corrida real del 2026-10-07 | — |
+| #47 | Fede: el test de hermeticidad del modo mock ya no falla en Windows | #86, sin evidencia |
+| #49 | Fede: lint del frontend limpio | #77, en QA |
+| #50 | Fede: el filtro de relevancia del RAG filtra (umbral 0,55, `NEXUS_RAG_MIN_SCORE`) | #76, en QA |
+| #54 | Fede: logo NEXUS en el frontend | — |
+| #57 | Landing rediseñada con la skill `landing-page-design`: el producto como imagen | #88, en QA |
+| #58 | `/registro`, `/ingresar`, `/cuenta` y `/analizar` con la identidad de la landing; pestañas en el hero y comparación de citas como secuencia | #88, en QA |
+| #59 | La landing reconoce la sesión; el admin llega a `/admin/pendientes` y ya no se le ofrece analizar | #88, en QA |
+| #61 | `/admin/pendientes` con la identidad de la landing; marco compartido `ShellFrame` | #88, en QA |
+| #62 | `/analyzing` con la identidad de la landing y los pasos de `lib/pipelineSteps.ts` | #88, en QA |
+| #63 | `/report` con la identidad de la landing y tema oscuro; se retira la identidad anterior | #88, en QA |
+
+Los PR #57 a #59 y #61 a #63 se abrieron en dos cadenas y se mergearon en orden, sin revisión
+de otro integrante. El detalle está en `odd/tasks/landing-skill-prueba.md`,
+`odd/tasks/sesion-en-landing.md` y `odd/tasks/migracion-rutas-internas.md`; el estado del
+frontend, en "Identidad visual del frontend" de `.claude/CLAUDE.md`.
+
+Con los PR #61 a #63 queda un solo sistema visual. Cambios que no son solo de aspecto:
+
+- `/analyzing`: el avance de los pasos es orientativo (el backend responde una sola vez, con
+  el reporte terminado) y la pantalla lo dice. El último paso queda "en curso" hasta que
+  llega la respuesta; antes mostraba 100 % con el análisis todavía corriendo.
+- `/report`: las pestañas se manejan con el teclado; el botón del PDF dejó la barra fija y
+  queda junto al título; los colores de estado siguen la landing.
+- Se eliminaron `ThemeScope`, las fuentes Newsreader y Atkinson y los iconos sin uso.
+
+### Lo que se mergeó entre el 2026-10-15 y el 2026-10-26
+| PR | Qué | Tarjeta |
+|----|-----|---------|
+| #65 | La cita "verificada" del ejemplo de la landing es un PMID real | — |
+| #66 | Detalles de `/analyzing` y `/report`: error de red legible, sin caso lleva a `/analizar`, "En PubMed este PMID es:" en rojo solo en fuentes refutadas | — |
+| #67 | El modo mock reproduce lo que ofreció el RAG en la corrida grabada (bloque `rag`); ver 4.3 | #89 |
+| #68 | Corredor de tests del frontend: Vitest + React Testing Library (`cd frontend && npm test`); ver 4.10 | — |
+| #69 | `next` y `eslint-config-next` 16.2.7 → 16.4.3 + `npm audit fix`: `npm audit` de 8 (1 crítica) a 0 | #87, en QA |
+| #70 | Ronda 5: el prompt prohíbe `hypotheses` y reescribir; esa forma solo se acepta por texto idéntico; aviso por stderr; mock regrabado el 2026-10-26 | #90, en QA |
+
+Sobre el #70: las `hypotheses` que devolvieron los Agentes 01 y 02 el 2026-10-20 no eran las
+hipótesis que fallaron la verificación sino hipótesis nuevas armadas alrededor de los
+artículos ofrecidos. Por eso no se aceptan por posición: le pegarían citas reales a hipótesis
+no verificadas. La #90 estaba asignada a Facundo; la resolvió Matías.
+
+Evidencia de las dos tarjetas en `output/evidencia/87/` y `output/evidencia/90/` (local).
 
 ---
 
@@ -135,6 +203,15 @@ Antes, el 2026-09-28, había entrado la landing explicativa (PR #21, tarjeta #82
 
 ## 4. Pendiente (en orden)
 
+Resumen al 2026-10-26, de lo que sigue abierto:
+1. PR #51 de Fede (tarjeta #79): cambios pedidos por Facundo el 2026-10-07, sin movimiento.
+2. Evidencia faltante en Trello: #86 (hay que generarla desde Windows) y #75.
+3. Decisiones abiertas de 4.4: recorte de la Ronda 4, distinguir el nivel III por
+   saneamiento y PharmGKB contra ClinVar para el Agente 02.
+4. Frontend (4.10): tests del resto de las pantallas y CI, pantallas de admin que faltan y
+   política de privacidad y términos.
+5. Seis ramas locales `worktree-agent-*` sin revisar (4.5).
+
 ### 4.1 #62 Agente 06 (Sintetizador) — mergeado, con correcciones y observaciones abiertas
 El PR #35 (Facundo) entró a `develop` el 2026-10-06 (merge `1f11917`). Agregó, según el
 código y `openspec/changes/agente-06-sintetizador/`:
@@ -168,11 +245,8 @@ Defectos de la revisión posterior, **arreglados y mergeados** (rama
   símbolo génico: una sigla ausente del reporte ("DM2", "HSAN") descarta todo el resumen.
   **Mitigada, no cerrada**: la guarda no se tocó (sigue igual de estricta), pero el prompt
   ahora le dice al modelo que no introduzca siglas ni símbolos ausentes del reporte y que
-  los escriba con palabras. **Pendiente (T4)**: en modo mock el resumen grabado se descarta
-  siempre (cita DNMT1, que el reporte mock no contiene), así que el Agente 06 no se ve en
-  mock (`executive_summary` queda `None`). Arreglarlo exige grabar el resumen con el prompt
-  nuevo sobre el reporte mock: una llamada real a Groq, que depende de la cuota diaria y
-  puede quedar para otro día. Las grabaciones no se editan a mano.
+  los escriba con palabras. **T4 cerrada el 2026-10-07**: con la regrabación completa (ver 4.3) el reporte
+  mock es el de la corrida y la guarda acepta el resumen grabado: el Agente 06 se ve en mock.
 - **b.** El contexto se truncaba a 6000 caracteres desde el final (ensayos y verificación).
   **Cerrada**: `build_context()` acorta solo los textos libres largos (narrativa,
   fundamentos y notas del Árbitro), con el mayor tope común que entre en el límite, y deja
@@ -181,10 +255,10 @@ Defectos de la revisión posterior, **arreglados y mergeados** (rama
 - **c.** Texto libre sin escapar en el PDF. **Cerrada**: `_t()` en `pdf_exporter.py` escapa
   cada valor al interpolarlo en un `Paragraph` (ver 4.5).
 
-Tareas de `openspec/changes/agente-06-sintetizador/tasks.md`: la 7.2 quedó tildada (suite
-completa en verde) y la 6.2 sigue abierta: el build del frontend compila, pero nadie vio la
-sección "Resumen ejecutivo" en el navegador, y en mock hoy no hay resumen (depende de T4).
-Archivar el cambio recién cuando la 6.2 se cierre.
+El cambio OpenSpec `agente-06-sintetizador` se archivó el 2026-10-06 (PR #42): la 6.2 se
+verificó en el navegador con un reporte de prueba cargado en `sessionStorage` (la sección
+aparece arriba de las hipótesis y desaparece con `executive_summary: null`). En mock sigue sin
+haber resumen hasta cerrar la T4.
 
 ### 4.2 Verificar contra Groq los arreglos del parseo — parcial
 Los PR #25 y #26 (fuente malformada y hipótesis malformada) se verificaron con tests. Las dos
@@ -213,9 +287,46 @@ Con 6.2, 6.4 y 7.5 hechas, `control-de-costos-del-pipeline` quedó sin tareas ab
 archivó el 2026-10-06 junto con `landing-demostrativa`. Sus specs están en `openspec/specs/`
 (`modo-mock-pipeline`, `presupuesto-por-tarea` y `telemetria-de-costos`).
 
+**El modo mock reproduce la corrida completa** (PR #53 + regrabación del 2026-10-07, rama
+`feature/s4-regrabar-mock`). `backend/mock/grabadas.json` tiene las 22 respuestas de la
+corrida real del 2026-10-07, una por llamada y con su agente. Medido en mock: 9 hipótesis de
+consenso sin repetidas (antes 10 con 5 textos repetidos), 10 ensayos y el `executive_summary`
+del Agente 06. `regenerar_mock.py` se usó por primera vez con una grabación real y funcionó sin
+cambios. Para regrabar otra vez:
+
+```bash
+python scripts/medir_costos.py --grabar
+python scripts/regenerar_mock.py output/medicion_costos/grabacion.json backend/mock/grabadas.json --fecha AAAA-MM-DD
+pytest tests/test_mock_responses.py tests/test_mock_pipeline.py -q
+```
+
+Los tests del mock que fijan el contenido de la grabación (fecha, críticas por agente) hay que
+actualizarlos con cada regrabación. La corrida del 2026-10-07 (ya con el prompt del Agente 02
+sin genes) midió 84.867 tokens en 27 llamadas (5 reintentadas por 429) y 493 s, ninguna
+respuesta cortada. El PDF de respaldo para la demo, generado en mock con verificación real
+contra PubMed, quedó en `output/demo_respaldo/reporte_mock.pdf` (local, gitignoreado).
+Falta la captura real de la tarjeta #80. Al 2026-10-09 sigue faltando: la tarjeta está en QA
+con datos de prueba y dos corridas reales (2026-10-06 y 2026-10-07) no produjeron el caso.
+No conviene gastar una corrida solo para buscarlo.
+
 La comparación de costo contra Claude, GPT-4o y Gemini que muestra `scripts/demo_costos.py`
 usa una **muestra sintética**. Con el `costos.jsonl` real ya se puede recalcular con
 `usage.recalculate()` y una tabla de tarifas.
+
+**Modo mock determinista (2026-10-20, rama `feature/s4-mock-rag-grabado`).** El 2026-10-15 el
+mock dejó de mostrar el resumen del Agente 06: la Ronda 1 consultaba PubMed en vivo, PubMed ya
+devolvía otros artículos y las recitaciones grabadas citaban PMIDs que no se ofrecían. Ahora
+`--grabar` guarda también lo que ofreció el RAG (bloque `rag` de `grabadas.json`) y en modo mock
+la Ronda 1 usa eso. Regrabado el 2026-10-20 (87.320 tokens, 30 llamadas, 8 reintentadas por 429,
+495 s): dos pasadas del mock dan el mismo consenso y el mismo resumen. **Hallazgo**: en esa
+corrida los Agentes 01 y 02 respondieron la Ronda 5 con `{"hypotheses": [...]}` en vez de
+`{"recitations": [...]}`; el parser las rechaza y su recitación falla sin aviso visible.
+**Resuelto el 2026-10-26 (PR #70, tarjeta #90)** y regrabado ese día con el prompt nuevo
+(88.143 tokens, 28 llamadas, 6 reintentadas por 429, 526 s; grabación en
+`output/medicion_costos/ronda5_20261026/`). Los tres agentes usaron `recitations`. Medido en
+modo mock sobre cada grabación: 9 recitadas y 2 mejoradas (2026-10-20) contra 12 y 4
+(2026-10-26). El mock reproduce 12 hipótesis de consenso, 10 ensayos y el resumen del Agente
+06. Es una corrida por lado: la variación del modelo entre corridas no está medida.
 
 ### 4.4 Decisiones abiertas
 - **Recorte de la Ronda 4**: ahorraría hasta un tercio del consumo. Hace falta más de una
@@ -236,8 +347,10 @@ usa una **muestra sintética**. Con el `costos.jsonl` real ya se puede recalcula
   El PR #44 (Facundo) lo cerró: la guarda anti-invención ahora lee `case_genetic_findings` del
   JSON crudo (antes lo buscaba en la `Hypothesis` ya parseada, que no tiene ese campo, y con
   hallazgos en el caso no degradaba nada), PharmGKB usa `pharmgkb_breaker`, y se agregaron los
-  tests de tres agentes y el demo. **Sigue abierto**: el `SYSTEM_PROMPT` del Agente 02 nombra
-  `TTR p.Val30Met` en su ejemplo JSON, y la spec pide que no nombre genes concretos.
+  tests de tres agentes y el demo. El `SYSTEM_PROMPT` del Agente 02 nombraba `TTR p.Val30Met` en
+  su ejemplo JSON, contra la spec; desde `fix/s4-prompt-agente02-sin-genes` usa un marcador
+  genérico, pide `case_genetic_findings` vacío en modo orientación y un test impide volver a
+  nombrar genes o variantes en el prompt.
 - Quedan 6 ramas locales `worktree-agent-*` sin revisar. Los worktrees y las demás ramas ya
   mergeadas se borraron; lo que tenían en `output/` se copió a `output/de-worktrees/`.
 - **Texto libre del PDF** (resuelto en `fix/s4-agente06-pendientes`): todo valor que llega a un
@@ -247,15 +360,23 @@ usa una **muestra sintética**. Con el `costos.jsonl` real ya se puede recalcula
   agentes, objeciones), fuentes, divergencias, ensayos, enfermedades raras, versión y
   descargo. Las celdas de tabla con texto plano (perfil del paciente, etc.) no interpretan
   marcado y no hacen falta. Las URL se imprimen como texto, no como enlaces.
-- Tarjetas #73 y #75 (Facundo y Fede): mergeadas el 2026-09-16 y todavía en Sprint 4 sin
-  evidencia.
+- Tarjeta #73 (Facundo): evidencia adjunta y en QA desde el 2026-10-06. La #75 (Fede) sigue
+  en Sprint 4 sin evidencia.
 
 ### 4.6 De otros integrantes
-- **Facundo**: #71 cliente ClinVar.
-- **Fede**: #74 cliente Orphadata, #76 filtro de relevancia del RAG, #77 lint del frontend,
-  #78 portada del PDF.
-- Sin asignar: #79 (comentario en el `.env` que desactiva la verificación) y #80 (un agente
-  como sostén y objetor de la misma hipótesis).
+- **Facundo**: #71 cliente ClinVar — hecho (PR #41) y en QA desde el 2026-10-06.
+- **Fede**, al 2026-10-09:
+  - #76 (filtro de relevancia del RAG) y #77 (lint del frontend): mergeadas y en QA. La
+    evidencia la generó Matías sobre `develop`; está en `output/evidencia/76/` y `77/`.
+  - #86 (test de hermeticidad en Windows): mergeada (PR #47), sin evidencia. Hay que
+    generarla desde Windows.
+  - #79 (comentario en el `.env` que desactiva la verificación): PR #51 abierto, con cambios
+    pedidos por Facundo el 2026-10-07.
+  - #74 (cliente Orphadata) y #78 (portada del PDF): sin trabajo en el repo.
+  - #87 (vulnerabilidades del frontend): **resuelta el 2026-10-26** (PR #69, la hizo Matías):
+    `npm audit` en 0 con Next 16.4.3. En QA con evidencia.
+- #80 (un agente como sostén y objetor de la misma hipótesis): resuelta en el PR #52 y en QA;
+  ver la nota de 4.3.
 
 ### 4.7 Observaciones de la revisión nativa y tests intermitentes
 La revisión nativa de los PR #30 y #31 se aprobó con seis observaciones no bloqueantes; la 1 y
@@ -275,10 +396,17 @@ ese test y el siguiente que lo disputa recibe un `RuntimeError` que el Agente 05
 caída de la API. La fixture `_limitadores_aislados` de `tests/conftest.py` deja limitadores y
 breakers como nuevos antes de cada test; `tests/test_aislamiento_limitadores.py` lo cubre.
 
-Queda abierto el defecto de fondo en producción: el limitador sigue durmiendo con el lock
-tomado. Con un único event loop (uvicorn) no se manifiesta, pero cualquier código que use
-`asyncio.run` más de una vez sobre esos limitadores puede degradar en silencio (estado
-`parcial`, ensayos faltantes). El arreglo sería reservar el turno y dormir fuera del lock.
+El defecto de fondo se arregló el 2026-10-06 (rama `fix/s4-limitador-sin-lock`):
+`RateLimiter.acquire()` reserva el turno de forma síncrona y duerme después, sin
+`asyncio.Lock`, así que usar los limitadores globales desde más de un `asyncio.run` ya no
+levanta `RuntimeError`. Lo cubren dos tests nuevos de `tests/test_rate_limiter.py`. La fixture
+`_limitadores_aislados` sigue haciendo falta para no arrastrar turnos consumidos entre tests.
+Los `ApiCircuitBreaker` conservan su lock: no tienen ningún `await` adentro, así que nunca hay
+contención.
+
+En Windows fallan 4 tests que no dependen de esto: tres de `tests/test_ingesta.py` por falta
+de Tesseract y `test_hermetico_sin_red_analisis_completo_en_modo_mock` por la codificación de
+la salida de un subproceso (`UnicodeDecodeError`). Fallan igual en `develop`.
 
 ### 4.8 Evidencia de Trello a regenerar
 Los reportes y la evidencia de Trello producidos **antes del 2026-10-06** que muestren el
@@ -295,6 +423,47 @@ se colgó con la cuota agotada. La fixture autouse `_sin_clave_del_proveedor` de
 clave pone una falsa; ahora una llamada sin aislar falla fuerte. Tras el arreglo pasan 1150
 tests en ~57 s. Regla práctica: si la suite tarda mucho más o se cuelga, hay una llamada de
 red o de proveedor sin aislar.
+
+### 4.10 Frontend, después de la landing nueva (2026-10-10)
+En orden sugerido:
+- **Corredor de tests del frontend.** Ya existe: Vitest con React Testing Library sobre
+  jsdom (`cd frontend && npm test`). Cubre el cierre de `/analyzing` (la respuesta llega antes
+  o después del último paso, error del backend, error de red y entrada sin caso) y el teclado
+  de las pestañas de `/report` (flechas con vuelta, Inicio/Fin, atajos con modificador
+  ignorados, foco y `aria-selected`). Falta: las demás pantallas (carga, registro, ingreso,
+  cuenta, admin y la landing), la descarga del PDF, pruebas de punta a punta en un navegador
+  real y un flujo de CI que corra los tests. Los guiones del navegador sin interfaz con los que
+  se probó lo interactivo siguen fuera del repo.
+- **Pantallas de admin que no existen**: cuentas aprobadas, historial de decisiones y baja de
+  cuentas. La auditoría se guarda en la base y no tiene vista.
+- `NEXT_PUBLIC_SITE_URL` no está definida: las etiquetas para compartir caen a
+  `http://localhost:3000` con un aviso.
+- No hay política de privacidad ni términos.
+- Detalles conocidos de la sesión en la landing: una página restaurada con el botón "atrás"
+  después de cerrar sesión puede mostrar la sesión vieja hasta recargar; un visitante sin
+  sesión genera un 401 de `/api/cuenta` en la consola.
+
+Cómo se probó contra el backend real sin gastar cuota: backend con una base temporal y el
+modelo en modo grabado, pasando las variables por línea de comandos (ganan sobre el `.env`,
+así que no hace falta leerlo):
+
+```bash
+env NEXUS_DB_PATH=<archivo temporal> NEXUS_MOCK_LLM=1 ALLOWED_ORIGINS=http://localhost:3000 \
+    SECRET_KEY=<valor aleatorio> .venv/bin/python -m uvicorn backend.main:app --port 8000
+env NEXUS_DB_PATH=<el mismo archivo> .venv/bin/python -m backend.cli crear-admin --email <email>
+```
+
+El validador de email rechaza dominios reservados (`.example`, `.test`): usar uno con forma
+real. En modo grabado un análisis tarda unos 30 s, porque PubMed y ClinicalTrials.gov se
+consultan de verdad.
+
+**Ojo con el servidor de desarrollo después de cambiar de rama.** Dos veces (2026-10-09 y
+2026-10-10) siguió sirviendo una hoja de estilos vieja después de un `git checkout` o un
+`git pull`: la primera vez sin ninguna regla de la landing, la segunda sin el token de color
+de peligro, con lo que el aviso de modo grabado de `/report` quedaba invisible (texto blanco
+sin fondo). El código y el build de producción estaban bien. Se arregla deteniendo el
+servidor, borrando `frontend/.next/dev` y volviéndolo a levantar; reiniciar solo no alcanza.
+Antes de una demo conviene hacerlo siempre.
 
 ---
 
@@ -313,8 +482,8 @@ cd frontend && npm run dev                                   # :3000
 1. Definir `SECRET_KEY` en el `.env`.
 2. Crear el primer admin: `.venv/bin/python -m backend.cli crear-admin --email <email>`
    (pide la contraseña sin mostrarla).
-3. Registrar un médico en `/registro`, entrar como admin en `/ingresar` y aprobarlo en
-   `/admin/pendientes`.
+3. Registrar un médico en `/registro`, entrar como admin en `/ingresar` (desde el PR #59 el
+   ingreso de un admin lleva directo a `/admin/pendientes`) y aprobarlo ahí.
 
 Una corrida real tarda unos 8 minutos y gasta cerca de 40% de la cuota diaria (80.458 de 200.000 tokens): no hacer
 pruebas con Groq el mismo día de la demo.
@@ -327,8 +496,11 @@ anterior **no están en la máquina Linux de Matías**.
 
 ### Guion (~10 min)
 1. Qué es NEXUS: genera **hipótesis de investigación**, no diagnósticos. La landing en `/` lo
-   explica.
+   muestra con el producto: la tarjeta del reporte con sus tres estados, la comparación entre
+   la cita declarada y el título real de PubMed (14 de 18 no coincidieron en la corrida del
+   2026-09-22) y el pipeline.
 2. Registro e ingreso: solo un médico con matrícula verificada por un admin puede analizar.
+   Con la sesión iniciada, la landing muestra el nombre y el botón pasa a "Analizar un caso".
 3. Cargar el caso en `/analizar`.
 4. Vista de pipeline en tiempo real: ingesta → PICO → RAG → Ronda 1 → debate → verificación →
    Árbitro → Navegador de ensayos.
@@ -338,7 +510,8 @@ anterior **no están en la máquina Linux de Matías**.
 7. Costos: 80.458 tokens por caso, medidos; y cómo medir destapó defectos que el sistema
    escondía detrás de un fallback, entre ellos que las críticas del debate no llegaban a su
    destinatario.
-8. Qué sigue: el Sintetizador ya está mergeado; falta que el resumen se vea en mock (T4 de 4.1, necesita una llamada real).
+8. Qué sigue: los seis agentes están mergeados y el resumen del Sintetizador ya se ve en modo
+   mock (regrabación del 2026-10-07). Lo pendiente del frontend está en 4.10.
 
 ---
 
