@@ -336,6 +336,14 @@ class TestLecturaDeLaApiKey:
         assert _leer_api_key() is None
         assert _ENV_API_KEY_VAR in capsys.readouterr().err
 
+    def test_el_aviso_no_muestra_ningun_pedazo_de_la_clave(self, monkeypatch, capsys):
+        """Una clave real mal copiada es un secreto: ni siquiera su comienzo va al log."""
+        monkeypatch.setenv(_ENV_API_KEY_VAR, "Zq9X-secreto-mal-copiado")
+        assert _leer_api_key() is None
+        err = capsys.readouterr().err
+        assert "Zq9X" not in err
+        assert "24 caracteres" in err
+
     @pytest.mark.parametrize("valor", [
         "clave con espacios",
         "/ruta/a/un/archivo",

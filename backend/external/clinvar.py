@@ -21,13 +21,13 @@ registran el tipo de excepción, nunca datos del caso.
 
 from __future__ import annotations
 
-import os
 import re
 import sys
 
 import httpx
 
 from ..models.genomics import ClinVarStatus, VariantClassification
+from .ncbi_api_key import leer_api_key
 from .rate_limiter import pubmed_breaker, pubmed_limiter
 
 _BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
@@ -103,7 +103,7 @@ class ClinVarClient:
     """Cliente async de ClinVar. Usar como `async with ClinVarClient() as c:`."""
 
     def __init__(self) -> None:
-        self._api_key = os.getenv("PUBMED_API_KEY")
+        self._api_key = leer_api_key()
         self._client: httpx.AsyncClient | None = None
 
     async def __aenter__(self) -> "ClinVarClient":
