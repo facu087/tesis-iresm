@@ -739,7 +739,9 @@ PUBMED_API_KEY=         # Opcional, aumenta rate limit
 ORPHANET_API_KEY=       # Opcional: la API responde sin credencial (medido el
                         # 2026-09-15, 10 de 10 llamadas). Si está definida se
                         # manda en el header apiKey; si no, el cliente manda un
-                        # valor por defecto que el servicio acepta.
+                        # valor por defecto que el servicio acepta. Un valor
+                        # con espacios o '#' (el comentario en la misma línea)
+                        # se descarta con un aviso y se usa el de por defecto.
 
 # RAG — umbral de relevancia (opcional)
 NEXUS_RAG_MIN_SCORE=    # Score mínimo para que un artículo recuperado llegue
