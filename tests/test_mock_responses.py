@@ -92,7 +92,7 @@ class TestGrabacionFiel:
             assert entrada["model"].startswith("openai/gpt-oss-")
             assert isinstance(entrada["seq"], int)
             assert "agent_id" in entrada
-            assert entrada["recorded_at"] == "2026-10-20"
+            assert entrada["recorded_at"] == "2026-10-26"
 
     @pytest.mark.parametrize("tarea", sorted(_ESPERADAS_GRABADAS))
     def test_el_modelo_de_la_grabacion_coincide_con_el_presupuesto_de_la_tarea(self, tarea):
@@ -220,37 +220,38 @@ class TestParseoRealPorSitioDeLlamada:
             assert all(re.fullmatch(r"\d{2}", c.target_agent_id) for c in criticas)
 
     def test_la_critica_grabada_parsea_con_ids_canonicos(self):
-        """El modelo real nombra "Agent 02"; el parser real lo lleva a "02"."""
+        """El parser real lleva el destinatario que nombra el modelo a un ID canónico."""
         criticas = ArbiterAgent()._parse_critiques(mock_responses.get_mock_response("debate_critica"))
-        assert len(criticas) == 5
+        assert len(criticas) == 4
         assert all(re.fullmatch(r"\d{2}", c.target_agent_id) for c in criticas)
-        assert sorted(c.target_agent_id for c in criticas) == ["02"] * 2 + ["03"] * 3
+        assert sorted(c.target_agent_id for c in criticas) == ["01"] * 2 + ["03"] * 2
 
     def test_la_critica_grabada_llega_a_un_agente_del_debate(self):
         from backend.pipeline.debate import _critiques_for
 
         criticas = ArbiterAgent()._parse_critiques(mock_responses.get_mock_response("debate_critica"))
-        assert len(_critiques_for("02", criticas)) == 2
-        assert len(_critiques_for("03", criticas)) == 3
-        assert _critiques_for("01", criticas) == []  # nadie critica al autor de la grabación
+        assert len(_critiques_for("01", criticas)) == 2
+        assert len(_critiques_for("03", criticas)) == 2
+        assert _critiques_for("02", criticas) == []  # nadie critica al autor de la grabación
 
-    def test_recitacion_parsea_con_fuentes(self):
+    def test_recitacion_parsea_con_fuentes(self, capsys):
         """
-        Grabación del 2026-10-20: el Agente 03 recitó con el esquema pedido y sus
-        recitaciones parsean con fuentes. Los Agentes 01 y 02 respondieron con
-        `{"hypotheses": [...]}` en lugar de `{"recitations": [...]}`: el parser
-        las rechaza y en esa corrida su Ronda 5 falló. Es lo que hizo el modelo,
-        no un defecto de la grabación; el arreglo del prompt o del parseo va aparte.
+        Grabación del 2026-10-26, con el prompt de la tarjeta #90: los tres
+        agentes respondieron con el esquema pedido. El 01 y el 03 recitaron con
+        fuentes; el 02 devolvió una lista vacía, que el prompt permite cuando
+        ningún artículo ofrecido es pertinente.
         """
         por_agente = {
             e["agent_id"]: e["response"]
             for e in mock_responses.get_recorded_entries()["debate_recitacion"]
         }
-        recitadas = ArbiterAgent()._parse_recitation(por_agente["03"], total=3)
-        assert recitadas and all(fuentes for fuentes in recitadas.values())
-        for agente in ("01", "02"):
-            assert '"hypotheses"' in por_agente[agente]
-            assert ArbiterAgent()._parse_recitation(por_agente[agente], total=3) == {}
+        for agente in ("01", "02", "03"):
+            assert '"recitations"' in por_agente[agente]
+        for agente in ("01", "03"):
+            recitadas = ArbiterAgent()._parse_recitation(por_agente[agente], total=5)
+            assert recitadas and all(fuentes for fuentes in recitadas.values())
+        assert ArbiterAgent()._parse_recitation(por_agente["02"], total=5) == {}
+        assert capsys.readouterr().err == ""  # ningún aviso de esquema
 
     def test_pico_parsea(self):
         for respuesta in _grabaciones("pico_sintesis"):

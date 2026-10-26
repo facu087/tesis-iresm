@@ -322,7 +322,7 @@ tesis-iresm/
 │   ├── mock/                   ← modo mock del pipeline (S4)
 │   │   ├── mode.py             ← activación de `NEXUS_MOCK_LLM`
 │   │   ├── responses.py        ← respuestas por tarea, carga diferida de grabadas.json
-│   │   ├── grabadas.json       ← respuestas y RAG de la corrida real del 2026-10-20
+│   │   ├── grabadas.json       ← respuestas y RAG de la corrida real del 2026-10-26
 │   │   ├── recorder.py         ← grabador de respuestas crudas (solo lo abre un script)
 │   │   └── __init__.py
 │   ├── telemetry/              ← control de costos (S4)
@@ -653,7 +653,7 @@ en el frontend con la misma visibilidad que la advertencia del consenso de
 IA.
 
 Las trece tareas de `TASK_BUDGETS` usan respuestas **textuales de la corrida
-real del 2026-10-20** (22 respuestas: una por llamada, con el agente que la
+real del 2026-10-26** (22 respuestas: una por llamada, con el agente que la
 pidió), guardadas en `backend/mock/grabadas.json` (versionado) y
 cargadas de forma diferida por `backend/mock/responses.py` en el primer uso en
 modo mock: el modo real nunca lee ese archivo, y si falta o está malformado se
@@ -665,11 +665,18 @@ script** (nunca una variable de entorno ni `POST /api/analyze`) y guarda
 `output/medicion_costos/grabacion.json` (gitignoreado);
 `scripts/regenerar_mock.py` la convierte en `grabadas.json`. Como cada agente
 recibe su propia grabación en el orden en que la pidió, el modo mock reproduce
-la corrida: 9 hipótesis de consenso sin repetidas, 10 ensayos y el
-`executive_summary` del Agente 06, igual en cada pasada. En esa corrida los
-Agentes 01 y 02 respondieron la Ronda 5 con el esquema equivocado
-(`hypotheses` en vez de `recitations`) y su recitación falló: el mock lo
-reproduce (2 hipótesis mejoradas por recitación). La grabación incluye además lo que el RAG
+la corrida: 12 hipótesis de consenso sin repetidas, 10 ensayos y el
+`executive_summary` del Agente 06, igual en cada pasada. En la corrida del
+2026-10-20 los Agentes 01 y 02 respondieron la Ronda 5 con el esquema equivocado
+(`hypotheses` en vez de `recitations`) y su recitación falló (2 hipótesis
+mejoradas). Desde la tarjeta #90 el prompt de recitación prohíbe esa clave y
+reescribir hipótesis, y `_parse_recitation()` acepta la forma `hypotheses` solo
+para la hipótesis cuyo texto coincide con la ofrecida (una reescrita no hereda
+citas) y avisa por stderr, con claves y conteos, cuando falta `recitations`. En
+la corrida del 2026-10-26, ya con ese prompt, los tres agentes usaron el esquema
+pedido: 12 hipótesis recitadas y 4 mejoradas (el 02 no recitó ninguna, que el
+prompt permite). Es una sola corrida: la variación entre corridas del modelo
+no está medida. La grabación incluye además lo que el RAG
 ofreció en la Ronda 1 (bloque `rag` de `grabadas.json`): en modo mock la Ronda 1
 usa esos artículos y no consulta PubMed. Sin ese bloque se consultaba en vivo y,
 medido el 2026-10-15, PubMed ya devolvía otros artículos que el 2026-10-07: las
