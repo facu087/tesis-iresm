@@ -1,6 +1,12 @@
-# Traspaso de sesión — 2026-10-10
+# Traspaso de sesión — 2026-10-26
 
-Actualizado el 2026-10-10 sobre el traspaso del 2026-10-06. Lo nuevo: la landing rediseñada y
+Actualizado el 2026-10-26. Lo nuevo: PR #65 a #70 (ver "Lo que se mergeó entre el 2026-10-15 y
+el 2026-10-26", sección 2). `npm audit` del frontend quedó en 0 (tarjeta #87, en QA) y la
+Ronda 5 ya no falla en silencio cuando el modelo responde con otro esquema (tarjeta #90, en
+QA); el modo mock se regrabó el 2026-10-26 con ese arreglo. Las demás secciones no se
+revisaron en esta actualización.
+
+Texto del 2026-10-10, sobre el traspaso del 2026-10-06. Lo nuevo: la landing rediseñada y
 todas las pantallas con la misma identidad (PR #57 a #59 y #61 a #63, tarjeta #88 en QA), los
 cuatro PR de Fede mergeados y las tarjetas #76 y #77 en QA con evidencia.
 El detalle está en "Lo que se mergeó entre el 2026-10-07 y el 2026-10-10" (sección 2) y en 4.10.
@@ -130,6 +136,23 @@ Con los PR #61 a #63 queda un solo sistema visual. Cambios que no son solo de as
   queda junto al título; los colores de estado siguen la landing.
 - Se eliminaron `ThemeScope`, las fuentes Newsreader y Atkinson y los iconos sin uso.
 
+### Lo que se mergeó entre el 2026-10-15 y el 2026-10-26
+| PR | Qué | Tarjeta |
+|----|-----|---------|
+| #65 | La cita "verificada" del ejemplo de la landing es un PMID real | — |
+| #66 | Detalles de `/analyzing` y `/report`: error de red legible, sin caso lleva a `/analizar`, "En PubMed este PMID es:" en rojo solo en fuentes refutadas | — |
+| #67 | El modo mock reproduce lo que ofreció el RAG en la corrida grabada (bloque `rag`); ver 4.3 | #89 |
+| #68 | Corredor de tests del frontend: Vitest + React Testing Library (`cd frontend && npm test`); ver 4.10 | — |
+| #69 | `next` y `eslint-config-next` 16.2.7 → 16.4.3 + `npm audit fix`: `npm audit` de 8 (1 crítica) a 0 | #87, en QA |
+| #70 | Ronda 5: el prompt prohíbe `hypotheses` y reescribir; esa forma solo se acepta por texto idéntico; aviso por stderr; mock regrabado el 2026-10-26 | #90, en QA |
+
+Sobre el #70: las `hypotheses` que devolvieron los Agentes 01 y 02 el 2026-10-20 no eran las
+hipótesis que fallaron la verificación sino hipótesis nuevas armadas alrededor de los
+artículos ofrecidos. Por eso no se aceptan por posición: le pegarían citas reales a hipótesis
+no verificadas. La #90 estaba asignada a Facundo; la resolvió Matías.
+
+Evidencia de las dos tarjetas en `output/evidencia/87/` y `output/evidencia/90/` (local).
+
 ---
 
 ## 3. Lo que se midió
@@ -179,6 +202,15 @@ Con los PR #61 a #63 queda un solo sistema visual. Cambios que no son solo de as
 ---
 
 ## 4. Pendiente (en orden)
+
+Resumen al 2026-10-26, de lo que sigue abierto:
+1. PR #51 de Fede (tarjeta #79): cambios pedidos por Facundo el 2026-10-07, sin movimiento.
+2. Evidencia faltante en Trello: #86 (hay que generarla desde Windows) y #75.
+3. Decisiones abiertas de 4.4: recorte de la Ronda 4, distinguir el nivel III por
+   saneamiento y PharmGKB contra ClinVar para el Agente 02.
+4. Frontend (4.10): tests del resto de las pantallas y CI, pantallas de admin que faltan y
+   política de privacidad y términos.
+5. Seis ramas locales `worktree-agent-*` sin revisar (4.5).
 
 ### 4.1 #62 Agente 06 (Sintetizador) — mergeado, con correcciones y observaciones abiertas
 El PR #35 (Facundo) entró a `develop` el 2026-10-06 (merge `1f11917`). Agregó, según el
@@ -288,8 +320,13 @@ devolvía otros artículos y las recitaciones grabadas citaban PMIDs que no se o
 la Ronda 1 usa eso. Regrabado el 2026-10-20 (87.320 tokens, 30 llamadas, 8 reintentadas por 429,
 495 s): dos pasadas del mock dan el mismo consenso y el mismo resumen. **Hallazgo**: en esa
 corrida los Agentes 01 y 02 respondieron la Ronda 5 con `{"hypotheses": [...]}` en vez de
-`{"recitations": [...]}`; el parser las rechaza y su recitación falla sin aviso visible. Pasa
-también en análisis reales: hay que arreglar el prompt o el parseo de la recitación y regrabar.
+`{"recitations": [...]}`; el parser las rechaza y su recitación falla sin aviso visible.
+**Resuelto el 2026-10-26 (PR #70, tarjeta #90)** y regrabado ese día con el prompt nuevo
+(88.143 tokens, 28 llamadas, 6 reintentadas por 429, 526 s; grabación en
+`output/medicion_costos/ronda5_20261026/`). Los tres agentes usaron `recitations`. Medido en
+modo mock sobre cada grabación: 9 recitadas y 2 mejoradas (2026-10-20) contra 12 y 4
+(2026-10-26). El mock reproduce 12 hipótesis de consenso, 10 ensayos y el resumen del Agente
+06. Es una corrida por lado: la variación del modelo entre corridas no está medida.
 
 ### 4.4 Decisiones abiertas
 - **Recorte de la Ronda 4**: ahorraría hasta un tercio del consumo. Hace falta más de una
@@ -336,8 +373,8 @@ también en análisis reales: hay que arreglar el prompt o el parseo de la recit
   - #79 (comentario en el `.env` que desactiva la verificación): PR #51 abierto, con cambios
     pedidos por Facundo el 2026-10-07.
   - #74 (cliente Orphadata) y #78 (portada del PDF): sin trabajo en el repo.
-  - #87 (vulnerabilidades del frontend): `npm audit` sigue dando 14 (1 crítica, 12 altas,
-    1 moderada).
+  - #87 (vulnerabilidades del frontend): **resuelta el 2026-10-26** (PR #69, la hizo Matías):
+    `npm audit` en 0 con Next 16.4.3. En QA con evidencia.
 - #80 (un agente como sostén y objetor de la misma hipótesis): resuelta en el PR #52 y en QA;
   ver la nota de 4.3.
 
