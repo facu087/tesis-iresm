@@ -229,9 +229,21 @@ class ApiCircuitBreaker:
 # Instancias globales (una por API)
 # ---------------------------------------------------------------------------
 
-import os as _os
+from .ncbi_api_key import leer_api_key as _leer_api_key
 
-_pubmed_rps = RateLimiter.PUBMED_WITH_KEY if _os.getenv("PUBMED_API_KEY") else RateLimiter.PUBMED_NO_KEY
+
+def pubmed_rps() -> int:
+    """
+    Velocidad de NCBI según PUBMED_API_KEY, con la misma validación que el cliente.
+
+    Si el limitador leyera la variable cruda, una clave mal formada lo dejaría
+    en 10 req/s mientras el cliente sale sin clave (3 req/s para NCBI): 429 en
+    la verificación bibliográfica (tarjeta #79).
+    """
+    return RateLimiter.PUBMED_WITH_KEY if _leer_api_key() else RateLimiter.PUBMED_NO_KEY
+
+
+_pubmed_rps = pubmed_rps()
 
 pubmed_limiter = RateLimiter(requests_per_second=_pubmed_rps)
 orphanet_limiter = RateLimiter(requests_per_second=RateLimiter.ORPHANET)
