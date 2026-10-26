@@ -669,7 +669,11 @@ la corrida: 9 hipótesis de consenso sin repetidas, 10 ensayos y el
 `executive_summary` del Agente 06, igual en cada pasada. En esa corrida los
 Agentes 01 y 02 respondieron la Ronda 5 con el esquema equivocado
 (`hypotheses` en vez de `recitations`) y su recitación falló: el mock lo
-reproduce (2 hipótesis mejoradas por recitación). La grabación incluye además lo que el RAG
+reproduce (2 hipótesis mejoradas por recitación). Desde la tarjeta #90 el prompt
+de recitación prohíbe esa clave y reescribir hipótesis, y `_parse_recitation()`
+acepta la forma `hypotheses` solo para la hipótesis cuyo texto coincide con la
+ofrecida (una reescrita no hereda citas) y avisa por stderr, con claves y
+conteos, cuando falta `recitations`. La grabación incluye además lo que el RAG
 ofreció en la Ronda 1 (bloque `rag` de `grabadas.json`): en modo mock la Ronda 1
 usa esos artículos y no consulta PubMed. Sin ese bloque se consultaba en vivo y,
 medido el 2026-10-15, PubMed ya devolvía otros artículos que el 2026-10-07: las

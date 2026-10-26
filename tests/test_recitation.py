@@ -416,6 +416,108 @@ class TestPromptDeRecitacion:
         assert fuentes[0].verified is None
 
 
+# ── Ronda 5 con el esquema equivocado (tarjeta #90) ──────────────────────────
+
+class TestRecitacionConOtroEsquema:
+    """
+    En la corrida real del 2026-10-20 los Agentes 01 y 02 respondieron la Ronda 5
+    con {"hypotheses": [...]} en vez de {"recitations": [...]}: hipótesis
+    reescritas, sin número. Una hipótesis reescrita no es la que falló la
+    verificación, así que solo se acepta la que repite el texto ofrecido.
+    """
+
+    OTRA = "Evaluate multifocal motor neuropathy with anti-GM1 antibodies."
+
+    def _alternativa(self, *textos: str) -> str:
+        return json.dumps({"hypotheses": [
+            {"text": t, "sources": [{"pmid": OFRECIDO, "title": "Fabry disease"}]}
+            for t in textos
+        ]})
+
+    def test_hipotesis_con_el_texto_ofrecido_se_acepta(self, capsys):
+        from backend.agents.agent_01_literature import LiteratureAnalystAgent
+
+        parseado = LiteratureAnalystAgent()._parse_recitation(
+            self._alternativa(f"  {ATTR.upper()} "), total=2, texts=[self.OTRA, ATTR]
+        )
+
+        assert list(parseado) == [1]
+        assert parseado[1][0].pmid == OFRECIDO
+        assert "[NEXUS] Recitación del Agente 01" in capsys.readouterr().err
+
+    def test_hipotesis_reescrita_no_se_acepta_y_avisa(self, capsys):
+        from backend.agents.agent_01_literature import LiteratureAnalystAgent
+
+        parseado = LiteratureAnalystAgent()._parse_recitation(
+            self._alternativa(self.OTRA), total=1, texts=[ATTR]
+        )
+
+        assert parseado == {}
+        err = capsys.readouterr().err
+        assert "[NEXUS] Recitación del Agente 01" in err
+        assert "'hypotheses'" in err
+        assert "0 de 1" in err
+        # Nunca texto clínico en el log.
+        assert self.OTRA not in err and ATTR not in err
+
+    def test_respuesta_sin_json_sigue_levantando_error(self):
+        """El Árbitro la registra como recitación fallida del agente (no muda)."""
+        from backend.agents.agent_01_literature import LiteratureAnalystAgent
+
+        with pytest.raises(ValueError):
+            LiteratureAnalystAgent()._parse_recitation(
+                "no hay artículos pertinentes", total=1, texts=[ATTR]
+            )
+
+    def test_esquema_correcto_no_avisa(self, capsys):
+        from backend.agents.agent_01_literature import LiteratureAnalystAgent
+
+        raw = json.dumps({"recitations": [
+            {"hypothesis": 1, "sources": [{"pmid": OFRECIDO, "title": "Fabry disease"}]},
+        ]})
+        parseado = LiteratureAnalystAgent()._parse_recitation(raw, total=1, texts=[ATTR])
+
+        assert list(parseado) == [0]
+        assert capsys.readouterr().err == ""
+
+    def test_recitations_vacia_es_valida_y_no_avisa(self, capsys):
+        """El prompt permite no recitar ninguna: no es un error de esquema."""
+        from backend.agents.agent_01_literature import LiteratureAnalystAgent
+
+        parseado = LiteratureAnalystAgent()._parse_recitation(
+            json.dumps({"recitations": []}), total=1, texts=[ATTR]
+        )
+
+        assert parseado == {}
+        assert capsys.readouterr().err == ""
+
+    def test_recite_empareja_por_texto_de_punta_a_punta(self, monkeypatch):
+        from backend.agents.agent_01_literature import LiteratureAnalystAgent
+
+        agente = LiteratureAnalystAgent()
+        monkeypatch.setattr(
+            agente, "_call_llm", lambda *_a, **_k: self._alternativa(ATTR)
+        )
+
+        parseado = agente.recite(
+            [(self.OTRA, ["motivo"]), (ATTR, ["motivo"])],
+            [f"[PMID: {OFRECIDO}] Fabry disease"],
+        )
+
+        assert list(parseado) == [1]
+
+    def test_el_prompt_prohibe_reescribir_hipotesis(self):
+        from backend.agents.agent_01_literature import LiteratureAnalystAgent
+
+        prompt = LiteratureAnalystAgent()._build_recitation_prompt(
+            [(ATTR, ["motivo"])], [f"[PMID: {OFRECIDO}] Fabry disease"]
+        )
+
+        assert '"recitations"' in prompt
+        assert 'NO uses la clave "hypotheses"' in prompt
+        assert "no reescribas" in prompt
+
+
 class TestLaRecitacionLlegaAlReporte:
     """
     Regresión: `arbitrate()` copiaba el dict de veredictos, así que los que
