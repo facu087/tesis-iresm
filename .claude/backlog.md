@@ -404,7 +404,7 @@ se probaron con una corrida real de `POST /api/analyze` sobre el caso de la tesi
 
 | # | Tarea |
 |---|-------|
-| 1 | Módulo de anonimización: nombres, fechas e identificadores |
+| 1 | ✅ Módulo de anonimización: nombres, fechas e identificadores — `backend/ingestion/anonimizador.py` (tarjeta #55). Reglas deterministas sobre identificadores directos; un nombre suelto sin marcador no se detecta, por diseño. Evidencia: `scripts/demo_anonimizacion.py` (0 de 22 prompts filtran identificadores, 2 de 22 sin la anonimización) |
 | 2 | Limpieza automática de archivos temporales (SESSION_TTL) |
 | 3 | Configuración CORS, validación de origins y HTTPS/TLS |
 | 4 | Validación end-to-end: caso neuropatía axonal (42 años) |

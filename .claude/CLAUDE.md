@@ -260,6 +260,31 @@ Scripts disponibles:
   (pipeline mockeado) → rechazo con motivo → reenvío corregido. Contra una base
   SQLite temporal en memoria, cero llamadas a un LLM. Genera `flujo.json` y
   `resumen.txt` en `output/demo_registro/`
+- `demo_anonimizacion.py` (Sprint 5, tarjeta #55) — corre `POST /api/analyze` completo
+  en modo mock sobre un caso con identificadores inyectados (nombre, DNI, teléfono,
+  correo, domicilio, fecha de nacimiento, historia clínica, médica derivante),
+  interceptando `call_provider()`, y revisa cada prompt saliente. Se corre dos veces:
+  con la anonimización activa (0 prompts con identificadores) y apagada, que es el
+  control del instrumento (2 de 22 los filtran). Sale con código 1 si algo se filtra.
+  Genera `resultado.txt` y `resumen.json` en `output/demo_anonimizacion/`
+
+### Anonimización (Sprint 5)
+
+`backend/ingestion/anonimizador.py` se aplica en `POST /api/analyze` entre
+`normalize()` y `ClinicalCase(...)`: es la última parada antes de que el texto vaya a
+Groq, PubMed, ClinicalTrials.gov, Orphanet y PharmGKB. Detecta con reglas
+deterministas documentos argentinos (DNI, LC, LE, CI, CUIL, CUIT), historia clínica y
+afiliado, teléfonos, correos, fechas de calendario, domicilios y nombres propios
+**precedidos por un marcador explícito** ("Paciente:", "Sr.", "Dra.", "derivado por").
+
+Qué **no** hace, y es parte del diseño: un nombre suelto sin marcador no se detecta, y
+ante la duda no se enmascara. Una heurística de "palabras capitalizadas" destruiría
+Charcot-Marie-Tooth, Guillain-Barré, Villa Carlos Paz y los nombres de fármacos. Es una
+**red de seguridad determinista, no una garantía de desidentificación**; para eso haría
+falta un NER biomédico en español, evaluado con métricas propias (trabajo futuro).
+`InformeAnonimizacion` lleva conteos por categoría y **nunca** los valores encontrados:
+va a los logs. El caso base de `scripts/poc_test.py` ya viene anonimizado a mano y debe
+salir intacto (hay un test).
 
 También se corrigió un bug del Sprint 2: falsos positivos en el extractor de
 biomarcadores (regex de anticuerpos y de marcadores de lab). Ver commit `e72e004`.
@@ -305,6 +330,8 @@ tesis-iresm/
 │   ├── ingestion/
 │   │   ├── extractor.py            ← PDF nativo (pdfplumber) + OCR (Tesseract)
 │   │   ├── normalizer.py           ← normalización INN y unidades de medida
+│   │   ├── anonimizador.py         ← enmascara identificadores directos antes de que el
+│   │   │                              texto salga del sistema (S5, tarjeta #55)
 │   │   ├── biomarker_extractor.py  ← extracción genes, anticuerpos, fármacos
 │   │   └── __init__.py
 │   ├── models/
