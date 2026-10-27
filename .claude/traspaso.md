@@ -203,14 +203,15 @@ Evidencia de las dos tarjetas en `output/evidencia/87/` y `output/evidencia/90/`
 
 ## 4. Pendiente (en orden)
 
-Resumen al 2026-10-26, de lo que sigue abierto:
-1. PR #51 de Fede (tarjeta #79): cambios pedidos por Facundo el 2026-10-07, sin movimiento.
-2. Evidencia faltante en Trello: #86 (hay que generarla desde Windows) y #75.
-3. Decisiones abiertas de 4.4: recorte de la Ronda 4, distinguir el nivel III por
+Resumen al 2026-10-27, de lo que sigue abierto:
+1. Evidencia faltante en Trello: #86 (hay que generarla desde Windows). La #75 tiene
+   evidencia y está en QA desde el 2026-10-06; el demo se volvió a correr el 2026-10-27
+   sobre `develop` (0 conexiones; 18 y 31 tests ok).
+2. Decisiones abiertas de 4.4: recorte de la Ronda 4, distinguir el nivel III por
    saneamiento y PharmGKB contra ClinVar para el Agente 02.
-4. Frontend (4.10): tests del resto de las pantallas y CI, pantallas de admin que faltan y
+3. Frontend (4.10): tests del resto de las pantallas y CI, pantallas de admin que faltan y
    política de privacidad y términos.
-5. Seis ramas locales `worktree-agent-*` sin revisar (4.5).
+4. Seis ramas locales `worktree-agent-*` sin revisar (4.5).
 
 ### 4.1 #62 Agente 06 (Sintetizador) — mergeado, con correcciones y observaciones abiertas
 El PR #35 (Facundo) entró a `develop` el 2026-10-06 (merge `1f11917`). Agregó, según el
@@ -360,8 +361,8 @@ modo mock sobre cada grabación: 9 recitadas y 2 mejoradas (2026-10-20) contra 1
   agentes, objeciones), fuentes, divergencias, ensayos, enfermedades raras, versión y
   descargo. Las celdas de tabla con texto plano (perfil del paciente, etc.) no interpretan
   marcado y no hacen falta. Las URL se imprimen como texto, no como enlaces.
-- Tarjeta #73 (Facundo): evidencia adjunta y en QA desde el 2026-10-06. La #75 (Fede) sigue
-  en Sprint 4 sin evidencia.
+- Tarjeta #73 (Facundo): evidencia adjunta y en QA desde el 2026-10-06. La #75 (Fede): evidencia
+  adjunta y en QA desde el 2026-10-06.
 
 ### 4.6 De otros integrantes
 - **Facundo**: #71 cliente ClinVar — hecho (PR #41) y en QA desde el 2026-10-06.
@@ -370,8 +371,9 @@ modo mock sobre cada grabación: 9 recitadas y 2 mejoradas (2026-10-20) contra 1
     evidencia la generó Matías sobre `develop`; está en `output/evidencia/76/` y `77/`.
   - #86 (test de hermeticidad en Windows): mergeada (PR #47), sin evidencia. Hay que
     generarla desde Windows.
-  - #79 (comentario en el `.env` que desactiva la verificación): PR #51 abierto, con cambios
-    pedidos por Facundo el 2026-10-07.
+  - #79 (comentario en el `.env` que desactiva la verificación): **cerrada el 2026-10-26**
+    (PR #51 mergeado; ClinVar y el limitador de NCBI validan igual, y la ORPHANET_API_KEY
+    mal formada se descarta en el PR #72). Lo que quedaba pasó a la #91.
   - #74 (cliente Orphadata) y #78 (portada del PDF): sin trabajo en el repo.
   - #87 (vulnerabilidades del frontend): **resuelta el 2026-10-26** (PR #69, la hizo Matías):
     `npm audit` en 0 con Next 16.4.3. En QA con evidencia.
