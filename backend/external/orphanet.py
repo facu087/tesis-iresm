@@ -55,6 +55,8 @@ from __future__ import annotations
 
 import os
 from contextlib import AsyncExitStack
+import re
+import sys
 from dataclasses import dataclass, field
 from typing import Any, Optional
 from urllib.parse import quote
@@ -71,6 +73,35 @@ _ORPHANET_URL_TEMPLATE = "https://www.orpha.net/en/disease/detail/{code}"
 # La API acepta `test` como clave. Ver el docstring: hoy no la exige, pero
 # mandarla es gratis y cubre el caso de que empiece a exigirla.
 _DEFAULT_API_KEY = "test"
+
+_ENV_API_KEY_VAR = "ORPHANET_API_KEY"
+
+# Orphanet no publica el formato de sus claves: el patrón solo descarta lo que
+# evidentemente NO es una, como el comentario del .env o una frase con espacios.
+_API_KEY_VALIDA = re.compile(r"^[^\s#]{1,128}$")
+
+
+def _leer_api_key() -> str:
+    """
+    Lee ORPHANET_API_KEY y cae a `test` si falta o no parece una clave.
+
+    Mismo defecto que PUBMED_API_KEY (tarjeta #79): con el comentario escrito
+    en la misma línea del .env, python-dotenv lo carga como valor y viajaba
+    como header `apiKey`. Ante un valor inválido se avisa por stderr con el
+    largo, nunca con el contenido, y se manda `test`, que la API acepta.
+    """
+    clave = (os.getenv(_ENV_API_KEY_VAR) or "").strip()
+    if not clave:
+        return _DEFAULT_API_KEY
+    if not _API_KEY_VALIDA.match(clave):
+        print(
+            f"[NEXUS][Orphanet] {_ENV_API_KEY_VAR} no parece una clave válida "
+            f"(se leyeron {len(clave)} caracteres). Revisá que en el .env el "
+            f"comentario no esté en la misma línea. Se usa la clave por defecto.",
+            file=sys.stderr,
+        )
+        return _DEFAULT_API_KEY
+    return clave
 
 
 @dataclass
@@ -120,7 +151,7 @@ class OrphanetClient:
     """
 
     def __init__(self) -> None:
-        self._api_key: str = os.getenv("ORPHANET_API_KEY") or _DEFAULT_API_KEY
+        self._api_key: str = _leer_api_key()
         self._client: Optional[httpx.AsyncClient] = None
         self._orphadata: Optional[OrphadataClient] = None
         self._pila: Optional[AsyncExitStack] = None

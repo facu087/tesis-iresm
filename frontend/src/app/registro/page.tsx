@@ -2,14 +2,19 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import ThemeToggle from "@/components/ThemeToggle";
 import { useRouter } from "next/navigation";
+import { UserPlusIcon } from "@phosphor-icons/react/ssr";
 import { registrarMedico } from "@/lib/api";
-import { UserPlusIcon } from "@/components/icons";
+import AuthShell from "@/components/landing/AuthShell";
+import {
+  FORM_CARD,
+  FormError,
+  FormField,
+  SubmitButton,
+} from "@/components/landing/FormPrimitives";
+import { FOCUS_RING, TEXT_LINK } from "@/components/landing/styles";
 
-const inputClass =
-  "w-full rounded-lg border border-fg-muted bg-bg px-3.5 py-2.5 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-accent";
-const labelClass = "mb-1.5 block text-sm font-medium text-fg";
+const ERROR_ID = "registro-error";
 
 export default function RegistroPage() {
   const router = useRouter();
@@ -55,125 +60,77 @@ export default function RegistroPage() {
   };
 
   return (
-    <div className="flex min-h-screen font-body flex-col bg-bg text-fg">
-      <header className="border-b border-border">
-        <div className="mx-auto flex max-w-2xl items-center justify-between px-6 py-5">
-          <Link
-            href="/"
-            className="cursor-pointer rounded-sm font-serif text-lg font-semibold tracking-tight text-accent transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
-          >
-            NEXUS
+    <AuthShell
+      headerLink={{ href: "/ingresar", label: "Ingresar" }}
+      icon={<UserPlusIcon aria-hidden="true" weight="bold" className="size-6" />}
+      title="Registro de médicos"
+      lead="Tu cuenta queda pendiente hasta que un administrador la revise."
+    >
+      <form onSubmit={handleSubmit} noValidate className={FORM_CARD}>
+        <div className="grid gap-6 sm:grid-cols-2">
+          <FormField id="nombre" label="Nombre" required value={form.nombre} onChange={setField("nombre")} autoComplete="given-name" />
+          <FormField id="apellido" label="Apellido" required value={form.apellido} onChange={setField("apellido")} autoComplete="family-name" />
+        </div>
+
+        <div className="grid gap-6 sm:grid-cols-2">
+          <FormField id="dni" label="DNI" required value={form.dni} onChange={setField("dni")} inputMode="numeric" />
+          <FormField
+            id="profesion"
+            label={
+              <>
+                Profesión / especialidad <span className="font-normal text-fg-muted">(opcional)</span>
+              </>
+            }
+            value={form.profesion}
+            onChange={setField("profesion")}
+          />
+        </div>
+
+        <div className="grid gap-6 sm:grid-cols-2">
+          <FormField id="matricula" label="Matrícula" required value={form.matricula} onChange={setField("matricula")} />
+          <FormField id="jurisdiccion" label="Jurisdicción de matriculación" required value={form.jurisdiccion} onChange={setField("jurisdiccion")} placeholder="Ej: Córdoba" />
+        </div>
+
+        <FormField id="email" label="Email institucional" type="email" required value={form.email} onChange={setField("email")} autoComplete="email" />
+
+        <FormField
+          id="password"
+          label="Contraseña"
+          type="password"
+          required
+          minLength={8}
+          value={form.password}
+          onChange={setField("password")}
+          autoComplete="new-password"
+          hint="Mínimo 8 caracteres."
+        />
+
+        <label className="flex cursor-pointer items-start gap-3 text-sm text-pretty text-fg-muted">
+          <input
+            type="checkbox"
+            checked={aceptaTratamientoDatos}
+            onChange={(e) => setAceptaTratamientoDatos(e.target.checked)}
+            className={`mt-0.5 size-4 shrink-0 cursor-pointer rounded accent-accent ${FOCUS_RING}`}
+          />
+          <span>
+            Acepto el tratamiento de mis datos personales (nombre, DNI, matrícula, email y
+            contraseña) con la finalidad de verificar mi habilitación profesional y darme
+            acceso al pipeline de NEXUS, conforme a la Ley 25.326.
+          </span>
+        </label>
+
+        {error && <FormError id={ERROR_ID}>{error}</FormError>}
+
+        <SubmitButton pending={enviando} describedBy={error ? ERROR_ID : undefined}>
+          {enviando ? "Enviando..." : "Registrarme"}
+        </SubmitButton>
+
+        <p className="text-center text-sm text-fg-muted">
+          <Link href="/ingresar" className={TEXT_LINK}>
+            Ya tengo cuenta — Ingresar
           </Link>
-          <div className="flex items-center gap-2 sm:gap-4">
-            <ThemeToggle />
-            <Link
-              href="/ingresar"
-              className="cursor-pointer rounded-sm text-sm text-fg-muted transition-colors duration-200 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
-            >
-              Ya tengo cuenta — Ingresar
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      <main className="flex-1">
-        <div className="mx-auto max-w-2xl px-6 py-14">
-          <div className="mb-8 flex items-center gap-3">
-            <UserPlusIcon className="h-7 w-7" />
-            <div>
-              <h1 className="font-serif text-2xl font-semibold">Registro de médicos</h1>
-              <p className="text-sm text-fg-muted">
-                Tu cuenta queda pendiente hasta que un administrador la revise.
-              </p>
-            </div>
-          </div>
-
-          <form onSubmit={handleSubmit} noValidate className="space-y-5 rounded-2xl border border-border bg-bg-subtle p-8">
-            <div className="grid gap-5 sm:grid-cols-2">
-              <div>
-                <label htmlFor="nombre" className={labelClass}>Nombre</label>
-                <input id="nombre" required value={form.nombre} onChange={setField("nombre")} className={inputClass} autoComplete="given-name" />
-              </div>
-              <div>
-                <label htmlFor="apellido" className={labelClass}>Apellido</label>
-                <input id="apellido" required value={form.apellido} onChange={setField("apellido")} className={inputClass} autoComplete="family-name" />
-              </div>
-            </div>
-
-            <div className="grid gap-5 sm:grid-cols-2">
-              <div>
-                <label htmlFor="dni" className={labelClass}>DNI</label>
-                <input id="dni" required value={form.dni} onChange={setField("dni")} className={inputClass} inputMode="numeric" />
-              </div>
-              <div>
-                <label htmlFor="profesion" className={labelClass}>
-                  Profesión / especialidad <span className="text-fg-muted">(opcional)</span>
-                </label>
-                <input id="profesion" value={form.profesion} onChange={setField("profesion")} className={inputClass} />
-              </div>
-            </div>
-
-            <div className="grid gap-5 sm:grid-cols-2">
-              <div>
-                <label htmlFor="matricula" className={labelClass}>Matrícula</label>
-                <input id="matricula" required value={form.matricula} onChange={setField("matricula")} className={inputClass} />
-              </div>
-              <div>
-                <label htmlFor="jurisdiccion" className={labelClass}>Jurisdicción de matriculación</label>
-                <input id="jurisdiccion" required value={form.jurisdiccion} onChange={setField("jurisdiccion")} className={inputClass} placeholder="Ej: Córdoba" />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="email" className={labelClass}>Email institucional</label>
-              <input id="email" type="email" required value={form.email} onChange={setField("email")} className={inputClass} autoComplete="email" />
-            </div>
-
-            <div>
-              <label htmlFor="password" className={labelClass}>Contraseña</label>
-              <input
-                id="password"
-                type="password"
-                required
-                minLength={8}
-                value={form.password}
-                onChange={setField("password")}
-                className={inputClass}
-                autoComplete="new-password"
-              />
-              <p className="mt-1 text-xs text-fg-muted">Mínimo 8 caracteres.</p>
-            </div>
-
-            <label className="flex items-start gap-3 text-sm text-fg-muted">
-              <input
-                type="checkbox"
-                checked={aceptaTratamientoDatos}
-                onChange={(e) => setAceptaTratamientoDatos(e.target.checked)}
-                className="mt-0.5 h-4 w-4 shrink-0 rounded border-fg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              />
-              <span>
-                Acepto el tratamiento de mis datos personales (nombre, DNI, matrícula, email y
-                contraseña) con la finalidad de verificar mi habilitación profesional y darme
-                acceso al pipeline de NEXUS, conforme a la Ley 25.326.
-              </span>
-            </label>
-
-            {error && (
-              <p role="alert" className="rounded-lg border border-red-600/30 bg-red-600/10 px-4 py-2 text-sm text-red-700 dark:text-red-400">
-                {error}
-              </p>
-            )}
-
-            <button
-              type="submit"
-              disabled={enviando}
-              className="w-full cursor-pointer rounded-xl bg-accent py-3 font-semibold text-accent-fg transition-opacity duration-200 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {enviando ? "Enviando..." : "Registrarme"}
-            </button>
-          </form>
-        </div>
-      </main>
-    </div>
+        </p>
+      </form>
+    </AuthShell>
   );
 }

@@ -67,6 +67,14 @@ resultado, para que sirva de base de comparación mientras se itera.
 - **WHEN** se analiza dos veces el mismo texto en modo mock
 - **THEN** las hipótesis, el consenso y los ensayos son los mismos
 
+#### Scenario: La literatura ofrecida no depende del día
+- **WHEN** la grabación incluye lo que el RAG ofreció en la Ronda 1 y se analiza en modo mock días después, con PubMed devolviendo otros artículos
+- **THEN** los agentes reciben los artículos grabados, no consulta PubMed para la Ronda 1, y las recitaciones grabadas se validan contra esos mismos artículos
+
+#### Scenario: Grabación anterior al bloque del RAG
+- **WHEN** la grabación no incluye lo que ofreció el RAG
+- **THEN** la Ronda 1 consulta PubMed como en modo real
+
 ### Requirement: El modo mock ejercita el flujo real
 
 Las respuestas grabadas SHALL atravesar el mismo parseo, las mismas validaciones

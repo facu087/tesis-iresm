@@ -13,7 +13,7 @@ Endpoints usados:
 
 from __future__ import annotations
 
-import os
+import sys
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from typing import Optional
@@ -21,8 +21,13 @@ from typing import Optional
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+# Los nombres con guion bajo se conservan para los llamadores y tests existentes.
+from .ncbi_api_key import ENV_API_KEY_VAR as _ENV_API_KEY_VAR
+from .ncbi_api_key import leer_api_key as _leer_api_key
+
 _BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 _PUBMED_URL_TEMPLATE = "https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
+
 
 # Pausa entre reintentos: 2s → 4s → 8s (máx 3 intentos)
 _RETRY_KWARGS = dict(
@@ -30,6 +35,25 @@ _RETRY_KWARGS = dict(
     wait=wait_exponential(multiplier=2, min=2, max=8),
     reraise=True,
 )
+
+
+def _verificar_respuesta(response: httpx.Response) -> None:
+    """
+    Levanta si la respuesta no fue exitosa, nombrando la causa más probable.
+
+    Un 400 de E-utilities casi siempre significa que un parámetro viajó mal, y
+    el candidato número uno es `api_key`. Decirlo acá ahorra el rastreo que
+    costó una corrida entera: desde arriba solo se veía "todas las fuentes
+    no_verificable".
+    """
+    if response.status_code == 400:
+        print(
+            "[NEXUS][PubMed] La API devolvió 400 (parámetros inválidos). "
+            f"Si hay {_ENV_API_KEY_VAR} definida, revisá su valor: una clave "
+            "mal formada es la causa más común.",
+            file=sys.stderr,
+        )
+    response.raise_for_status()
 
 
 @dataclass
@@ -66,7 +90,7 @@ class PubMedClient:
     """
 
     def __init__(self) -> None:
-        self._api_key: Optional[str] = os.getenv("PUBMED_API_KEY")
+        self._api_key: Optional[str] = _leer_api_key()
         self._client: Optional[httpx.AsyncClient] = None
 
     async def __aenter__(self) -> "PubMedClient":
@@ -108,7 +132,7 @@ class PubMedClient:
         })
 
         response = await self._client.get(f"{_BASE_URL}/esearch.fcgi", params=params)
-        response.raise_for_status()
+        _verificar_respuesta(response)
 
         data = response.json()
         return data.get("esearchresult", {}).get("idlist", [])
@@ -139,7 +163,7 @@ class PubMedClient:
         params["retmode"] = "xml"
 
         response = await self._client.get(f"{_BASE_URL}/efetch.fcgi", params=params)
-        response.raise_for_status()
+        _verificar_respuesta(response)
 
         return _parse_abstracts_xml(response.text)
 
@@ -171,7 +195,7 @@ class PubMedClient:
         })
 
         response = await self._client.get(f"{_BASE_URL}/esummary.fcgi", params=params)
-        response.raise_for_status()
+        _verificar_respuesta(response)
 
         data = response.json()
         result: dict[str, dict] = {}

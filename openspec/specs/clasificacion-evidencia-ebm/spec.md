@@ -98,6 +98,21 @@ III, cualquiera sea el nivel declarado.
 - **WHEN** una hipótesis declara nivel II y no cita ninguna fuente
 - **THEN** su nivel efectivo es III
 
+### Requirement: Nivel no declarado por el agente
+Si el agente no declara un nivel válido (falta, o no es I, II, III, 1, 2 ni 3), el sistema SHALL
+asignarle III y MUST marcar la hipótesis como de nivel no declarado. Ese III MUST NOT subir por
+la verificación, igual que un III declarado. El reporte exportado, el PDF y la vista de reporte
+SHALL mostrar que el nivel no fue declarado y MUST NOT presentar ese III como declarado por el
+agente: el campo `declared_evidence_level` queda vacío y `evidence_level_defaulted` en verdadero.
+
+#### Scenario: Nivel inválido queda en III y marcado
+- **WHEN** el agente devuelve una hipótesis con nivel `"IV"` y una fuente verificada `Meta-Analysis`
+- **THEN** su nivel efectivo es III, `evidence_level_defaulted` es verdadero, `declared_evidence_level` es nulo y la nota explica que el agente no declaró un nivel válido
+
+#### Scenario: Un III declarado no se marca
+- **WHEN** el agente declara nivel III
+- **THEN** `evidence_level_defaulted` es falso y `declared_evidence_level` es III
+
 ### Requirement: Estado bibliográfico de la hipótesis
 El sistema SHALL asignar a cada hipótesis exactamente uno de estos estados, derivado de los
 veredictos de verificación de sus fuentes:

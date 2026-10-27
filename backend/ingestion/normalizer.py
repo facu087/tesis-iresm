@@ -2,9 +2,12 @@
 Normalización terminológica de texto clínico.
 - Nombres INN: reemplaza marcas comerciales por el nombre genérico internacional.
 - Unidades de medida: estandariza variantes ortográficas a la forma canónica.
+- Nombre INN en inglés: traduce el INN en español al nombre que usan las bases
+  internacionales (PharmGKB), con un diccionario determinista.
 """
 
 import re
+import unicodedata
 
 # ── Diccionario INN ────────────────────────────────────────────────────────────
 # Formato: "Marca / variante" → "inn_canonical"
@@ -196,3 +199,113 @@ def normalize(text: str) -> str:
     text = normalize_units(text)
     text = normalize_inn(text)
     return text
+
+
+# ── INN en inglés ──────────────────────────────────────────────────────────────
+# Formato: "inn en español, sin tildes" → "inn en inglés"
+# Cubre todos los INN canónicos de _INN_MAP (un test lo verifica) más los
+# fármacos con farmacogenómica relevante en neuropatía periférica: los que la
+# causan (quimioterapia, antimicrobianos) y los que se usan para tratarla.
+# Un fármaco ausente no se traduce: nunca se adivina un nombre.
+_INN_EN: dict[str, str] = {
+    # INN canónicos del normalizador
+    "acenocumarol": "acenocoumarol",
+    "acido acetilsalicilico": "aspirin",
+    "amitriptilina": "amitriptyline",
+    "amlodipina": "amlodipine",
+    "apixaban": "apixaban",
+    "atenolol": "atenolol",
+    "azatioprina": "azathioprine",
+    "baclofeno": "baclofen",
+    "bupropion": "bupropion",
+    "carbamazepina": "carbamazepine",
+    "celecoxib": "celecoxib",
+    "cianocobalamina": "cyanocobalamin",
+    "ciclobenzaprina": "cyclobenzaprine",
+    "ciclosporina": "cyclosporine",
+    "citalopram": "citalopram",
+    "colecalciferol": "cholecalciferol",
+    "dabigatran": "dabigatran",
+    "dexametasona": "dexamethasone",
+    "diclofenaco": "diclofenac",
+    "domperidona": "domperidone",
+    "duloxetina": "duloxetine",
+    "escitalopram": "escitalopram",
+    "esomeprazol": "esomeprazole",
+    "etoricoxib": "etoricoxib",
+    "fenitoina": "phenytoin",
+    "fentanilo": "fentanyl",
+    "fludrocortisona": "fludrocortisone",
+    "fluoxetina": "fluoxetine",
+    "gabapentina": "gabapentin",
+    "hidrocodona": "hydrocodone",
+    "ibuprofeno": "ibuprofen",
+    "lacosamida": "lacosamide",
+    "lamotrigina": "lamotrigine",
+    "levetiracetam": "levetiracetam",
+    "metilprednisolona": "methylprednisolone",
+    "metoprolol": "metoprolol",
+    "micofenolato": "mycophenolic acid",
+    "midodrina": "midodrine",
+    "mirtazapina": "mirtazapine",
+    "naproxeno": "naproxen",
+    "omeprazol": "omeprazole",
+    "oxcarbazepina": "oxcarbazepine",
+    "oxicodona": "oxycodone",
+    "paracetamol": "acetaminophen",
+    "paroxetina": "paroxetine",
+    "pregabalina": "pregabalin",
+    "propranolol": "propranolol",
+    "ranitidina": "ranitidine",
+    "rituximab": "rituximab",
+    "rivaroxaban": "rivaroxaban",
+    "sertralina": "sertraline",
+    "tacrolimus": "tacrolimus",
+    "topiramato": "topiramate",
+    "tramadol": "tramadol",
+    "valproato": "valproic acid",
+    "venlafaxina": "venlafaxine",
+    "warfarina": "warfarin",
+    # Farmacogenómica frecuente en neuropatía
+    "bortezomib": "bortezomib",
+    "capecitabina": "capecitabine",
+    "cisplatino": "cisplatin",
+    "clopidogrel": "clopidogrel",
+    "codeina": "codeine",
+    "docetaxel": "docetaxel",
+    "fluorouracilo": "fluorouracil",
+    "imipramina": "imipramine",
+    "isoniazida": "isoniazid",
+    "metformina": "metformin",
+    "nortriptilina": "nortriptyline",
+    "oxaliplatino": "oxaliplatin",
+    "paclitaxel": "paclitaxel",
+    "simvastatina": "simvastatin",
+    "talidomida": "thalidomide",
+    "tamoxifeno": "tamoxifen",
+    "vincristina": "vincristine",
+}
+
+_INN_EN_VALUES: frozenset[str] = frozenset(_INN_EN.values())
+
+
+def _sin_tildes(text: str) -> str:
+    """Minúsculas, sin espacios extremos ni tildes: la clave de _INN_EN."""
+    descompuesto = unicodedata.normalize("NFKD", text.strip().lower())
+    return "".join(c for c in descompuesto if not unicodedata.combining(c))
+
+
+def english_inn(name: str) -> str | None:
+    """
+    Nombre INN en inglés de un fármaco, para consultar bases internacionales.
+
+    Acepta el INN en español (con o sin tildes) o el nombre ya en inglés.
+    Devuelve None si el fármaco no está en el diccionario: el llamador decide
+    qué hacer, pero nunca se consulta un nombre adivinado.
+    """
+    clave = _sin_tildes(name)
+    if not clave:
+        return None
+    if clave in _INN_EN_VALUES:
+        return clave
+    return _INN_EN.get(clave)

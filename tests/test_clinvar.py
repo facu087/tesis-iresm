@@ -146,3 +146,21 @@ def test_usa_el_limitador_de_ncbi_compartido_con_pubmed():
     from backend.external import rate_limiter
     assert clinvar.pubmed_limiter is rate_limiter.pubmed_limiter
     assert clinvar.pubmed_breaker is rate_limiter.pubmed_breaker
+
+
+# ── PUBMED_API_KEY mal formada (tarjeta #79, revisión del PR #51) ──────────────
+
+def test_el_comentario_del_env_no_viaja_como_clave_a_clinvar(monkeypatch):
+    """ClinVar leía la clave sin validar: mandaba el comentario como api_key."""
+    monkeypatch.setenv("PUBMED_API_KEY", "   # Opcional: aumenta rate limit")
+    fake = _Fake(_esearch("13417"), _esummary(TTR_V50M))
+    _clasificar(fake)
+    for _, params in fake.llamadas:
+        assert "api_key" not in params
+
+
+def test_una_clave_valida_si_viaja_a_clinvar(monkeypatch):
+    monkeypatch.setenv("PUBMED_API_KEY", "abc123def456abc123def456")
+    fake = _Fake(_esearch("13417"), _esummary(TTR_V50M))
+    _clasificar(fake)
+    assert all(p.get("api_key") == "abc123def456abc123def456" for _, p in fake.llamadas)

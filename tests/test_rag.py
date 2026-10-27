@@ -209,3 +209,102 @@ class TestRetrievedArticle:
         block = article.to_prompt_block()
         assert "[PMID: 29470523]" in block
         assert "0.85" in block
+
+
+# ---------------------------------------------------------------------------
+# Umbral de relevancia (hallazgo A, tarjeta #76)
+# ---------------------------------------------------------------------------
+
+class _ColeccionFalsa:
+    """
+    Colección mínima con distancias controladas, para probar el filtro sin
+    depender del modelo de embeddings ni de la red.
+    """
+
+    def __init__(self, distancias: list[float]) -> None:
+        self._distancias = distancias
+
+    def count(self) -> int:
+        return len(self._distancias)
+
+    def query(self, query_texts, n_results, include):
+        n = min(n_results, len(self._distancias))
+        return {
+            "documents": [["doc"] * n],
+            "metadatas": [[
+                {"pmid": f"{i:08d}", "title": f"Articulo {i}", "journal": "J",
+                 "year": "2024", "authors": "A"}
+                for i in range(n)
+            ]],
+            "distances": [self._distancias[:n]],
+        }
+
+
+def _retriever_con(distancias: list[float]) -> PubMedRetriever:
+    return PubMedRetriever(collection=_ColeccionFalsa(distancias))
+
+
+class TestEscalaDelScore:
+    """
+    El score NO es la similitud coseno: es (1 + coseno) / 2, porque ChromaDB
+    devuelve distancia coseno en [0, 2] y el retriever hace 1 - distancia/2.
+    Confundir las dos escalas fue exactamente el hallazgo A.
+    """
+
+    @pytest.mark.parametrize("distancia,score_esperado,coseno", [
+        (0.0, 1.0, 1.0),    # idéntico
+        (1.0, 0.5, 0.0),    # ortogonal
+        (2.0, 0.0, -1.0),   # opuesto
+        (0.9, 0.55, 0.1),   # el umbral por defecto
+    ])
+    def test_conversion_distancia_a_score(self, distancia, score_esperado, coseno):
+        articulos = _retriever_con([distancia]).search("q", min_score=0.0)
+        assert articulos[0].relevance_score == pytest.approx(score_esperado, abs=1e-3)
+        assert (1 + coseno) / 2 == pytest.approx(score_esperado, abs=1e-3)
+
+    def test_el_umbral_viejo_no_filtraba_nada(self):
+        """
+        0.3 equivale a un coseno de -0,4. Ni un artículo ortogonal al query
+        (coseno 0, lo más parecido a "sin relación" que hay) quedaba afuera.
+        """
+        ortogonal = 1.0
+        assert _retriever_con([ortogonal]).search("q", min_score=0.3) != []
+        assert _retriever_con([ortogonal]).search("q", min_score=0.55) == []
+
+
+class TestFiltroDeRelevancia:
+    def test_descarta_los_que_estan_por_debajo(self):
+        # scores: 0.75, 0.60, 0.50, 0.40
+        articulos = _retriever_con([0.5, 0.8, 1.0, 1.2]).search("q", max_results=10)
+        assert [a.relevance_score for a in articulos] == [0.75, 0.6]
+
+    def test_el_limite_es_inclusivo(self):
+        """Un artículo justo en el umbral se conserva: la comparación es `<`."""
+        assert _retriever_con([0.9]).search("q", min_score=0.55) != []
+
+    def test_sin_resultados_relevantes_devuelve_vacio(self):
+        assert _retriever_con([1.5, 1.8]).search("q") == []
+
+    def test_get_pmids_for_hypothesis_usa_el_mismo_umbral(self):
+        """Antes tenía un 0.35 propio, descrito como 'más alto' y más permisivo."""
+        pmids = _retriever_con([0.5, 1.2]).get_pmids_for_hypothesis("hipotesis")
+        assert len(pmids) == 1
+
+
+class TestUmbralConfigurable:
+    def test_default_medido(self):
+        from backend.rag import retriever as r
+        assert r._DEFAULT_MIN_RELEVANCE_SCORE == 0.55
+
+    def test_toma_el_valor_del_entorno(self, monkeypatch):
+        from backend.rag import retriever as r
+        monkeypatch.setenv(r._ENV_MIN_SCORE_VAR, "0.7")
+        assert r._resolver_min_score() == 0.7
+
+    @pytest.mark.parametrize("valor", ["abc", "", "1.5", "-0.2"])
+    def test_valor_invalido_cae_al_default_sin_romper(self, valor, monkeypatch, capsys):
+        from backend.rag import retriever as r
+        monkeypatch.setenv(r._ENV_MIN_SCORE_VAR, valor)
+        assert r._resolver_min_score() == r._DEFAULT_MIN_RELEVANCE_SCORE
+        if valor:  # el vacío se trata como "no configurado", sin aviso
+            assert r._ENV_MIN_SCORE_VAR in capsys.readouterr().err

@@ -308,3 +308,40 @@ class TestRareDisease:
         """El summary anterior hacía definition[:200] + '...' sobre un string vacío."""
         d = RareDisease(orpha_code="64746", name="CMT2", definition="")
         assert "sin definición disponible" in d.summary()
+
+
+# ── ORPHANET_API_KEY mal formada (tarjeta #79, punto 2) ───────────────────────
+
+class TestLecturaDeLaApiKey:
+    """
+    Mismo defecto que PUBMED_API_KEY: con el comentario del .env en la misma
+    línea, python-dotenv carga el comentario como valor y viajaba como header.
+    """
+
+    COMENTARIO = "            # Opcional: la API responde sin credencial"
+
+    def test_sin_variable_manda_test(self, monkeypatch):
+        monkeypatch.delenv("ORPHANET_API_KEY", raising=False)
+        assert OrphanetClient()._api_key == "test"
+
+    def test_el_comentario_del_env_no_viaja_y_avisa(self, monkeypatch, capsys):
+        monkeypatch.setenv("ORPHANET_API_KEY", self.COMENTARIO)
+        assert OrphanetClient()._api_key == "test"
+        err = capsys.readouterr().err
+        assert "ORPHANET_API_KEY" in err
+        assert "Opcional" not in err  # nunca el valor en el log
+
+    @pytest.mark.parametrize("valor", ["clave con espacios", "#abc123", "abc\tdef"])
+    def test_formatos_que_no_son_clave_caen_a_test(self, valor, monkeypatch):
+        monkeypatch.setenv("ORPHANET_API_KEY", valor)
+        assert OrphanetClient()._api_key == "test"
+
+    def test_en_blanco_cae_a_test_sin_avisar(self, monkeypatch, capsys):
+        monkeypatch.setenv("ORPHANET_API_KEY", "   ")
+        assert OrphanetClient()._api_key == "test"
+        assert capsys.readouterr().err == ""
+
+    def test_una_clave_valida_se_conserva_recortada(self, monkeypatch, capsys):
+        monkeypatch.setenv("ORPHANET_API_KEY", "  a1B2-c3D4_e5  ")
+        assert OrphanetClient()._api_key == "a1B2-c3D4_e5"
+        assert capsys.readouterr().err == ""

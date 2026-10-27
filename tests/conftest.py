@@ -8,6 +8,10 @@ porque cualquiera que instancie `TestClient(app)` dispara el `lifespan` de
 la app y, con él, `create_db_and_tables()` — sin este reemplazo, correr la
 suite escribiría en la base real del proyecto (`./data/nexus.db`).
 
+La red está bloqueada en toda la suite (`_red_bloqueada`, autouse): un test que
+intenta conectarse a un host que no sea local falla, aunque el código atrape el
+error con un fallback. Las llamadas externas se reemplazan con mocks.
+
 `StaticPool` es obligatorio para el engine en memoria: `TestClient` ejecuta
 las dependencias síncronas en un hilo del threadpool, y una base
 `sqlite://` en memoria es privada por hilo sin ese pool — perdería entre
@@ -18,6 +22,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import socket
 
 import pytest
 from fastapi.testclient import TestClient
@@ -30,6 +35,73 @@ from backend.external import rate_limiter
 from backend.models.cuenta import CuentaMedico, EstadoCuenta, RolCuenta
 
 _ORIGEN_PERMITIDO = "http://localhost:3000"
+
+
+# ── Red bloqueada ──────────────────────────────────────────────────────────────
+# Se reemplaza al importar el conftest, antes de que corra cualquier test.
+# Un fallback del código atrapa el ConnectionError, así que el registro de
+# intentos es lo que hace fallar al test (ver `_red_bloqueada`).
+
+INTENTOS_DE_RED: list[str] = []
+_HOSTS_LOCALES = frozenset({"127.0.0.1", "localhost", "::1", "0.0.0.0"})
+_connect_real = socket.socket.connect
+_create_connection_real = socket.create_connection
+_getaddrinfo_real = socket.getaddrinfo
+
+
+def _host(address: object) -> str:
+    host = address[0] if isinstance(address, tuple) else address
+    return host.decode() if isinstance(host, bytes) else str(host)
+
+
+def _es_local(host: str) -> bool:
+    return host in _HOSTS_LOCALES
+
+
+def _bloquear(host: str) -> None:
+    INTENTOS_DE_RED.append(host)
+    raise ConnectionError(f"red bloqueada en los tests: conexión a {host}")
+
+
+def _connect(self, address):
+    host = _host(address)
+    # AF_UNIX no existe en todas las versiones de Python para Windows.
+    if not _es_local(host) and self.family != getattr(socket, "AF_UNIX", None):
+        _bloquear(host)
+    return _connect_real(self, address)
+
+
+def _create_connection(address, *args, **kwargs):
+    host = _host(address)
+    if not _es_local(host):
+        _bloquear(host)
+    return _create_connection_real(address, *args, **kwargs)
+
+
+def _getaddrinfo(host, *args, **kwargs):
+    if host is not None and not _es_local(_host(host)):
+        _bloquear(_host(host))
+    return _getaddrinfo_real(host, *args, **kwargs)
+
+
+socket.socket.connect = _connect
+socket.create_connection = _create_connection
+socket.getaddrinfo = _getaddrinfo
+
+
+@pytest.fixture(autouse=True)
+def _red_bloqueada():
+    """Falla el test que intentó conectarse a la red, aunque haya pasado."""
+    INTENTOS_DE_RED.clear()
+    yield
+    if INTENTOS_DE_RED:
+        hosts = ", ".join(sorted(set(INTENTOS_DE_RED)))
+        INTENTOS_DE_RED.clear()
+        pytest.fail(
+            f"El test intentó conectarse a la red ({hosts}). Reemplazá la llamada "
+            "externa con un mock: la suite tiene que correr sin red.",
+            pytrace=False,
+        )
 
 
 @pytest.fixture(autouse=True)

@@ -267,6 +267,21 @@ class TestParseHypotheses:
         raw = _hipotesis([{**_VALIDA, "evidence_level": nivel}])
         assert BaseAgent.parse_hypotheses(raw)[0].evidence_level is EvidenceLevel.III
 
+    @pytest.mark.parametrize("nivel", ["IV", None, "alto", 7, ["II"]])
+    def test_nivel_invalido_queda_marcado_como_no_declarado(self, nivel):
+        """El III asignado por saneamiento no se confunde con un III declarado."""
+        raw = _hipotesis([{**_VALIDA, "evidence_level": nivel}])
+        assert BaseAgent.parse_hypotheses(raw)[0].evidence_level_defaulted is True
+
+    def test_nivel_ausente_queda_marcado_como_no_declarado(self):
+        hypothesis = BaseAgent.parse_hypotheses(_hipotesis([{"text": "Algo"}]))[0]
+        assert hypothesis.evidence_level_defaulted is True
+
+    @pytest.mark.parametrize("nivel", ["III", "3", "ii", " I "])
+    def test_nivel_valido_no_queda_marcado(self, nivel):
+        raw = _hipotesis([{**_VALIDA, "evidence_level": nivel}])
+        assert BaseAgent.parse_hypotheses(raw)[0].evidence_level_defaulted is False
+
     @pytest.mark.parametrize(
         "nivel, esperado",
         [("ii", EvidenceLevel.II), (" I ", EvidenceLevel.I), (2, EvidenceLevel.II),

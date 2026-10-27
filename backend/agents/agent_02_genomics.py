@@ -61,6 +61,9 @@ REGLAS CRÍTICAS:
 6. Cada hipótesis DEBE estar respaldada por evidencia. Si no la conocés con certeza,
    marcá evidence_level: "III" y no inventes PubMed IDs (dejá pmid: null).
 7. Generá entre 1 y 4 hipótesis.
+8. En "case_genetic_findings" listá solo los hallazgos genéticos del caso en los que
+   se apoya la hipótesis, copiados del bloque CONTEXTO GENÓMICO. En modo ORIENTACIÓN
+   la lista va vacía ([]).
 
 FORMATO DE RESPUESTA:
 Respondé ÚNICAMENTE con un objeto JSON válido:
@@ -72,7 +75,7 @@ Respondé ÚNICAMENTE con un objeto JSON válido:
       "priority": "HIGH" | "MEDIUM" | "LOW",
       "evidence_level": "I" | "II" | "III",
       "rationale": "razonamiento genético/molecular",
-      "case_genetic_findings": ["TTR p.Val30Met"],
+      "case_genetic_findings": ["<hallazgo genético del caso, copiado tal como figura en el contexto>"],
       "sources": [
         {
           "pmid": "12345678 o null",
