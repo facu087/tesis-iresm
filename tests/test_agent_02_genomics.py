@@ -325,6 +325,28 @@ class TestGuardaAlelosYRsids:
         assert out.hypotheses[0].rationale.startswith("ADVERTENCIA")
 
 
+class TestGuardaNotacionGenomica:
+    """La notación genómica g. cuenta igual que p./c. en modo orientación (spec)."""
+
+    def _run(self, ctx: GenomicContext, texto: str) -> Priority:
+        agente = GenomicsSpecialistAgent(ctx)
+        with patch.object(agente, "_call_llm", return_value=_json_con_texto(texto)):
+            return agente.run("contexto").hypotheses[0].priority
+
+    def test_modo_orientacion_variante_g_en_texto_se_degrada(self):
+        texto = "Paciente portador de g.29178618G>A en TTR"
+        assert self._run(_ctx_sin_hallazgos(), texto) == Priority.LOW
+
+    def test_modo_orientacion_variante_c_sigue_degradandose(self):
+        texto = "Paciente portador de c.148G>A en TTR"
+        assert self._run(_ctx_sin_hallazgos(), texto) == Priority.LOW
+
+    def test_modo_con_hallazgos_variante_g_en_texto_no_se_degrada(self):
+        """En modo hallazgos el control del enunciado no corre, igual que con p./c."""
+        texto = "Amiloidosis por TTR p.Val30Met (g.29178618G>A)"
+        assert self._run(_ctx_con_ttr(), texto) != Priority.LOW
+
+
 class TestAtribucionEnElReporte:
     def test_hipotesis_del_agente_02_en_la_ronda_4_lista_al_especialista(self):
         from backend.models.case import ClinicalCase

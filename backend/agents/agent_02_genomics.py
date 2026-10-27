@@ -14,7 +14,7 @@ from ..models.genomics import GenomicContext
 from ..models.hypothesis import Hypothesis, Priority
 from ..models.report import AgentOutput
 
-_VARIANT_IN_TEXT = re.compile(r"\b(?:p\.|c\.)[A-Za-z0-9>_*+\-]{3,}")
+_VARIANT_IN_TEXT = re.compile(r"\b(?:p\.|c\.|g\.)[A-Za-z0-9>_*+\-]{3,}")
 _GENE_TOKEN = re.compile(r"\b[A-Z][A-Z0-9]{1,7}\b")
 _WARNING = "ADVERTENCIA: hallazgo no reportado en el caso. "
 
@@ -210,7 +210,7 @@ class GenomicsSpecialistAgent(BaseAgent):
 
         Tres controles: (1) cada `case_genetic_findings` declarado en el JSON
         crudo tiene que estar en el caso; (2) en modo orientación (sin variantes
-        ni hallazgos positivos) ninguna notación `p.`/`c.` puede aparecer en el
+        ni hallazgos positivos) ninguna notación `p.`/`c.`/`g.` puede aparecer en el
         enunciado; (3) en los dos modos, todo alelo estrella o rsID del
         enunciado tiene que aparecer en `context`, el texto que recibió el
         agente (caso + bloque genómico, PharmGKB incluido). El control 3 no
