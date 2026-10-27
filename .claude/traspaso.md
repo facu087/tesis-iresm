@@ -331,7 +331,24 @@ modo mock sobre cada grabación: 9 recitadas y 2 mejoradas (2026-10-20) contra 1
 
 ### 4.4 Decisiones abiertas
 - **Recorte de la Ronda 4**: ahorraría hasta un tercio del consumo. Hace falta más de una
-  corrida para decidirlo.
+  corrida para decidirlo. Medido el 2026-10-27 sobre la corrida grabada del 2026-10-26
+  (`debate_revision` de `backend/mock/grabadas.json`, Ronda 3 contra Ronda 4):
+  - La Ronda 4 recibe las mismas críticas de la Ronda 2 que ya respondió la 3
+    (`debate.py:237`): no le entra información nueva. El docstring dice "el acumulado del
+    debate", pero no es así.
+  - Igual refina. El 03 casi no cambia (4 de 6 hipótesis idénticas). El 01 reformula las 6
+    y en algunas precisa el estudio (cadenas livianas libres para anti-MAG; HARS y FIG4 en
+    el panel HSAN). El 02 reemplaza una hipótesis por otra con contenido nuevo: análisis de
+    CNV (duplicación de PMP22, deleción de GJB1) en lugar del exoma amplio.
+  - Las citas cambian sin mejorar: ni en la 3 ni en la 4 sale un PMID de los 5 que ofreció
+    el RAG; eso lo corrige la Ronda 5.
+  - Decisión del 2026-10-27: **no se recorta todavía**. Se mide en las próximas corridas
+    reales con la sección 7.3 de `scripts/medir_costos.py` (ya compara las Rondas 3 y 4):
+    si en varias corridas la 4 no aporta hipótesis con contenido nuevo, se saca. Si se saca,
+    la recitación conserva el nombre "Ronda 5" (es solo texto, ningún dato lleva
+    `round_number=5`) y las grabaciones de la Ronda 4 quedan sin usar, sin tocar
+    `grabadas.json`.
+  - Ojo al comparar a mano: el enunciado de la hipótesis está en la clave `text`.
 - **Nivel III por saneamiento**: si el modelo manda un nivel de evidencia inválido, la
   hipótesis queda en III y en el reporte se ve igual que una declarada como III. Si para la
   tesis importa distinguirlas, hay que marcarlo en el reporte.
