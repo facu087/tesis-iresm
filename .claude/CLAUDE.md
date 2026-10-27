@@ -261,6 +261,13 @@ Scripts disponibles:
   SQLite temporal en memoria, cero llamadas a un LLM. Genera `flujo.json` y
   `resumen.txt` en `output/demo_registro/`
 
+- `demo_limpieza_temporales.py` (Sprint 5, tarjeta #56) — verifica la premisa de la tarjeta
+  (el backend no escribe archivos temporales: el PDF se procesa en memoria) y muestra lo que
+  sí se acumulaba, las filas de la tabla `sesion`: seis sesiones de distintas edades antes y
+  después de la limpieza, que el comportamiento observable no cambia (una sesión viva sigue
+  resolviéndose) y que una limpieza que falla devuelve `ok=False` sin levantar. Sin red ni
+  cuota. Sale con código 1 si falla una comprobación
+
 También se corrigió un bug del Sprint 2: falsos positivos en el extractor de
 biomarcadores (regex de anticuerpos y de marcadores de lab). Ver commit `e72e004`.
 
@@ -331,6 +338,9 @@ tesis-iresm/
 │   │   ├── medicion.py         ← lógica de la medición de costos
 │   │   └── __init__.py
 │   ├── db.py                   ← engine SQLite + create_db_and_tables() (S4)
+│   ├── mantenimiento/
+│   │   └── limpieza.py         ← borra las sesiones vencidas en segundo plano; no hay
+│   │                              archivos temporales que limpiar (S5, tarjeta #56)
 │   ├── cli.py                  ← `python -m backend.cli crear-admin` (S4)
 │   ├── pipeline/
 │   │   ├── pico.py             ← build() síntesis PICO + format_for_agents()
@@ -785,6 +795,9 @@ NEXUS_MOCK_LLM=          # Apagada por defecto. 1/true la activa: el pipeline
 ENVIRONMENT=development
 MAX_FILE_SIZE_MB=50
 SESSION_TTL_MINUTES=60  # TTL de la sesión de cuenta — en uso desde Sprint 4
+SESSION_CLEANUP_INTERVAL_MINUTES=15  # Cada cuántos minutos se borran las sesiones
+                         # vencidas (backend/mantenimiento/limpieza.py, tarea de fondo
+                         # del lifespan). 0 la apaga. Sprint 5, tarjeta #56.
 
 # Seguridad (Sprint 4 — registro de médicos)
 SECRET_KEY=              # Firma la cookie de sesión (HMAC). Obligatoria: sin
