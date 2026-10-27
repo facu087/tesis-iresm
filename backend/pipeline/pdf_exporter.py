@@ -442,7 +442,9 @@ def _hypothesis_block(h: RankedHypothesis, s: dict) -> list:
 
     topeada = bool(h.declared_evidence_level) and h.declared_evidence_level != h.evidence_level
     evidencia = f"Evidencia {_t(h.evidence_level)}"
-    if topeada:
+    if h.evidence_level_defaulted:
+        evidencia += " (no declarado)"
+    elif topeada:
         evidencia += f" (declarado {_t(h.declared_evidence_level)})"
 
     # Un agente puede sostener la hipótesis y además objetarla: se lo muestra una

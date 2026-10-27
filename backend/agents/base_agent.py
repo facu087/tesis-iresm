@@ -392,7 +392,8 @@ class BaseAgent(ABC):
                 priority_defaults += 1
 
             evidence_level = BaseAgent._as_evidence_level(h.get("evidence_level"))
-            if evidence_level is None:
+            level_defaulted = evidence_level is None
+            if level_defaulted:
                 evidence_level = EvidenceLevel.III
                 level_defaults += 1
 
@@ -409,6 +410,7 @@ class BaseAgent(ABC):
                 evidence_level=evidence_level,
                 rationale=BaseAgent._as_text(h.get("rationale")) or "",
                 sources=sources,
+                evidence_level_defaulted=level_defaulted,
             ))
 
         if not hypotheses:

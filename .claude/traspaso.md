@@ -207,11 +207,14 @@ Resumen al 2026-10-27, de lo que sigue abierto:
 1. Evidencia faltante en Trello: #86 (hay que generarla desde Windows). La #75 tiene
    evidencia y está en QA desde el 2026-10-06; el demo se volvió a correr el 2026-10-27
    sobre `develop` (0 conexiones; 18 y 31 tests ok).
-2. Decisiones abiertas de 4.4: recorte de la Ronda 4, distinguir el nivel III por
-   saneamiento y PharmGKB contra ClinVar para el Agente 02.
+2. Decisiones abiertas de 4.4: recorte de la Ronda 4 (medir en corridas reales) y
+   PharmGKB contra ClinVar para el Agente 02.
 3. Frontend (4.10): tests del resto de las pantallas y CI, pantallas de admin que faltan y
    política de privacidad y términos.
 4. Seis ramas locales `worktree-agent-*` sin revisar (4.5).
+5. La suite con la red bloqueada (`PYTHONPATH=scripts pytest -p pytest_sin_red tests/`) pasa,
+   pero registra 70 intentos de conexión (64 a huggingface.co, 6 a eutils): algún test carga
+   el modelo de embeddings o consulta NCBI. Medido igual sobre `develop` el 2026-10-27.
 
 ### 4.1 #62 Agente 06 (Sintetizador) — mergeado, con correcciones y observaciones abiertas
 El PR #35 (Facundo) entró a `develop` el 2026-10-06 (merge `1f11917`). Agregó, según el
@@ -349,9 +352,14 @@ modo mock sobre cada grabación: 9 recitadas y 2 mejoradas (2026-10-20) contra 1
     `round_number=5`) y las grabaciones de la Ronda 4 quedan sin usar, sin tocar
     `grabadas.json`.
   - Ojo al comparar a mano: el enunciado de la hipótesis está en la clave `text`.
-- **Nivel III por saneamiento**: si el modelo manda un nivel de evidencia inválido, la
-  hipótesis queda en III y en el reporte se ve igual que una declarada como III. Si para la
-  tesis importa distinguirlas, hay que marcarlo en el reporte.
+- **Nivel III por saneamiento**: **resuelto el 2026-10-27** (rama `fix/s4-nivel-no-declarado`).
+  No era solo cosmético: el III asignado actuaba como nivel declarado y topeaba en III una
+  hipótesis aunque citara un metaanálisis verificado. Se decidió **marcarlo, no cambiar la
+  regla**: el nivel sigue en III (conservador), pero `Hypothesis.evidence_level_defaulted`
+  viaja hasta el reporte, `declared_evidence_level` queda nulo y la nota, el PDF ("no
+  declarado") y `/report` ("no declarado por el agente") lo dicen. Requisito nuevo en
+  `openspec/specs/clasificacion-evidencia-ebm/spec.md`. En las corridas reales medidas no
+  ocurrió nunca. Pendiente de esa línea: tolerar `"Level I"`/`"Nivel II"` en el parser.
 - **PharmGKB**: los genes del caso (PMP22, MPZ, TTR) no tienen anotaciones ahí. Sigue sin
   decidirse si la fuente correcta para el Agente 02 es ClinVar (#71).
 

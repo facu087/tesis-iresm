@@ -165,10 +165,14 @@ function HypothesisCard({ h }: { h: RankedHypothesis }) {
               title={h.evidence_note || undefined}
             >
               Evidencia nivel <span className="font-mono">{h.evidence_level}</span>
-              {topeada && (
-                <span className="ml-1 font-normal">
-                  (el agente declaró <span className="font-mono">{h.declared_evidence_level}</span>)
-                </span>
+              {h.evidence_level_defaulted ? (
+                <span className="ml-1 font-normal">(no declarado por el agente)</span>
+              ) : (
+                topeada && (
+                  <span className="ml-1 font-normal">
+                    (el agente declaró <span className="font-mono">{h.declared_evidence_level}</span>)
+                  </span>
+                )
               )}
             </Badge>
             {sostienen.map((ag) => (

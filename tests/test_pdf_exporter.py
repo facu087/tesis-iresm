@@ -355,6 +355,20 @@ class TestPriorizacionEnPdf:
         # La especulativa declaró III y quedó en III: no muestra "declarado".
         assert "(declarado III)" not in texto
 
+    def test_nivel_no_declarado_se_nombra(self):
+        report = self._report_priorizado()
+        report.hypotheses[2] = report.hypotheses[2].model_copy(
+            update={"declared_evidence_level": None, "evidence_level_defaulted": True}
+        )
+        texto = _texto_del_pdf(generate_pdf(report))
+        # La etiqueta puede cortar línea dentro de la celda del encabezado.
+        assert "Evidencia III (no" in texto
+        assert "declarado)" in texto
+
+    def test_iii_declarado_no_se_marca_como_no_declarado(self):
+        texto = _texto_del_pdf(generate_pdf(self._report_priorizado()))
+        assert "(no declarado)" not in texto
+
     def test_portada_con_pendientes_y_topeadas(self):
         texto = _texto_del_pdf(generate_pdf(self._report_priorizado()))
         assert "Hipótesis pendientes de verificación" in texto
