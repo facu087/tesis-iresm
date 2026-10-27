@@ -207,8 +207,8 @@ Resumen al 2026-10-27, de lo que sigue abierto:
 1. Evidencia faltante en Trello: #86 (hay que generarla desde Windows). La #75 tiene
    evidencia y está en QA desde el 2026-10-06; el demo se volvió a correr el 2026-10-27
    sobre `develop` (0 conexiones; 18 y 31 tests ok).
-2. Decisiones abiertas de 4.4: recorte de la Ronda 4 (medir en corridas reales) y
-   PharmGKB contra ClinVar para el Agente 02.
+2. Decisiones abiertas de 4.4: recorte de la Ronda 4 (medir en corridas reales) y la guarda
+   del Agente 02 ante alelos estrella y rsIDs.
 3. Frontend (4.10): tests del resto de las pantallas y CI, pantallas de admin que faltan y
    política de privacidad y términos.
 4. Seis ramas locales `worktree-agent-*` sin revisar (4.5).
@@ -360,8 +360,18 @@ modo mock sobre cada grabación: 9 recitadas y 2 mejoradas (2026-10-20) contra 1
   declarado") y `/report` ("no declarado por el agente") lo dicen. Requisito nuevo en
   `openspec/specs/clasificacion-evidencia-ebm/spec.md`. En las corridas reales medidas no
   ocurrió nunca. Pendiente de esa línea: tolerar `"Level I"`/`"Nivel II"` en el parser.
-- **PharmGKB**: los genes del caso (PMP22, MPZ, TTR) no tienen anotaciones ahí. Sigue sin
-  decidirse si la fuente correcta para el Agente 02 es ClinVar (#71).
+- **PharmGKB**: **resuelto el 2026-10-27** (rama `feature/s4-pharmgkb-por-farmaco`). No era
+  PharmGKB contra ClinVar: responden preguntas distintas y quedan las dos. ClinVar clasifica
+  variantes del caso; PharmGKB ahora se consulta también por los fármacos del paciente (máx.
+  3), traducidos al inglés con el diccionario cerrado `normalizer.english_inn()` (74 nombres,
+  todos verificados contra PharmGKB). Solo llegan al Agente 02 los niveles 1A a 2B, con la
+  aclaración de que el genotipo del paciente no está informado. Medido contra la API real:
+  carbamazepina → HLA-B*15:02 y HLA-A*31:01 (1A); pregabalina solo tiene nivel 3 y queda
+  afuera. El caso base no tiene fármacos, así que en la demo no se ve. Matías aprobó relajar
+  la anonimización: viaja un INN del diccionario, nunca texto del caso. Reemplaza a la
+  decisión D7 de `agente-02-genomica`. Pendiente: la guarda anti-invención del Agente 02
+  (`_VARIANT_IN_TEXT`) solo reconoce `p.`/`c.`; "porta HLA-B*15:02" en el enunciado no se
+  degrada, y ahora esas notaciones están en el contexto.
 
 ### 4.5 Orden y limpieza
 - No queda ningún cambio OpenSpec abierto (`openspec list` vacío al 2026-10-06). Ese día se
