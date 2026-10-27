@@ -131,3 +131,37 @@ class TestNormalize:
         assert "mg/dL" in result
         assert "g/dL" in result
         assert "mmHg" in result
+
+
+# ── Nombre INN en inglés (consulta a PharmGKB) ─────────────────────────────────
+
+from backend.ingestion.normalizer import _INN_MAP, english_inn  # noqa: E402
+
+
+class TestEnglishInn:
+    @pytest.mark.parametrize(
+        "nombre, esperado",
+        [
+            ("carbamazepina", "carbamazepine"),
+            ("Pregabalina ", "pregabalin"),
+            ("fenitoína", "phenytoin"),
+            ("fenitoina", "phenytoin"),
+            ("ácido acetilsalicílico", "aspirin"),
+            ("paracetamol", "acetaminophen"),
+            ("valproato", "valproic acid"),
+        ],
+    )
+    def test_traduce_el_inn_en_espanol(self, nombre, esperado):
+        assert english_inn(nombre) == esperado
+
+    def test_acepta_el_nombre_ya_en_ingles(self):
+        assert english_inn("Carbamazepine") == "carbamazepine"
+
+    @pytest.mark.parametrize("nombre", ["farmacoinexistente", "", "   "])
+    def test_sin_equivalente_devuelve_none(self, nombre):
+        assert english_inn(nombre) is None
+
+    def test_cubre_todos_los_inn_del_normalizador(self):
+        """Todo fármaco que el normalizador deja en su forma canónica tiene nombre en inglés."""
+        faltan = sorted({inn for inn in _INN_MAP.values() if english_inn(inn) is None})
+        assert faltan == []

@@ -31,12 +31,20 @@ class GenomicSource(BaseModel):
 
 
 class PharmacogenomicAnnotation(BaseModel):
-    """Anotación farmacogenómica de PharmGKB para un gen."""
+    """
+    Anotación farmacogenómica de PharmGKB.
+
+    `queried_by` dice cómo se obtuvo: "gene" (por un gen del caso) o "drug"
+    (por un fármaco que recibe el paciente). En el segundo caso el gen es el
+    que modifica la respuesta al fármaco, no un hallazgo del paciente.
+    """
 
     gene: str
     drug: str
     significance: str = ""
     level: str = ""
+    variant: str = ""
+    queried_by: str = "gene"
     raw: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -79,6 +87,9 @@ class GenomicContext(BaseModel):
       clínicas, no genes.
     - negative_genetic_studies: estudios genéticos negativos mencionados en el
       caso (ej. "Panel CMT de 40 genes negativo").
+    - drugs: fármacos del paciente con su INN en inglés, para PharmGKB.
+    - drugs_without_english: fármacos sin equivalente en inglés conocido; no se
+      consultan.
     - annotations: anotaciones farmacogenómicas obtenidas de PharmGKB.
     - clinvar: clasificación de ClinVar de cada variante consultada.
     - sources: estado de cada fuente consultada.
@@ -89,6 +100,8 @@ class GenomicContext(BaseModel):
     genes: list[str] = Field(default_factory=list)
     discarded_symbols: list[str] = Field(default_factory=list)
     negative_genetic_studies: list[str] = Field(default_factory=list)
+    drugs: list[str] = Field(default_factory=list)
+    drugs_without_english: list[str] = Field(default_factory=list)
     annotations: list[PharmacogenomicAnnotation] = Field(default_factory=list)
     clinvar: list[VariantClassification] = Field(default_factory=list)
     sources: list[GenomicSource] = Field(default_factory=list)
@@ -135,23 +148,44 @@ class GenomicContext(BaseModel):
                 f"{', '.join(self.discarded_symbols)}"
             )
 
-        if self.annotations:
+        por_gen = [a for a in self.annotations if a.queried_by != "drug"]
+        por_farmaco = [a for a in self.annotations if a.queried_by == "drug"]
+        if por_gen:
             lines.append("Anotaciones farmacogenómicas (PharmGKB):")
-            for ann in self.annotations:
+            for ann in por_gen:
                 sig = f" — {ann.significance}" if ann.significance else ""
                 lines.append(f"  • {ann.gene} / {ann.drug}{sig}")
-        else:
+        if por_farmaco:
+            lines.append(
+                "Fármacos del paciente con farmacogenómica conocida (PharmGKB, niveles 1A a 2B):"
+            )
+            for ann in por_farmaco:
+                variante = f" ({ann.variant})" if ann.variant else ""
+                sig = f" — {ann.significance}" if ann.significance else ""
+                lines.append(
+                    f"  • {ann.drug}: {ann.gene}{variante}, nivel {ann.level}{sig}"
+                )
+            lines.append(
+                "  El genotipo del paciente para estos genes no está informado: "
+                "son genes que modifican la respuesta al fármaco, no hallazgos del caso."
+            )
+        if self.drugs_without_english:
+            lines.append(
+                "Fármacos no consultados en PharmGKB (sin nombre en inglés conocido): "
+                f"{', '.join(self.drugs_without_english)}"
+            )
+        if not self.annotations:
             fuentes_farmaco = [
                 s for s in self.sources if s.name == "PharmGKB"
             ]
             if fuentes_farmaco:
                 st = fuentes_farmaco[0].status
                 if st == GenomicSourceStatus.sin_resultados:
-                    lines.append("PharmGKB: sin anotaciones para los genes del caso.")
+                    lines.append("PharmGKB: sin anotaciones para los genes ni los fármacos del caso.")
                 elif st == GenomicSourceStatus.no_disponible:
                     lines.append("PharmGKB: no disponible en esta corrida.")
                 elif st == GenomicSourceStatus.no_consultada:
-                    lines.append("PharmGKB: no consultada (sin genes en el caso).")
+                    lines.append("PharmGKB: no consultada (sin genes ni fármacos en el caso).")
 
         if self.clinvar:
             lines.append("Clasificación de variantes (ClinVar):")

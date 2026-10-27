@@ -69,11 +69,11 @@ agente como genes ni enviarse a fuentes externas.
 ### Requirement: Enriquecimiento farmacogenómico por gen
 El sistema SHALL consultar PharmGKB solo por los genes saneados del perfil, con un máximo de 3 genes por
 caso, y SHALL agregar al perfil las anotaciones clínicas encontradas (gen, fármaco, fenotipo, variante y
-nivel de evidencia PharmGKB). Si el perfil no tiene genes saneados, el sistema MUST NOT hacer ninguna
-consulta externa. El sistema MUST NOT consultar PharmGKB por nombres de fármacos en este cambio.
+nivel de evidencia PharmGKB). Si el perfil no tiene genes saneados ni fármacos traducidos (ver
+"Enriquecimiento farmacogenómico por fármaco del paciente"), el sistema MUST NOT consultar PharmGKB.
 
 #### Scenario: Caso sin genes saneados
-- **WHEN** se enriquece el perfil del caso base (sin genes tras el saneamiento)
+- **WHEN** se enriquece el perfil del caso base (sin genes tras el saneamiento y sin fármacos)
 - **THEN** no se realiza ninguna solicitud a PharmGKB y la fuente queda en estado `no_consultada`
 
 #### Scenario: Más de tres genes
@@ -85,11 +85,37 @@ consulta externa. El sistema MUST NOT consultar PharmGKB por nombres de fármaco
 - **THEN** el perfil incluye esas anotaciones con su nivel de evidencia PharmGKB y la fuente queda en estado
   `consultada`
 
+### Requirement: Enriquecimiento farmacogenómico por fármaco del paciente
+El sistema SHALL traducir los fármacos del perfil de biomarcadores a su INN en inglés con un diccionario
+determinista (`english_inn()` en `backend/ingestion/normalizer.py`) y SHALL consultar PharmGKB por los 3
+primeros, además de los genes. Un fármaco sin equivalente en el diccionario MUST NOT consultarse ni
+traducirse por aproximación; queda listado como no consultado. De cada fármaco SHALL quedar solo las
+anotaciones de nivel 1A, 1B, 2A o 2B, sin repetidos, marcadas como obtenidas por fármaco. El bloque del
+Agente 02 MUST aclarar que el genotipo del paciente para esos genes no está informado.
+
+#### Scenario: Fármaco con farmacogenómica conocida
+- **WHEN** el caso registra `carbamazepina` y PharmGKB asocia `carbamazepine` con `HLA-B*15:02`, nivel 1A
+- **THEN** el perfil incluye esa anotación, marcada como obtenida por fármaco, y el bloque aclara que el
+  genotipo del paciente no está informado
+
+#### Scenario: Evidencia débil
+- **WHEN** PharmGKB solo devuelve anotaciones de nivel 3 o 4 para el fármaco consultado
+- **THEN** el perfil no incluye ninguna y la fuente queda en estado `sin_resultados`
+
+#### Scenario: Fármaco sin nombre en inglés conocido
+- **WHEN** el caso registra un fármaco que no está en el diccionario
+- **THEN** no se consulta PharmGKB por él y el bloque lo lista como no consultado
+
 ### Requirement: Anonimización de las consultas externas
-Toda solicitud a una fuente genómica externa MUST contener únicamente símbolos de genes saneados; las
-consultas a ClinVar agregan además la notación de la variante (ver `clinvar-variantes`). Las
-solicitudes MUST NOT contener narrativa clínica, perfil del paciente, antecedentes, estudios negativos,
-nombres de fármacos ni ningún otro texto del documento clínico.
+Toda solicitud a una fuente genómica externa MUST contener únicamente símbolos de genes saneados o INN
+en inglés tomados del diccionario cerrado de `english_inn()`; las consultas a ClinVar agregan además la
+notación de la variante (ver `clinvar-variantes`). Las solicitudes MUST NOT contener narrativa clínica,
+perfil del paciente, antecedentes, estudios negativos, dosis ni ningún otro texto del documento clínico.
+
+#### Scenario: Solo nombres del diccionario
+- **WHEN** el perfil registra `pregabalina 75 mg c/12h`
+- **THEN** no se envía a PharmGKB ningún nombre de fármaco, porque el texto no es una entrada del
+  diccionario
 
 #### Scenario: Contenido de la solicitud
 - **WHEN** se enriquece el perfil de un caso con el gen `TTR` y una narrativa clínica que menciona edad, sexo

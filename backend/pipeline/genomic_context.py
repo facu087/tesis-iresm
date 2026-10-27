@@ -3,7 +3,8 @@ Construcción y enriquecimiento del contexto genómico para el Agente 02.
 
 - build(case): determinista, sin red. Sanea símbolos, detecta estudios negativos
   y construye GenomicContext desde los datos del caso.
-- enrich(ctx): consulta PharmGKB (por gen) y ClinVar (por variante) en paralelo.
+- enrich(ctx): consulta PharmGKB (por gen y por fármaco del paciente) y ClinVar
+  (por variante) en paralelo.
   Nunca lanza excepción: ante cualquier error actualiza el estado de la fuente
   y devuelve el contexto.
 """
@@ -17,6 +18,7 @@ import sys
 from ..external.clinvar import ClinVarClient
 from ..external.pharmgkb import PharmGKBClient
 from ..external.rate_limiter import ApiUnavailableError, RateLimitError
+from ..ingestion.normalizer import english_inn
 from ..models.case import ClinicalCase
 from ..models.genomics import (
     ClinVarStatus,
@@ -44,6 +46,14 @@ _NEGATIVE_KEYWORDS: tuple[str, ...] = (
 
 # Número máximo de genes a consultar en PharmGKB por corrida
 _MAX_PHARMGKB_GENES = 3
+
+# Número máximo de fármacos a consultar en PharmGKB por corrida (2 solicitudes c/u)
+_MAX_PHARMGKB_DRUGS = 3
+
+# Niveles de PharmGKB que llegan al Agente 02 desde una consulta por fármaco.
+# 3 y 4 son evidencia débil (un estudio, resultados no replicados): el modelo
+# podría sobreinterpretarlos.
+_PHARMGKB_DRUG_LEVELS: frozenset[str] = frozenset({"1A", "1B", "2A", "2B"})
 
 # Número máximo de variantes a consultar en ClinVar por análisis (2 solicitudes c/u)
 _MAX_CLINVAR_VARIANTS = 5
@@ -89,6 +99,26 @@ def _extract_negative_from_text(raw_text: str) -> list[str]:
             if clean:
                 results.append(clean)
     return results
+
+
+def _english_drugs(raw_drugs: list[str]) -> tuple[list[str], list[str]]:
+    """
+    Separa los fármacos del caso en (INN en inglés, sin equivalente conocido),
+    sin repetidos y en el orden del caso.
+    """
+    drugs: list[str] = []
+    without: list[str] = []
+    for raw in raw_drugs:
+        name = (raw or "").strip()
+        if not name:
+            continue
+        english = english_inn(name)
+        if english is None:
+            if name not in without:
+                without.append(name)
+        elif english not in drugs:
+            drugs.append(english)
+    return drugs, without
 
 
 def build(case: ClinicalCase) -> GenomicContext:
@@ -139,12 +169,18 @@ def build(case: ClinicalCase) -> GenomicContext:
             seen.add(key)
             unique_negative.append(entry)
 
+    drugs, drugs_without_english = _english_drugs(
+        list(biomarkers.drugs) if biomarkers else []
+    )
+
     return GenomicContext(
         variants=raw_variants,
         genetic_findings=positive_findings,
         genes=genes,
         discarded_symbols=discarded,
         negative_genetic_studies=unique_negative,
+        drugs=drugs,
+        drugs_without_english=drugs_without_english,
         annotations=[],
         sources=[],
     )
@@ -154,20 +190,23 @@ async def _enrich_pharmgkb(ctx: GenomicContext) -> GenomicContext:
     """
     Anotaciones de PharmGKB. Nunca lanza excepción.
 
-    Consulta hasta _MAX_PHARMGKB_GENES genes. Si no hay genes, marca la fuente
-    como no_consultada. Cualquier error de red o de la API actualiza el estado
-    a no_disponible y devuelve el contexto sin anotaciones.
+    Consulta hasta _MAX_PHARMGKB_GENES genes y hasta _MAX_PHARMGKB_DRUGS
+    fármacos del paciente; de los fármacos se quedan solo los niveles 1A a 2B,
+    sin repetidos. Si no hay genes ni fármacos, marca la fuente como
+    no_consultada. Cualquier error de red o de la API actualiza el estado a
+    no_disponible y devuelve lo obtenido hasta ese momento.
     """
-    if not ctx.genes:
+    if not ctx.genes and not ctx.drugs:
         return ctx.model_copy(update={
             "sources": [GenomicSource(
                 name="PharmGKB",
                 status=GenomicSourceStatus.no_consultada,
-                detail="Sin genes en el caso.",
+                detail="Sin genes ni fármacos en el caso.",
             )]
         })
 
     genes_to_query = ctx.genes[:_MAX_PHARMGKB_GENES]
+    drugs_to_query = ctx.drugs[:_MAX_PHARMGKB_DRUGS]
     all_annotations: list[PharmacogenomicAnnotation] = []
 
     try:
@@ -180,6 +219,25 @@ async def _enrich_pharmgkb(ctx: GenomicContext) -> GenomicContext:
                         drug=ann.drug_name,
                         significance=ann.phenotype,
                         level=ann.evidence_level,
+                        raw={},
+                    ))
+            for drug in drugs_to_query:
+                interaction = await client.get_drug_interactions(drug)
+                if interaction is None:
+                    continue
+                seen: set[tuple[str, str, str]] = set()
+                for ann in interaction.annotations:
+                    key = (ann.gene_symbol, ann.variant, ann.evidence_level)
+                    if ann.evidence_level not in _PHARMGKB_DRUG_LEVELS or key in seen:
+                        continue
+                    seen.add(key)
+                    all_annotations.append(PharmacogenomicAnnotation(
+                        gene=ann.gene_symbol,
+                        drug=drug,
+                        significance=ann.phenotype,
+                        level=ann.evidence_level,
+                        variant=ann.variant,
+                        queried_by="drug",
                         raw={},
                     ))
     except (ApiUnavailableError, RateLimitError) as exc:
