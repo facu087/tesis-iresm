@@ -113,7 +113,10 @@ def _rank_from_consensus(
                 sources=[_annotate_source(s, verifications) for s in h.sources],
                 status=evaluacion.status.value,
                 verified_sources=evaluacion.verified_sources,
-                declared_evidence_level=evaluacion.declared_level.value,
+                declared_evidence_level=(
+                    None if evaluacion.level_defaulted else evaluacion.declared_level.value
+                ),
+                evidence_level_defaulted=evaluacion.level_defaulted,
                 evidence_note=evaluacion.note,
                 refuting_agents=list(item.refuting_agents) if item else [],
                 agents_with_reservations=(
@@ -165,7 +168,10 @@ def _rank_from_debate(
                 sources=[_annotate_source(s, verifications) for s in h.sources],
                 status=evaluacion.status.value,
                 verified_sources=evaluacion.verified_sources,
-                declared_evidence_level=evaluacion.declared_level.value,
+                declared_evidence_level=(
+                    None if evaluacion.level_defaulted else evaluacion.declared_level.value
+                ),
+                evidence_level_defaulted=evaluacion.level_defaulted,
                 evidence_note=evaluacion.note,
             )
         )

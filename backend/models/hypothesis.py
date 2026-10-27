@@ -37,3 +37,6 @@ class Hypothesis(BaseModel):
     evidence_level: EvidenceLevel
     rationale: str
     sources: list[Source] = []
+    # True si el modelo no declaró un nivel válido y el parser asignó III
+    # (backend/agents/base_agent.py). Distingue ese III de uno declarado.
+    evidence_level_defaulted: bool = False

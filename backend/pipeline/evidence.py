@@ -118,6 +118,8 @@ class EvidenceAssessment(BaseModel):
     best_source_pmid: str | None = None
     best_source_types: list[str] = []
     note: str
+    # True si el agente no declaró un nivel válido y se le asignó III.
+    level_defaulted: bool = False
 
     @property
     def capped(self) -> bool:
@@ -188,9 +190,15 @@ def _build_note(
     best_pmid: str | None,
     best_types: list[str],
     has_sources: bool,
+    level_defaulted: bool = False,
 ) -> str:
     """Arma la explicación en español de por qué la hipótesis quedó con su nivel."""
-    declarado = "" if declared is EvidenceLevel.III else f" (el agente había declarado {declared.value})"
+    if level_defaulted:
+        declarado = " (el agente no declaró un nivel válido; se asignó III)"
+    elif declared is EvidenceLevel.III:
+        declarado = ""
+    else:
+        declarado = f" (el agente había declarado {declared.value})"
 
     if status is HypothesisStatus.PENDIENTE:
         return (
@@ -203,6 +211,11 @@ def _build_note(
         return f"Ninguna fuente citada resistió la verificación contra PubMed: nivel III{declarado}."
 
     fuente = f"PMID {best_pmid}, {_describe_types(best_types)}"
+    if level_defaulted:
+        return (
+            "El agente no declaró un nivel válido: se asignó III, aunque la mejor fuente "
+            f"verificada ({fuente}) habilitaría hasta nivel {ceiling.value}."
+        )
     if effective is not declared:
         return (
             f"El agente declaró nivel {declared.value}; queda topeado en {effective.value} "
@@ -274,7 +287,9 @@ def classify_hypothesis(
         note=_build_note(
             declared, ceiling, effective, status, best_pmid, best_types,
             has_sources=bool(hypothesis.sources),
+            level_defaulted=hypothesis.evidence_level_defaulted,
         ),
+        level_defaulted=hypothesis.evidence_level_defaulted,
     )
 
 

@@ -247,6 +247,40 @@ class TestNota:
         assert "III hasta poder confirmar" in nota
         assert "declarado I" in nota
 
+    def test_nivel_no_declarado_queda_en_iii_aunque_la_fuente_habilite_mas(self):
+        """Conservador: sin nivel declarado no se sube, pero la nota no dice que se declaró III."""
+        h = _hypothesis(declared=III, sources=[_source("30000001")])
+        h = h.model_copy(update={"evidence_level_defaulted": True})
+        v = _verifications(_verdict("30000001", types=["Meta-Analysis"]))
+        evaluacion = classify_hypothesis(h, v)
+        assert evaluacion.effective_level is III
+        assert evaluacion.level_defaulted is True
+        assert "no declaró un nivel válido" in evaluacion.note
+        assert "se asignó III" in evaluacion.note
+        assert "habilitaría" in evaluacion.note
+        assert "declaró nivel III" not in evaluacion.note
+
+    @pytest.mark.parametrize(
+        "veredicto, has_sources",
+        [(SourceStatus.NO_VERIFICABLE, True), (SourceStatus.DISCORDANTE, True), (None, False)],
+    )
+    def test_nivel_no_declarado_se_nombra_sin_fuente_verificada(self, veredicto, has_sources):
+        fuentes = [_source("30000001")] if has_sources else []
+        h = _hypothesis(declared=III, sources=fuentes).model_copy(
+            update={"evidence_level_defaulted": True}
+        )
+        v = _verifications(_verdict("30000001", veredicto)) if veredicto else {}
+        evaluacion = classify_hypothesis(h, v)
+        assert evaluacion.effective_level is III
+        assert "no declaró un nivel válido" in evaluacion.note
+
+    def test_iii_declarado_no_queda_marcado(self):
+        h = _hypothesis(declared=III, sources=[_source("30000001")])
+        v = _verifications(_verdict("30000001", types=["Case Reports"]))
+        evaluacion = classify_hypothesis(h, v)
+        assert evaluacion.level_defaulted is False
+        assert "no declaró" not in evaluacion.note
+
     def test_retractada_se_nombra_en_la_nota(self):
         h = _hypothesis(declared=I, sources=[_source("30000005")])
         v = _verifications(_verdict("30000005", types=["Randomized Controlled Trial", "Retracted Publication"]))
