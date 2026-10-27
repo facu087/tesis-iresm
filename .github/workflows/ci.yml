@@ -1,0 +1,88 @@
+# CI: runs the backend suite (pytest) and the frontend checks (lint, types, Vitest)
+# on every pull request and on pushes to develop and master.
+#
+# The suites need no secrets and no network: tests/conftest.py blocks every
+# non-local connection. The only thing downloaded before pytest is ChromaDB's
+# default embedding model (all-MiniLM-L6-v2 ONNX, ~80 MB), which the RAG tests
+# load from ~/.cache/chroma. It is cached between runs.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [develop, master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      # The OCR tests in tests/test_ingesta.py call the tesseract binary.
+      # The spa/eng language data comes from the repo (.tessdata/).
+      - name: Install Tesseract
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tesseract-ocr
+
+      # CPU-only torch first: the default wheel pulls ~5 GB of unused CUDA libraries.
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r backend/requirements.txt
+
+      - name: Cache ChromaDB embedding model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/chroma/onnx_models
+          key: chroma-onnx-all-MiniLM-L6-v2-v1
+
+      # Outside pytest on purpose: the suite blocks the network.
+      - name: Download ChromaDB embedding model
+        run: |
+          python -c "from chromadb.utils import embedding_functions as ef; ef.DefaultEmbeddingFunction()(['warmup'])"
+
+      - name: Run pytest
+        run: python -m pytest -q
+
+  frontend:
+    name: Frontend (lint, types, tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Tests
+        run: npm test

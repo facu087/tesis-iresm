@@ -47,6 +47,8 @@ export interface RankedHypothesis {
   verified_sources: number;
   /** Nivel que declaró el agente (puede ser mejor que el efectivo). */
   declared_evidence_level?: EvidenceLevel | null;
+  /** True si el agente no declaró un nivel válido y el sistema le asignó III. */
+  evidence_level_defaulted?: boolean;
   /** Explicación de por qué la hipótesis quedó con su nivel efectivo. */
   evidence_note?: string;
 

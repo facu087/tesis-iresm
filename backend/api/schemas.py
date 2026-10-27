@@ -60,7 +60,11 @@ class RankedHypothesis(BaseModel):
     verified_sources: int = 0
 
     # Trazabilidad del nivel: lo que declaró el agente y por qué quedó así.
+    # None también cuando el agente no declaró un nivel válido: ver
+    # `evidence_level_defaulted`.
     declared_evidence_level: str | None = None  # I | II | III
+    # True si el agente no declaró un nivel válido y el sistema le asignó III.
+    evidence_level_defaulted: bool = False
     evidence_note: str = ""
 
     # Consenso del Árbitro (Agente 04). Aditivo: un reporte anterior al Árbitro

@@ -209,3 +209,31 @@ async def test_with_fallback_preserva_nombre_funcion():
         pass
 
     assert mi_funcion.__name__ == "mi_funcion"
+
+
+# ── Velocidad de PubMed según PUBMED_API_KEY (tarjeta #79, revisión del PR #51) ──
+
+def test_una_clave_mal_formada_no_sube_la_velocidad_de_pubmed(monkeypatch):
+    """
+    Con el comentario del .env como valor, el cliente sale SIN clave (3 req/s
+    para NCBI). Si el limitador creyera que hay clave, permitiría 10 y la
+    verificación bibliográfica recibiría 429.
+    """
+    from backend.external.rate_limiter import RateLimiter, pubmed_rps
+
+    monkeypatch.setenv("PUBMED_API_KEY", "   # Opcional: aumenta rate limit")
+    assert pubmed_rps() == RateLimiter.PUBMED_NO_KEY
+
+
+def test_una_clave_valida_sube_la_velocidad_de_pubmed(monkeypatch):
+    from backend.external.rate_limiter import RateLimiter, pubmed_rps
+
+    monkeypatch.setenv("PUBMED_API_KEY", "abc123def456abc123def456")
+    assert pubmed_rps() == RateLimiter.PUBMED_WITH_KEY
+
+
+def test_sin_clave_pubmed_va_a_la_velocidad_base(monkeypatch):
+    from backend.external.rate_limiter import RateLimiter, pubmed_rps
+
+    monkeypatch.delenv("PUBMED_API_KEY", raising=False)
+    assert pubmed_rps() == RateLimiter.PUBMED_NO_KEY

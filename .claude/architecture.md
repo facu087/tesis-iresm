@@ -105,7 +105,12 @@ class ClinicalCase(BaseModel):
 ### GenomicContext — `backend/models/genomics.py`
 Perfil genómico del caso que recibe el Agente 02. Lo arma de forma determinista
 `pipeline/genomic_context.build()` (sin red ni LLM) y lo enriquece `enrich()` con
-PharmGKB (por gen, máx. 3) y ClinVar (por variante, máx. 5) en paralelo.
+PharmGKB (por gen, máx. 3, y por fármaco del paciente, máx. 3) y ClinVar (por
+variante, máx. 5) en paralelo. Los fármacos llegan en INN español y se traducen
+con el diccionario cerrado de `ingestion/normalizer.english_inn()` (verificado
+contra PharmGKB el 2026-10-27); uno ausente no se consulta. De cada fármaco
+quedan solo los niveles 1A a 2B. Esto reemplaza a la decisión D7 del cambio
+`agente-02-genomica` (solo por gen), que se tomó por falta de ese diccionario.
 
 ```python
 class GenomicContext(BaseModel):

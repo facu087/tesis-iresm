@@ -106,6 +106,18 @@ def _validar_entrada(entrada: object, posicion: int, vistos: set[int]) -> dict[s
     return entrada
 
 
+def _validar_rag(rag: object) -> dict[str, Any]:
+    """Comprueba el bloque `rag` de la grabación: contexto y artículos ofrecidos."""
+    if not isinstance(rag, dict) or not isinstance(rag.get("context"), str):
+        raise GrabacionInvalida("el bloque `rag` de la grabación no trae un `context` de texto")
+    articulos = rag.get("articles")
+    if not isinstance(articulos, list) or not all(
+        isinstance(a, dict) and isinstance(a.get("pmid"), str) and a["pmid"] for a in articulos
+    ):
+        raise GrabacionInvalida("el bloque `rag` no trae una lista `articles` con `pmid`")
+    return {"context": rag["context"], "articles": articulos}
+
+
 def construir_grabadas(
     grabacion: object, *, recorded_at: str | None = None
 ) -> dict[str, Any]:
@@ -143,7 +155,7 @@ def construir_grabadas(
             "response": entrada["response"],
         })
 
-    return {
+    resultado: dict[str, Any] = {
         "description": _DESCRIPCION,
         "recorded_at": fecha,
         "tasks": {
@@ -151,6 +163,9 @@ def construir_grabadas(
             for tarea in sorted(por_tarea)
         },
     }
+    if "rag" in grabacion:
+        resultado["rag"] = _validar_rag(grabacion["rag"])
+    return resultado
 
 
 def regenerar_archivo(
