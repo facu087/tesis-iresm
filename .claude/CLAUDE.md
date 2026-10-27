@@ -532,6 +532,12 @@ git push -u origin feature/s2-nombre-tarea
 # Luego: PR en GitHub base:develop ← compare:feature/...
 ```
 
+- **Antes de mergear, esperar a que el CI pase.** Cada PR corre el CI de GitHub
+  Actions (`.github/workflows/ci.yml`): pytest y, en el frontend, lint, tipos y
+  Vitest. Si un check está en rojo o todavía corriendo, no se mergea: se arregla en
+  la misma rama y se espera la corrida nueva. Se ve en la pestaña "Checks" del PR o
+  con `gh pr checks <número> --watch`.
+
 ---
 
 ## Spec-driven con OpenSpec
