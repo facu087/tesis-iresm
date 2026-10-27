@@ -33,6 +33,11 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
 
+      # The OCR tests in tests/test_ingesta.py call the tesseract binary.
+      # The spa/eng language data comes from the repo (.tessdata/).
+      - name: Install Tesseract
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tesseract-ocr
+
       # CPU-only torch first: the default wheel pulls ~5 GB of unused CUDA libraries.
       - name: Install dependencies
         run: |
