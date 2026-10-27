@@ -211,8 +211,7 @@ Resumen al 2026-10-27, de lo que sigue abierto:
    del Agente 02 ante alelos estrella y rsIDs.
 3. Frontend (4.10): tests del resto de las pantallas y CI, pantallas de admin que faltan y
    política de privacidad y términos.
-4. Seis ramas locales `worktree-agent-*` sin revisar (4.5).
-5. La suite con la red bloqueada (`PYTHONPATH=scripts pytest -p pytest_sin_red tests/`) pasa,
+4. La suite con la red bloqueada (`PYTHONPATH=scripts pytest -p pytest_sin_red tests/`) pasa,
    pero registra 70 intentos de conexión (64 a huggingface.co, 6 a eutils): algún test carga
    el modelo de embeddings o consulta NCBI. Medido igual sobre `develop` el 2026-10-27.
 
@@ -387,8 +386,9 @@ modo mock sobre cada grabación: 9 recitadas y 2 mejoradas (2026-10-20) contra 1
   su ejemplo JSON, contra la spec; desde `fix/s4-prompt-agente02-sin-genes` usa un marcador
   genérico, pide `case_genetic_findings` vacío en modo orientación y un test impide volver a
   nombrar genes o variantes en el prompt.
-- Quedan 6 ramas locales `worktree-agent-*` sin revisar. Los worktrees y las demás ramas ya
-  mergeadas se borraron; lo que tenían en `output/` se copió a `output/de-worktrees/`.
+- Las 6 ramas locales `worktree-agent-*` se borraron el 2026-10-27: las seis apuntaban al
+  merge del PR #2 (`43b68a4`, en `origin/master`), sin contenido propio. Los worktrees y las
+  demás ramas ya mergeadas se habían borrado antes; lo que tenían en `output/` se copió a `output/de-worktrees/`.
 - **Texto libre del PDF** (resuelto en `fix/s4-agente06-pendientes`): todo valor que llega a un
   `Paragraph` de `backend/pipeline/pdf_exporter.py` pasa por `_t()`, que escapa `&`, `<` y
   `>` y traduce los caracteres sin glifo antes de escapar; el marcado propio del módulo se
