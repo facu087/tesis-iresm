@@ -388,8 +388,9 @@ modo mock sobre cada grabación: 9 recitadas y 2 mejoradas (2026-10-20) contra 1
   sin el RAG reemplazado: bajaban el modelo de embeddings) y 6 de
   `test_proteccion_analisis.py` (su copia de los mocks del pipeline no tenía
   `verify_sources` ni `arbitrate`, y consultaba PubMed). Arreglado: 0 conexiones, 1452 tests,
-  43 s en lugar de 69. Si vuelve a aparecer, se encuentra el test anotando
-  `PYTEST_CURRENT_TEST` dentro de `_bloquear()` del plugin.
+  43 s en lugar de 69. Desde el mismo día `tests/conftest.py` bloquea la red en toda la
+  suite y hace fallar al test que intente conectarse, con el host en el mensaje: ya no
+  hace falta el plugin para detectarlo.
 - Las 6 ramas locales `worktree-agent-*` se borraron el 2026-10-27: las seis apuntaban al
   merge del PR #2 (`43b68a4`, en `origin/master`), sin contenido propio. Los worktrees y las
   demás ramas ya mergeadas se habían borrado antes; lo que tenían en `output/` se copió a `output/de-worktrees/`.
