@@ -207,8 +207,8 @@ Resumen al 2026-10-27, de lo que sigue abierto:
 1. Evidencia faltante en Trello: #86 (hay que generarla desde Windows). La #75 tiene
    evidencia y está en QA desde el 2026-10-06; el demo se volvió a correr el 2026-10-27
    sobre `develop` (0 conexiones; 18 y 31 tests ok).
-2. Decisiones abiertas de 4.4: recorte de la Ronda 4 (medir en corridas reales) y la guarda
-   del Agente 02 ante alelos estrella y rsIDs.
+2. Decisión abierta de 4.4: recorte de la Ronda 4 (medir en corridas reales). La guarda
+   del Agente 02 ante alelos estrella y rsIDs se resolvió el 2026-10-27 (ver 4.4).
 3. Frontend (4.10): tests del resto de las pantallas y CI, pantallas de admin que faltan y
    política de privacidad y términos.
 
@@ -365,9 +365,15 @@ modo mock sobre cada grabación: 9 recitadas y 2 mejoradas (2026-10-20) contra 1
   carbamazepina → HLA-B*15:02 y HLA-A*31:01 (1A); pregabalina solo tiene nivel 3 y queda
   afuera. El caso base no tiene fármacos, así que en la demo no se ve. Matías aprobó relajar
   la anonimización: viaja un INN del diccionario, nunca texto del caso. Reemplaza a la
-  decisión D7 de `agente-02-genomica`. Pendiente: la guarda anti-invención del Agente 02
-  (`_VARIANT_IN_TEXT`) solo reconoce `p.`/`c.`; "porta HLA-B*15:02" en el enunciado no se
-  degrada, y ahora esas notaciones están en el contexto.
+  decisión D7 de `agente-02-genomica`. Guarda ante alelos estrella y rsIDs (resuelta el
+  2026-10-27, opción elegida por Matías): en los dos modos, un `CYP2C19*2`, `HLA-B*15:02` o
+  `rs4149056` del enunciado que no aparece en el contexto del agente (texto del caso + bloque
+  genómico, PharmGKB incluido) degrada la hipótesis a LOW. No se castiga "solicitar
+  genotipado de HLA-B*15:02" cuando PharmGKB trae ese alelo. Lo que no atrapa: "porta
+  HLA-B*15:02" con un alelo del contexto, si el agente no lo declara como hallazgo del caso
+  (si lo declara, lo atrapa el control de `case_genetic_findings`). Se descartaron la versión
+  estricta (degradaba las hipótesis de genotipado que PharmGKB habilita) y una lista de verbos
+  ("porta", "portador"), por frágil.
 
 ### 4.5 Orden y limpieza
 - No queda ningún cambio OpenSpec abierto (`openspec list` vacío al 2026-10-06). Ese día se

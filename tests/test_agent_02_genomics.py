@@ -11,7 +11,12 @@ from unittest.mock import patch
 import pytest
 
 from backend.agents.agent_02_genomics import GenomicsSpecialistAgent
-from backend.models.genomics import GenomicContext, GenomicSource, GenomicSourceStatus
+from backend.models.genomics import (
+    GenomicContext,
+    GenomicSource,
+    GenomicSourceStatus,
+    PharmacogenomicAnnotation,
+)
 from backend.models.hypothesis import EvidenceLevel, Priority
 from backend.models.report import AgentOutput, Report
 
@@ -240,6 +245,84 @@ class TestGuardaConHallazgos:
         with patch.object(agente, "_call_llm", return_value=_json_con_hallazgo("MFN2 p.Arg94Gln")):
             out = agente.run("contexto")
         assert len(out.hypotheses) == 1
+
+
+def _json_con_texto(texto: str) -> str:
+    return (
+        f'{{"hypotheses": [{{"text": "{texto}", "priority": "HIGH", '
+        f'"evidence_level": "II", "rationale": "r", '
+        f'"case_genetic_findings": [], "sources": []}}]}}'
+    )
+
+
+def _ctx_con_carbamazepina() -> GenomicContext:
+    """PharmGKB consultado por fármaco: el alelo está en el contexto, no en el paciente."""
+    return GenomicContext(annotations=[
+        PharmacogenomicAnnotation(
+            gene="HLA-B", drug="carbamazepine", level="1A",
+            variant="HLA-B*15:02", queried_by="drug",
+        ),
+    ])
+
+
+class TestGuardaAlelosYRsids:
+    """
+    Alelos estrella (CYP2C19*2, HLA-B*15:02) y rsIDs (rs4149056) en el enunciado:
+    se degrada el que no aparece en ningún lado del contexto que recibió el
+    agente (texto del caso y bloque genómico, PharmGKB incluido), en los dos
+    modos. El que sí aparece no se degrada: "solicitar genotipado de
+    HLA-B*15:02" es una hipótesis válida cuando PharmGKB trae ese alelo.
+    """
+
+    def _run(self, ctx: GenomicContext, texto: str, caso: str = "contexto") -> Priority:
+        agente = GenomicsSpecialistAgent(ctx)
+        with patch.object(agente, "_call_llm", return_value=_json_con_texto(texto)):
+            return agente.run(caso).hypotheses[0].priority
+
+    def test_alelo_estrella_inventado_se_degrada(self):
+        assert self._run(_ctx_sin_hallazgos(), "El paciente porta CYP2C19*2") == Priority.LOW
+
+    def test_rsid_inventado_se_degrada(self):
+        assert self._run(_ctx_sin_hallazgos(), "Evaluar rs4149056 en SLCO1B1") == Priority.LOW
+
+    def test_alelo_hla_inventado_se_degrada(self):
+        assert self._run(_ctx_sin_hallazgos(), "Portador de HLA-B*15:02") == Priority.LOW
+
+    def test_alelo_de_pharmgkb_no_se_degrada(self):
+        texto = "Solicitar genotipado de HLA-B*15:02 antes de carbamazepina"
+        assert self._run(_ctx_con_carbamazepina(), texto) != Priority.LOW
+
+    def test_alelo_distinto_al_de_pharmgkb_se_degrada(self):
+        texto = "Solicitar genotipado de HLA-A*31:01 antes de carbamazepina"
+        assert self._run(_ctx_con_carbamazepina(), texto) == Priority.LOW
+
+    def test_alelo_informado_en_el_texto_del_caso_no_se_degrada(self):
+        caso = "Estudio farmacogenético previo: CYP2C19*2/*2."
+        assert self._run(_ctx_sin_hallazgos(), "Metabolizador lento por CYP2C19*2", caso) != Priority.LOW
+
+    def test_rsid_informado_en_el_texto_del_caso_no_se_degrada(self):
+        caso = "Genotipado: rs4149056 heterocigoto."
+        assert self._run(_ctx_sin_hallazgos(), "Riesgo de miopatía por RS4149056", caso) != Priority.LOW
+
+    def test_alelo_inventado_se_degrada_con_hallazgos_en_el_caso(self):
+        """Con variantes reportadas (modo hallazgos) el control también corre."""
+        assert self._run(_ctx_con_ttr(), "TTR p.Val30Met y además CYP2D6*4") == Priority.LOW
+
+    def test_variante_reportada_en_el_texto_sigue_sin_degradarse(self):
+        """Comportamiento previo: en modo hallazgos, p./c. reportada en el enunciado pasa."""
+        assert self._run(_ctx_con_ttr(), "Amiloidosis por TTR p.Val30Met") != Priority.LOW
+
+    def test_texto_sin_alelos_no_se_degrada(self):
+        assert self._run(_ctx_sin_hallazgos(), "Solicitar panel de neuropatías hereditarias") != Priority.LOW
+
+    def test_revise_degrada_alelo_inventado(self):
+        agente = GenomicsSpecialistAgent(_ctx_sin_hallazgos())
+        own = AgentOutput(agent_id="02", agent_name="Especialista Genómica",
+                          hypotheses=[], raw_response="{}")
+        with patch.object(agente, "_call_llm", return_value=_json_con_texto("Portador de CYP2C19*2")):
+            out = agente.revise("contexto", own, [])
+        assert out.hypotheses[0].priority == Priority.LOW
+        assert out.hypotheses[0].rationale.startswith("ADVERTENCIA")
 
 
 class TestAtribucionEnElReporte:
