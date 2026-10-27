@@ -723,6 +723,11 @@ ensayos consultan PubMed y ClinicalTrials.gov en vivo.
   test:watch` para el modo observador). Los tests van junto al código como `*.test.tsx`,
   sin red: la API y `next/navigation` se reemplazan con mocks y los tiempos se controlan
   con temporizadores falsos.
+- CI (`.github/workflows/ci.yml`, GitHub Actions): en cada PR y en cada push a `develop`
+  y `master` corre pytest (Python 3.12, torch CPU) y, en el frontend, lint, `tsc --noEmit`
+  y Vitest. No usa secretos. Antes de pytest descarga el modelo ONNX por defecto de
+  ChromaDB (all-MiniLM-L6-v2, ~80 MB, cacheado), que los tests del RAG leen de
+  `~/.cache/chroma`: sin él fallan 8 tests de `test_rag.py`, porque la suite bloquea la red.
 
 ---
 
