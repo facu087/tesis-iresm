@@ -586,6 +586,14 @@ class TestEnrichPorFarmaco:
             resultado = asyncio.run(enrich(GenomicContext(drugs=["carbamazepine"])))
         assert [(a.gene, a.level) for a in resultado.annotations] == [("HLA-B", "1A"), ("SCN1A", "2B")]
 
+    def test_anotacion_sin_gen_se_descarta(self):
+        llamadas: list[str] = []
+        anns = {"carbamazepine": [_drug_ann("", "carbamazepine", "1A")]}
+        mock = _mock_por_farmaco(anns, llamadas)
+        with patch("backend.pipeline.genomic_context.PharmGKBClient", return_value=mock):
+            resultado = asyncio.run(enrich(GenomicContext(drugs=["carbamazepine"])))
+        assert resultado.annotations == []
+
     def test_solo_evidencia_debil_queda_sin_resultados(self):
         llamadas: list[str] = []
         anns = {"pregabalin": [_drug_ann("SLC7A5", "pregabalin", "3", "rs4240803")]}

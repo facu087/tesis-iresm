@@ -228,7 +228,8 @@ async def _enrich_pharmgkb(ctx: GenomicContext) -> GenomicContext:
                 seen: set[tuple[str, str, str]] = set()
                 for ann in interaction.annotations:
                     key = (ann.gene_symbol, ann.variant, ann.evidence_level)
-                    if ann.evidence_level not in _PHARMGKB_DRUG_LEVELS or key in seen:
+                    if (not ann.gene_symbol or ann.evidence_level not in _PHARMGKB_DRUG_LEVELS
+                            or key in seen):
                         continue
                     seen.add(key)
                     all_annotations.append(PharmacogenomicAnnotation(
