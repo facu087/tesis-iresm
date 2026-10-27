@@ -716,6 +716,9 @@ ensayos consultan PubMed y ClinicalTrials.gov en vivo.
 ### Testing
 - Cada módulo nuevo requiere su test en `tests/`
 - Caso de prueba base: neuropatía axonal sensitivomotora, paciente masculino 42 años
+- La suite corre sin red: `tests/conftest.py` bloquea toda conexión no local y hace
+  fallar al test que la intente, aunque el código atrape el error. Las APIs externas
+  (PubMed, PharmGKB, ClinVar, huggingface.co…) se reemplazan con mocks
 - Frontend: `cd frontend && npm test` (Vitest + React Testing Library sobre jsdom; `npm run
   test:watch` para el modo observador). Los tests van junto al código como `*.test.tsx`,
   sin red: la API y `next/navigation` se reemplazan con mocks y los tiempos se controlan
