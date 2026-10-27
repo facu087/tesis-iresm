@@ -211,9 +211,6 @@ Resumen al 2026-10-27, de lo que sigue abierto:
    del Agente 02 ante alelos estrella y rsIDs.
 3. Frontend (4.10): tests del resto de las pantallas y CI, pantallas de admin que faltan y
    política de privacidad y términos.
-4. La suite con la red bloqueada (`PYTHONPATH=scripts pytest -p pytest_sin_red tests/`) pasa,
-   pero registra 70 intentos de conexión (64 a huggingface.co, 6 a eutils): algún test carga
-   el modelo de embeddings o consulta NCBI. Medido igual sobre `develop` el 2026-10-27.
 
 ### 4.1 #62 Agente 06 (Sintetizador) — mergeado, con correcciones y observaciones abiertas
 El PR #35 (Facundo) entró a `develop` el 2026-10-06 (merge `1f11917`). Agregó, según el
@@ -386,6 +383,13 @@ modo mock sobre cada grabación: 9 recitadas y 2 mejoradas (2026-10-20) contra 1
   su ejemplo JSON, contra la spec; desde `fix/s4-prompt-agente02-sin-genes` usa un marcador
   genérico, pide `case_genetic_findings` vacío en modo orientación y un test impide volver a
   nombrar genes o variantes en el prompt.
+- **Suite sin red** (2026-10-27): con `PYTHONPATH=scripts pytest -p pytest_sin_red tests/`
+  había 70 intentos de conexión. 64 eran de `test_orchestrator.py::TestRunRound1` (4 tests
+  sin el RAG reemplazado: bajaban el modelo de embeddings) y 6 de
+  `test_proteccion_analisis.py` (su copia de los mocks del pipeline no tenía
+  `verify_sources` ni `arbitrate`, y consultaba PubMed). Arreglado: 0 conexiones, 1452 tests,
+  43 s en lugar de 69. Si vuelve a aparecer, se encuentra el test anotando
+  `PYTEST_CURRENT_TEST` dentro de `_bloquear()` del plugin.
 - Las 6 ramas locales `worktree-agent-*` se borraron el 2026-10-27: las seis apuntaban al
   merge del PR #2 (`43b68a4`, en `origin/master`), sin contenido propio. Los worktrees y las
   demás ramas ya mergeadas se habían borrado antes; lo que tenían en `output/` se copió a `output/de-worktrees/`.
