@@ -392,7 +392,8 @@ class BaseAgent(ABC):
                 priority_defaults += 1
 
             evidence_level = BaseAgent._as_evidence_level(h.get("evidence_level"))
-            if evidence_level is None:
+            level_defaulted = evidence_level is None
+            if level_defaulted:
                 evidence_level = EvidenceLevel.III
                 level_defaults += 1
 
@@ -409,6 +410,7 @@ class BaseAgent(ABC):
                 evidence_level=evidence_level,
                 rationale=BaseAgent._as_text(h.get("rationale")) or "",
                 sources=sources,
+                evidence_level_defaulted=level_defaulted,
             ))
 
         if not hypotheses:
@@ -576,7 +578,11 @@ class BaseAgent(ABC):
         """
         prompt = self._build_recitation_prompt(hypotheses_with_reasons, articles)
         raw = self._call_llm(prompt, task="debate_recitacion")
-        return self._parse_recitation(raw, total=len(hypotheses_with_reasons))
+        return self._parse_recitation(
+            raw,
+            total=len(hypotheses_with_reasons),
+            texts=[texto for texto, _ in hypotheses_with_reasons],
+        )
 
     def _build_recitation_prompt(
         self,
@@ -609,34 +615,86 @@ class BaseAgent(ABC):
             "respuesta: es preferible que quede sin respaldo a que cites algo que no "
             "corresponde. NO inventes PMIDs ni cites artículos que no estén listados.",
             "",
-            "Respondé ÚNICAMENTE con JSON válido:",
+            "Esto NO es una nueva ronda de hipótesis: no reescribas, no traduzcas "
+            "ni agregues hipótesis. Identificá cada una por su número de la lista "
+            'de arriba en el campo "hypothesis". NO uses la clave "hypotheses".',
+            "",
+            "Respondé ÚNICAMENTE con JSON válido, con esta forma exacta:",
             '{"recitations": [{"hypothesis": 1, "sources": '
             '[{"pmid": "12345678", "title": "Título exacto del artículo"}]}]}',
         ]
         return "\n".join(lineas)
 
-    def _parse_recitation(self, raw: str, total: int) -> dict[int, list[Source]]:
-        """Parsea la respuesta de recitación, descartando índices fuera de rango."""
+    def _parse_recitation(
+        self,
+        raw: str,
+        total: int,
+        texts: list[str] | None = None,
+    ) -> dict[int, list[Source]]:
+        """
+        Parsea la respuesta de recitación, descartando índices fuera de rango.
+
+        El esquema pedido es {"recitations": [{"hypothesis": n, "sources": [...]}]}.
+        Si el modelo responde con {"hypotheses": [...]} (el formato de las rondas
+        anteriores), solo se acepta la hipótesis cuyo texto coincide con uno de
+        `texts` (sin distinguir mayúsculas ni espacios): una hipótesis reescrita
+        no es la que falló la verificación y no puede heredar sus citas. Cuando
+        la respuesta no trae el esquema pedido se avisa por stderr, solo con
+        claves y conteos, nunca con texto clínico.
+        """
         data = self.extract_json(raw)
+        if not isinstance(data, dict):
+            data = {}
         recitaciones: dict[int, list[Source]] = {}
 
-        for item in data.get("recitations", []):
-            if not isinstance(item, dict):
-                continue
-            numero = item.get("hypothesis")
-            if isinstance(numero, bool) or not isinstance(numero, int):
-                continue
-            if not 1 <= numero <= total:
-                continue
-            fuentes = [
-                BaseAgent._build_source(s)
-                for s in item.get("sources", [])
-                if isinstance(s, dict) and s.get("title")
-            ]
-            if fuentes:
-                recitaciones[numero - 1] = fuentes
+        items = data.get("recitations")
+        if isinstance(items, list):
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                numero = item.get("hypothesis")
+                if isinstance(numero, bool) or not isinstance(numero, int):
+                    continue
+                if not 1 <= numero <= total:
+                    continue
+                fuentes = BaseAgent._recited_sources(item)
+                if fuentes:
+                    recitaciones[numero - 1] = fuentes
+            return recitaciones
 
+        alternativas = data.get("hypotheses")
+        if isinstance(alternativas, list) and texts:
+            indice_por_texto = {_normalize_text(t): i for i, t in enumerate(texts)}
+            for item in alternativas:
+                if not isinstance(item, dict) or not isinstance(item.get("text"), str):
+                    continue
+                indice = indice_por_texto.get(_normalize_text(item["text"]))
+                if indice is None or indice >= total:
+                    continue
+                fuentes = BaseAgent._recited_sources(item)
+                if fuentes:
+                    recitaciones[indice] = fuentes
+
+        claves = ", ".join(f"'{k}'" for k in data) or "ninguna"
+        print(
+            f"[NEXUS] Recitación del Agente {self.AGENT_ID}: la respuesta no trae "
+            f"'recitations' (claves: {claves}); se aceptaron {len(recitaciones)} "
+            f"de {total} por coincidencia exacta del texto.",
+            file=sys.stderr,
+        )
         return recitaciones
+
+    @staticmethod
+    def _recited_sources(item: dict) -> list[Source]:
+        """Fuentes con título de un ítem de recitación; ignora las malformadas."""
+        fuentes = item.get("sources", [])
+        if not isinstance(fuentes, list):
+            return []
+        return [
+            BaseAgent._build_source(s)
+            for s in fuentes
+            if isinstance(s, dict) and s.get("title")
+        ]
 
     def _parse_critiques(
         self,
@@ -669,6 +727,11 @@ class BaseAgent(ABC):
                 alternative=c.get("alternative") or None,
             ))
         return critiques
+
+
+def _normalize_text(value: str) -> str:
+    """Texto comparable: sin mayúsculas ni espacios de más."""
+    return " ".join(value.split()).casefold()
 
 
 def _normalize_agent_id(

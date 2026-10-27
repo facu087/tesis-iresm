@@ -252,6 +252,31 @@ class TestPriorizacionEvidencia:
         assert "topeado" in exportada.evidence_note
         assert exportada.sources[0].publication_types == ["Journal Article", "Observational Study"]
 
+    def test_nivel_no_declarado_se_exporta_sin_nivel_declarado(self):
+        h = _hypothesis("B12 por metformina", Priority.HIGH, EvidenceLevel.III,
+                        sources=[_source("11111111")])
+        h = h.model_copy(update={"evidence_level_defaulted": True})
+        result = _build(
+            report=_make_report(hypotheses=[h]),
+            verifications=_verificadas(("11111111", ["Meta-Analysis"])),
+        )
+        exportada = result.hypotheses[0]
+        assert exportada.evidence_level == "III"
+        assert exportada.evidence_level_defaulted is True
+        assert exportada.declared_evidence_level is None
+        assert "no declaró un nivel válido" in exportada.evidence_note
+
+    def test_nivel_declarado_se_exporta_sin_marca(self):
+        h = _hypothesis("B12 por metformina", Priority.HIGH, EvidenceLevel.III,
+                        sources=[_source("11111111")])
+        result = _build(
+            report=_make_report(hypotheses=[h]),
+            verifications=_verificadas(("11111111", ["Case Reports"])),
+        )
+        exportada = result.hypotheses[0]
+        assert exportada.evidence_level_defaulted is False
+        assert exportada.declared_evidence_level == "III"
+
     def test_respaldada_antes_que_especulativa(self):
         especulativa = _hypothesis("Tóxica", Priority.HIGH, EvidenceLevel.I, sources=[_source("22222222")])
         respaldada = _hypothesis("CIDP", Priority.LOW, EvidenceLevel.III, sources=[_source("11111111")])

@@ -322,7 +322,7 @@ tesis-iresm/
 │   ├── mock/                   ← modo mock del pipeline (S4)
 │   │   ├── mode.py             ← activación de `NEXUS_MOCK_LLM`
 │   │   ├── responses.py        ← respuestas por tarea, carga diferida de grabadas.json
-│   │   ├── grabadas.json       ← respuestas textuales de la corrida real del 2026-10-06
+│   │   ├── grabadas.json       ← respuestas y RAG de la corrida real del 2026-10-26
 │   │   ├── recorder.py         ← grabador de respuestas crudas (solo lo abre un script)
 │   │   └── __init__.py
 │   ├── telemetry/              ← control de costos (S4)
@@ -371,33 +371,86 @@ tesis-iresm/
 ├── frontend/
 │   ├── src/
 │   │   ├── app/
-│   │   │   ├── page.tsx            ← landing demostrativa (S4) — Server Component
-│   │   │   ├── globals.css         ← tokens: azul marino + ocre, tema claro/oscuro por atributo (S4)
+│   │   │   ├── page.tsx            ← landing (S4) — Server Component; compone las
+│   │   │   │                          secciones de components/landing/
+│   │   │   ├── layout.tsx          ← fuentes, tema y `metadataBase` (lib/siteUrl.ts)
+│   │   │   ├── not-found.tsx       ← 404 propio con el sistema visual de la landing (S4)
+│   │   │   ├── opengraph-image.tsx ← tarjeta para compartir generada con texto; al
+│   │   │   │                          estar en la raíz aplica a todas las rutas (S4)
+│   │   │   ├── icon.svg            ← favicon de marca (isotipo NEXUS, S4)
+│   │   │   ├── globals.css         ← tokens globales + el sistema visual del producto,
+│   │   │   │                          acotado a la clase envoltorio `.landing` (S4)
 │   │   │   ├── analizar/
 │   │   │   │   ├── page.tsx        ← vista de carga (S4, movida desde `/`; guard de
 │   │   │   │   │                      sesión — capa de UX, no de seguridad)
 │   │   │   │   └── layout.tsx      ← metadata propia de la ruta (S4)
-│   │   │   ├── analyzing/page.tsx  ← vista de pipeline con progreso en tiempo real
-│   │   │   ├── report/page.tsx     ← vista de reporte (5 tabs)
+│   │   │   ├── analyzing/
+│   │   │   │   ├── page.tsx        ← vista de progreso del pipeline; los pasos salen
+│   │   │   │   │                      de lib/pipelineSteps.ts (S4)
+│   │   │   │   ├── layout.tsx      ← metadata propia de la ruta (S4)
+│   │   │   │   └── page.test.tsx   ← cierre de la vista: respuesta antes o después
+│   │   │   │                          del último paso, error y caso ausente (S4)
+│   │   │   ├── report/
+│   │   │   │   ├── page.tsx        ← vista de reporte (5 tabs); compone las piezas
+│   │   │   │   │                      de components/report/ (S4)
+│   │   │   │   ├── layout.tsx      ← metadata propia de la ruta (S4)
+│   │   │   │   └── page.test.tsx   ← teclado de las pestañas (S4)
 │   │   │   ├── registro/page.tsx   ← alta de médico + consentimiento Ley 25.326 (S4)
 │   │   │   ├── ingresar/page.tsx   ← login (S4)
 │   │   │   ├── cuenta/page.tsx     ← estado de cuenta + reenvío tras rechazo (S4)
 │   │   │   └── admin/pendientes/page.tsx ← revisión admin de cuentas pendientes (S4)
 │   │   ├── components/
+│   │   │   ├── landing/            ← sistema visual del producto (S4): lo usan
+│   │   │   │   │                      todas las rutas
+│   │   │   │   ├── styles.ts       ← clases compartidas: botones, foco, transición
+│   │   │   │   ├── IslandNav.tsx   ← navegación flotante + menú móvil accesible
+│   │   │   │   ├── LandingSession.tsx ← sesión de la landing: una consulta por
+│   │   │   │   │                      montaje y la acción principal según la cuenta
+│   │   │   │   ├── ShellFrame.tsx  ← marco de las rutas de acceso y con sesión: clase
+│   │   │   │   │                      `.landing`, píldora flotante (logo, una acción,
+│   │   │   │   │                      selector de tema), `main` y pie opcional
+│   │   │   │   ├── AuthShell.tsx   ← marco de dos columnas sobre ShellFrame; lo usan
+│   │   │   │   │                      todas esas rutas menos /report
+│   │   │   │   ├── DiagnosticNotice.tsx ← aviso "NEXUS no emite diagnósticos" del pie
+│   │   │   │   │                      de las rutas con sesión
+│   │   │   │   ├── FormPrimitives.tsx ← campo, error y botón de envío
+│   │   │   │   ├── LandingMarkSprite.tsx, LandingMark.tsx, LandingLogo.tsx
+│   │   │   │   │                   ← el isotipo se define UNA vez (sprite) y se
+│   │   │   │   │                      reutiliza con <use>; sin el sprite no se dibuja
+│   │   │   │   ├── Hero.tsx, HeroReportTabs.tsx ← tarjeta del reporte con tres pestañas
+│   │   │   │   ├── reportExample.tsx ← fuente única de las hipótesis de ejemplo
+│   │   │   │   ├── VerificationSection.tsx, VerificationSequence.tsx
+│   │   │   │   │                   ← comparación de citas como secuencia
+│   │   │   │   ├── HowItWorksSection.tsx, PipelineDiagram.tsx ← pipeline animado
+│   │   │   │   ├── AgentsSection.tsx, AgentTiles.tsx ← fichas de los seis agentes
+│   │   │   │   └── ReportSection, TaglineReveal, FaqSection, FinalCta,
+│   │   │   │       LandingFooter, AccessCta, SectionHeading, copy.ts
 │   │   │   ├── UploadForm.tsx      ← formulario de carga PDF/texto
 │   │   │   ├── ScrollReveal.tsx    ← animación de aparición al hacer scroll (S4)
-│   │   │   ├── ReportDemo.tsx      ← vista del reporte de ejemplo (ilustrativa) de la landing (S4)
+│   │   │   ├── ReportDemo.tsx      ← reporte de ejemplo (ilustrativo) de la landing (S4)
 │   │   │   ├── BeforeAfter.tsx     ← cita declarada vs. título real de PubMed (dato real, S4)
-│   │   │   ├── DebateDiagram.tsx   ← diagrama SVG del flujo del pipeline (S4)
+│   │   │   ├── report/             ← piezas de la vista de reporte (S4):
+│   │   │   │   │                      HypothesesTab, TrialsTab, CaseDebateTabs,
+│   │   │   │   │                      ReportNotices, sources, primitives
+│   │   │   ├── NexusLogo.tsx       ← isotipo de marca `NexusMark` (S4), con
+│   │   │   │                          nexus-mark-path.ts; lo usa landing/LandingLogo.tsx
 │   │   │   ├── ThemeToggle.tsx     ← selector claro/oscuro de la barra (S4)
-│   │   │   ├── ThemeScope.tsx      ← mantiene /report y /analyzing en claro (S4)
-│   │   │   └── icons.tsx           ← iconos SVG inline (agentes, cuentas y tema, S4)
+│   │   │   └── icons.tsx           ← sol y luna del selector de tema (S4); el resto
+│   │   │                              de los iconos son Phosphor
+│   │   ├── test/                   ← soporte de los tests del frontend (S4)
+│   │   │   ├── setup.ts            ← matchers de jest-dom + limpieza de RTL
+│   │   │   ├── fixtures.ts         ← reporte mínimo válido para las vistas
+│   │   │   └── smoke.test.tsx      ← prueba de que el corredor y el alias `@/` andan
 │   │   └── lib/
 │   │       ├── api.ts              ← cliente HTTP al backend FastAPI (credentials: "include", S4)
 │   │       ├── types.ts            ← tipos TypeScript del reporte y de cuentas (S4)
 │   │       ├── inputStore.ts       ← estado compartido entre vistas
-│   │       └── pipelineSteps.ts    ← pasos del pipeline (S4, fuente única landing + /analizar)
+│   │       ├── reportStore.ts      ← lectura del reporte guardado (useSyncExternalStore, S4)
+│   │       ├── siteUrl.ts          ← origen público validado (`NEXT_PUBLIC_SITE_URL`, S4)
+│   │       └── pipelineSteps.ts    ← pasos del pipeline (S4, fuente única de la landing,
+│   │                                  /analizar y /analyzing)
 │   ├── next.config.ts
+│   ├── vitest.config.mts       ← corredor de tests del frontend (Vitest + jsdom, S4)
 │   └── package.json
 ├── scripts/
 │   ├── poc_test.py             ← script de prueba end-to-end Sprint 1
@@ -426,12 +479,37 @@ tesis-iresm/
 
 ### Identidad visual del frontend (S4)
 
-Azul marino institucional con acento ocre, títulos en Newsreader y cuerpo en
-Atkinson Hyperlegible, para las pantallas que usan los tokens (`/`, `/analizar`,
-`/registro`, `/ingresar`, `/cuenta`, `/admin/pendientes`). El tema claro es el
-predeterminado; el oscuro se elige con el selector de la barra (atributo
-`data-theme` en `<html>`, clave `nexus-theme` en `localStorage`). `/report` y
-`/analyzing` siguen con colores fijos claros y Geist: se migran en otra etapa.
+Hay un solo sistema visual, y lo usan todas las rutas: `/`, `/registro`,
+`/ingresar`, `/cuenta`, `/analizar`, `/analyzing`, `/report`,
+`/admin/pendientes` y el 404.
+
+Geist como única tipografía (Geist Mono solo para datos), azul marino y ocre
+como colores de marca, fondos planos, iconos Phosphor
+(`@phosphor-icons/react`) y el isotipo NEXUS como motivo. Vive bajo la clase
+envoltorio `.landing` de `globals.css`: toda regla nueva va ahí adentro y no
+toca los tokens globales. Sale de aplicar la skill externa
+`landing-page-design` (elayadesign/ai-design-skills), subordinada a tres
+reglas del proyecto: nada de testimonios, cifras ni garantías inventadas; el
+aviso "NEXUS no emite diagnósticos" siempre visible; y se respeta
+`prefers-reduced-motion`. No se usan imágenes generadas: lo visual es el
+producto (tarjeta del reporte, comparación de citas, pipeline).
+
+Las rutas de acceso y las que piden sesión se arman sobre `ShellFrame`
+(píldora flotante con el logo a `/`, una acción y el selector de tema): todas
+menos `/report` pasan por `AuthShell`, que le agrega las dos columnas, y
+`/report` usa `ShellFrame` directo porque necesita el ancho completo. La
+landing y el 404 arman su propio marco. La única excepción a
+Phosphor son el sol y la luna del selector de tema (`components/icons.tsx`).
+
+El tema claro es el predeterminado; el oscuro se elige con el selector de la
+barra (atributo `data-theme` en `<html>`, clave `nexus-theme` en
+`localStorage`; la variante `dark:` de Tailwind está enlazada a ese atributo).
+Todas las rutas admiten los dos temas, `/report` y `/analyzing` incluidas: ya
+no queda ninguna de colores fijos.
+
+El frontend no tiene corredor de tests: lo interactivo se verifica en un
+navegador sin interfaz contra el servidor de desarrollo, simulando las
+respuestas del backend.
 
 ---
 
@@ -453,6 +531,12 @@ git commit -m "feat: descripción"
 git push -u origin feature/s2-nombre-tarea
 # Luego: PR en GitHub base:develop ← compare:feature/...
 ```
+
+- **Antes de mergear, esperar a que el CI pase.** Cada PR corre el CI de GitHub
+  Actions (`.github/workflows/ci.yml`): pytest y, en el frontend, lint, tipos y
+  Vitest. Si un check está en rojo o todavía corriendo, no se mergea: se arregla en
+  la misma rama y se espera la corrida nueva. Se ve en la pestaña "Checks" del PR o
+  con `gh pr checks <número> --watch`.
 
 ---
 
@@ -574,8 +658,9 @@ marcado (`StructuredReport.metadata.mock`) y la marca se muestra en el PDF y
 en el frontend con la misma visibilidad que la advertencia del consenso de
 IA.
 
-Las doce tareas de `TASK_BUDGETS` usan respuestas **textuales de la corrida
-real del 2026-10-06**, guardadas en `backend/mock/grabadas.json` (versionado) y
+Las trece tareas de `TASK_BUDGETS` usan respuestas **textuales de la corrida
+real del 2026-10-26** (22 respuestas: una por llamada, con el agente que la
+pidió), guardadas en `backend/mock/grabadas.json` (versionado) y
 cargadas de forma diferida por `backend/mock/responses.py` en el primer uso en
 modo mock: el modo real nunca lee ese archivo, y si falta o está malformado se
 levanta `RespuestasGrabadasInvalidas`. Salieron de `backend/mock/recorder.py`,
@@ -583,10 +668,27 @@ un grabador de respuestas crudas basado en `contextvars` que **solo abre un
 script** (nunca una variable de entorno ni `POST /api/analyze`) y guarda
 únicamente la respuesta del modelo, nunca el prompt. Se usa con
 `scripts/medir_costos.py --grabar`, que lo abre durante la pasada base y escribe
-`output/medicion_costos/grabacion.json` (gitignoreado). Salvedad: las
-grabadas que citan posiciones, PMIDs o NCT pertenecen a esa corrida; en modo
-mock se aplican por posición a hipótesis distintas y dependen de que PubMed y
-ClinicalTrials.gov sigan devolviendo lo mismo.
+`output/medicion_costos/grabacion.json` (gitignoreado);
+`scripts/regenerar_mock.py` la convierte en `grabadas.json`. Como cada agente
+recibe su propia grabación en el orden en que la pidió, el modo mock reproduce
+la corrida: 12 hipótesis de consenso sin repetidas, 10 ensayos y el
+`executive_summary` del Agente 06, igual en cada pasada. En la corrida del
+2026-10-20 los Agentes 01 y 02 respondieron la Ronda 5 con el esquema equivocado
+(`hypotheses` en vez de `recitations`) y su recitación falló (2 hipótesis
+mejoradas). Desde la tarjeta #90 el prompt de recitación prohíbe esa clave y
+reescribir hipótesis, y `_parse_recitation()` acepta la forma `hypotheses` solo
+para la hipótesis cuyo texto coincide con la ofrecida (una reescrita no hereda
+citas) y avisa por stderr, con claves y conteos, cuando falta `recitations`. En
+la corrida del 2026-10-26, ya con ese prompt, los tres agentes usaron el esquema
+pedido: 12 hipótesis recitadas y 4 mejoradas (el 02 no recitó ninguna, que el
+prompt permite). Es una sola corrida: la variación entre corridas del modelo
+no está medida. La grabación incluye además lo que el RAG
+ofreció en la Ronda 1 (bloque `rag` de `grabadas.json`): en modo mock la Ronda 1
+usa esos artículos y no consulta PubMed. Sin ese bloque se consultaba en vivo y,
+medido el 2026-10-15, PubMed ya devolvía otros artículos que el 2026-10-07: las
+recitaciones grabadas citaban PMIDs que no se ofrecían y el resumen del Agente
+06 se descartaba. Salvedad que sigue: la verificación de PMIDs y la búsqueda de
+ensayos consultan PubMed y ClinicalTrials.gov en vivo.
 
 ---
 
@@ -620,6 +722,19 @@ ClinicalTrials.gov sigan devolviendo lo mismo.
 ### Testing
 - Cada módulo nuevo requiere su test en `tests/`
 - Caso de prueba base: neuropatía axonal sensitivomotora, paciente masculino 42 años
+- La suite corre sin red: `tests/conftest.py` bloquea toda conexión no local y hace
+  fallar al test que la intente, aunque el código atrape el error. Las APIs externas
+  (PubMed, PharmGKB, ClinVar, huggingface.co…) se reemplazan con mocks
+- Frontend: `cd frontend && npm test` (Vitest + React Testing Library sobre jsdom; `npm run
+  test:watch` para el modo observador). Los tests van junto al código como `*.test.tsx`,
+  sin red: la API y `next/navigation` se reemplazan con mocks y los tiempos se controlan
+  con temporizadores falsos.
+- CI (`.github/workflows/ci.yml`, GitHub Actions): en cada PR y en cada push a `develop`
+  y `master` corre pytest (Python 3.12, torch CPU) y, en el frontend, lint, `tsc --noEmit`
+  y Vitest. No usa secretos. Instala el binario `tesseract-ocr` (los tests de OCR de
+  `test_ingesta.py` lo llaman; los idiomas salen de `.tessdata/`). Antes de pytest descarga el modelo ONNX por defecto de
+  ChromaDB (all-MiniLM-L6-v2, ~80 MB, cacheado), que los tests del RAG leen de
+  `~/.cache/chroma`: sin él fallan 8 tests de `test_rag.py`, porque la suite bloquea la red.
 
 ---
 
@@ -639,7 +754,18 @@ PUBMED_API_KEY=         # Opcional, aumenta rate limit
 ORPHANET_API_KEY=       # Opcional: la API responde sin credencial (medido el
                         # 2026-09-15, 10 de 10 llamadas). Si está definida se
                         # manda en el header apiKey; si no, el cliente manda un
-                        # valor por defecto que el servicio acepta.
+                        # valor por defecto que el servicio acepta. Un valor
+                        # con espacios o '#' (el comentario en la misma línea)
+                        # se descarta con un aviso y se usa el de por defecto.
+
+# RAG — umbral de relevancia (opcional)
+NEXUS_RAG_MIN_SCORE=    # Score mínimo para que un artículo recuperado llegue
+                        # al agente. Default 0.55, medido con
+                        # scripts/demo_umbral_relevancia.py. OJO con la escala:
+                        # score = (1 + coseno) / 2, no es la similitud coseno.
+                        # 0.5 es coseno 0 (ortogonal). Un valor inválido o fuera
+                        # de [0, 1] avisa por stderr y cae al default.
+                        # Al cambiar NEXUS_EMBEDDING_MODEL hay que volver a medir.
 
 # RAG — embeddings (opcional)
 NEXUS_EMBEDDING_MODEL=  # Sobreescribe el modelo de embeddings del RAG.
@@ -676,6 +802,13 @@ PROVINCIAL_LICENSE_SEARCH_URL=  # Enlace al buscador de matrícula de la
                          # /admin/pendientes. Puede quedar sin definir (el de
                          # Córdoba está roto al momento de este cambio). El
                          # Buscador Nacional REFEPS no es configurable.
+
+# Frontend (se definen en frontend/.env.local)
+NEXT_PUBLIC_API_URL=http://localhost:8000  # Base del backend FastAPI.
+NEXT_PUBLIC_SITE_URL=    # Origen público del despliegue, con https://. Lo usa
+                         # frontend/src/lib/siteUrl.ts para las etiquetas de
+                         # compartir. Vacía o malformada cae a
+                         # http://localhost:3000 con un aviso, sin romper el build.
 ```
 
 ---

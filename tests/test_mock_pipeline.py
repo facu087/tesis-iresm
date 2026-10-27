@@ -108,8 +108,8 @@ class TestElModoMockEjercitaElParseoReal:
     def test_critica_parsea(self):
         agente = ArbiterAgent()  # cualquier BaseAgent sirve, _parse_critiques no usa self
         criticas = agente._parse_critiques(mock_responses.get_mock_response("debate_critica"))
-        # La grabación real trae cinco críticas: dos a "Agent 02" y tres a "Agent 03".
-        assert [c.target_agent_id for c in criticas] == ["02", "02", "03", "03", "03"]
+        # Crítica del Agente 02 en la grabación del 2026-10-26: dos a "01" y dos a "03".
+        assert [c.target_agent_id for c in criticas] == ["01"] * 2 + ["03"] * 2
 
     def test_pico_parsea(self):
         sintesis = pico._parse_pico(mock_responses.get_mock_response("pico_sintesis"))
@@ -335,7 +335,17 @@ def test_hermetico_sin_red_analisis_completo_en_modo_mock():
     """
     import re
 
-    entorno = dict(os.environ, PYTHONPATH=str(_RAIZ / "scripts"))
+    # PYTHONIOENCODING es obligatorio, no decorativo: abajo se lee la salida del
+    # subproceso con encoding="utf-8", y en Windows el hijo escribe en cp1252 si
+    # no se le dice otra cosa. La decodificación falla en el hilo lector, stdout
+    # queda en None y el test revienta con un TypeError que no tiene nada que ver
+    # con lo que se está probando. Mismo criterio que
+    # scripts/demo_tests_rag_hermeticos.py, de donde sale este patrón.
+    entorno = dict(
+        os.environ,
+        PYTHONPATH=str(_RAIZ / "scripts"),
+        PYTHONIOENCODING="utf-8",
+    )
 
     proceso = subprocess.run(
         [sys.executable, "-m", "pytest",

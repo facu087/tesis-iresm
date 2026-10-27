@@ -99,6 +99,22 @@ class TestBuildSourcesSummary:
 # ── Tests: run_round_1 ─────────────────────────────────────────────────────────
 
 class TestRunRound1:
+    @pytest.fixture(autouse=True)
+    def _sin_rag(self):
+        """
+        Estos tests prueban la Ronda 1, no el RAG: sin este reemplazo, cada uno
+        intentaba bajar el modelo de embeddings de huggingface.co (16 conexiones).
+        El RAG tiene sus propios tests en tests/test_rag_integration.py.
+        """
+        async def _contexto_sin_rag(case, base_context):
+            return base_context, []
+
+        with patch(
+            "backend.pipeline.orchestrator._enrich_context_with_rag",
+            side_effect=_contexto_sin_rag,
+        ):
+            yield
+
     def test_requiere_pico_completado(self):
         case = ClinicalCase(raw_text="texto")
         with pytest.raises(ValueError, match="case.pico es None"):

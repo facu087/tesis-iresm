@@ -39,10 +39,8 @@
 
 /*
  * Solo los tokens semánticos cambian en modo oscuro. `--background` y
- * `--foreground` alimentan el `body` de todas las rutas, y /analyzing y
- * /report todavía usan clases claras fijas: si cambiaran acá, esas vistas
- * heredarían texto claro sobre sus tarjetas blancas. Las páginas que sí
- * adoptan la paleta fijan su propio fondo con `bg-bg text-fg`.
+ * `--foreground` alimentan el `body` de todas las rutas y quedan en claro:
+ * cada página fija su propio fondo con `bg-bg text-fg`.
  *
  * El tema oscuro se compone aparte, no es una inversión: azul noche de fondo,
  * y versiones claras de la marca y del ocre. Se activa por selección del
@@ -67,19 +65,9 @@
   color-scheme: dark;
 }
 
-/* Las rutas de colores fijos nunca adoptan el esquema oscuro nativo. */
-:root[data-fixed-light] {
-  color-scheme: light;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  --font-serif: var(--font-newsreader), Georgia, serif;
-  /* Cuerpo de las pantallas con tokens (clase `font-body`); /report y /analyzing siguen en Geist. */
-  --font-body: var(--font-atkinson), var(--font-geist-sans), system-ui, sans-serif;
 
   --color-bg: var(--color-bg);
   --color-bg-subtle: var(--color-bg-subtle);
@@ -102,4 +90,427 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/* ── Landing scope ─────────────────────────────────────────────────────────
+ *
+ * Visual system of every route: the public landing (`/`), the branded 404,
+ * the access pages (`/registro`, `/ingresar`) and the signed in pages
+ * (`/cuenta`, `/analizar`, `/analyzing`, `/report`, `/admin/pendientes`).
+ * Everything below is scoped to the `.landing` wrapper, which leaves the
+ * tokens defined above untouched. The wrapper redefines the semantic tokens
+ * for its own subtree: the Tailwind utilities (`bg-bg`, `text-fg`, …) resolve
+ * through `var()`, so they pick up the scoped values without new class names.
+ *
+ * Navy and ochre stay as brand accents. Backgrounds are flat. In dark theme
+ * the background colours come from a closed list: #000000, #181818, #1F1F1F,
+ * #272727, #313131 and #131209. Every text/background pair meets WCAG AA.
+ */
+.landing {
+  --landing-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  /* Tailwind's default easing, so `transition-*` utilities used by shared
+     components (e.g. ThemeToggle) also follow the landing curve in scope. */
+  --default-transition-timing-function: var(--landing-ease);
+
+  --color-bg: #ffffff;
+  --color-bg-subtle: #f1f5f9;
+  --color-surface: #ffffff;
+  --color-fg: #0f172a;
+  --color-fg-muted: #475569;
+  --color-border: #cbd5e1;
+  --color-accent: #1e3a5f;
+  --color-accent-fg: #ffffff;
+  --color-ochre: #8a5206;
+  --color-brand: #1e3a5f;
+  --color-brand-fg: #ffffff;
+  --color-brand-fg-muted: #c5d3e6;
+  --color-brand-line: #6e8bb0;
+  --color-brand-btn: #ffffff;
+  --color-brand-btn-fg: #1e3a5f;
+
+  --landing-hero-from: #000000;
+  --landing-hero-to: #666666;
+
+  /* Gradient of the logo mark where the landing draws it (LandingMark). */
+  --landing-mark-from: var(--color-accent);
+  --landing-mark-to: #6e8bb0;
+  /* Same gradient on the pipeline. The light end is deeper here so the stage
+     numbers keep AA contrast on the last nodes. */
+  --landing-pipeline-from: var(--color-accent);
+  --landing-pipeline-to: #4a6fa1;
+
+  /* Danger ink of the report view (`/report`): citations PubMed does not
+     confirm, objections left open and the recorded mode mark. Same reds as
+     the form error. On the surface and on its own 10 % tint it meets AA. */
+  --landing-danger: #b91c1c;
+}
+
+:root[data-theme="dark"] .landing {
+  --color-bg: #181818;
+  --color-bg-subtle: #1f1f1f;
+  --color-surface: #272727;
+  --color-fg: #f5f5f5;
+  --color-fg-muted: #b0b0b0;
+  --color-border: #3d3d3d;
+  --color-accent: #8fb4e3;
+  --color-accent-fg: #131209;
+  --color-ochre: #e3b25a;
+  --color-brand: #131209;
+  --color-brand-fg: #f5f5f5;
+  --color-brand-fg-muted: #b0b0b0;
+  --color-brand-line: #3d3d3d;
+  --color-brand-btn: #8fb4e3;
+  --color-brand-btn-fg: #131209;
+
+  --landing-hero-from: #ffffff;
+  --landing-hero-to: #9b9b9b;
+
+  --landing-mark-to: #dbe8f8;
+  --landing-pipeline-to: #dbe8f8;
+
+  --landing-danger: #fca5a5;
+}
+
+/* The logo mark fades from the accent to this token; in the landing's dark
+   theme the inherited value is a border grey, so the mark gets its own stop. */
+.landing .landing-logo {
+  --color-brand-line: #6e8bb0;
+}
+:root[data-theme="dark"] .landing .landing-logo {
+  --color-brand-line: #dbe8f8;
+}
+
+/* Anchored sections stop below the floating navigation pill. */
+.landing section[id] {
+  scroll-margin-top: 6rem;
+}
+
+@layer components {
+  /* The only gradient of the landing: left to right, on the hero heading text. */
+  .landing-hero-heading {
+    color: var(--landing-hero-from);
+    background-image: linear-gradient(
+      to right,
+      var(--landing-hero-from),
+      var(--landing-hero-to)
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* Entrance of what is already on screen at load. Pure CSS: without
+     JavaScript the content still ends fully visible. */
+  .landing-rise {
+    animation: landing-rise 900ms var(--landing-ease) both;
+    animation-delay: var(--landing-delay, 0ms);
+  }
+
+  /* Scroll reveal (see ScrollReveal.tsx). The hidden state is only ever set
+     by JavaScript; the transition lives on the shown state so that hiding is
+     instant and revealing is animated. */
+  .landing-reveal[data-reveal="hidden"] {
+    opacity: 0;
+    translate: 0 4rem;
+    filter: blur(12px);
+  }
+  .landing-reveal[data-reveal="shown"] {
+    transition:
+      opacity 900ms var(--landing-ease),
+      translate 900ms var(--landing-ease),
+      filter 900ms var(--landing-ease);
+    transition-delay: var(--landing-delay, 0ms);
+  }
+
+  /* Tagline reveal (see TaglineReveal.tsx): words are muted only once the
+     component has enhanced the block, then light up one by one. */
+  .landing-tagline[data-enhanced="true"] [data-word] {
+    opacity: 0.3;
+    transition: opacity 700ms var(--landing-ease);
+  }
+  .landing-tagline[data-enhanced="true"] [data-word][data-on="true"] {
+    opacity: 1;
+  }
+
+  /* Pipeline diagram (see landing/PipelineDiagram.tsx). Every stage is lit by
+     default; stages are dimmed only once the component has enhanced the list,
+     then light up in order. Lit, a node takes the tint of its position along
+     the gradient of the mark and the stroke below it fades to the next tint,
+     unveiled from the node downwards. */
+  .landing-pipeline-node {
+    --landing-pipeline-tint: color-mix(
+      in srgb,
+      var(--landing-pipeline-from),
+      var(--landing-pipeline-to) var(--landing-stage-from)
+    );
+    border-color: var(--landing-pipeline-tint);
+    background-color: var(--landing-pipeline-tint);
+    color: var(--color-accent-fg);
+    transition:
+      background-color 700ms var(--landing-ease),
+      border-color 700ms var(--landing-ease),
+      color 700ms var(--landing-ease);
+  }
+  .landing-pipeline-link {
+    color: var(--color-border);
+  }
+  .landing-pipeline-link-lit {
+    clip-path: inset(0);
+    transition: clip-path 700ms var(--landing-ease) 200ms;
+  }
+  .landing-pipeline-stop-from {
+    stop-color: color-mix(
+      in srgb,
+      var(--landing-pipeline-from),
+      var(--landing-pipeline-to) var(--landing-stage-from)
+    );
+  }
+  .landing-pipeline-stop-to {
+    stop-color: color-mix(
+      in srgb,
+      var(--landing-pipeline-from),
+      var(--landing-pipeline-to) var(--landing-stage-to)
+    );
+  }
+  .landing-pipeline-body {
+    transition: opacity 700ms var(--landing-ease);
+  }
+  .landing-pipeline[data-enhanced="true"] [data-stage]:not([data-on="true"]) {
+    .landing-pipeline-node {
+      border-color: var(--color-border);
+      background-color: var(--color-surface);
+      color: var(--color-fg-muted);
+    }
+    .landing-pipeline-link-lit {
+      clip-path: inset(0 0 100% 0);
+    }
+    .landing-pipeline-body {
+      opacity: 0.4;
+    }
+  }
+
+  /* The mark as a motif (see landing/LandingMark.tsx). Behind the hero card
+     it is a faint watermark; inside the navy closing card it is repainted
+     with the tokens of that surface. Both stay well below the text content. */
+  .landing-hero-mark {
+    opacity: 0.1;
+  }
+  .landing-cta-mark {
+    --landing-mark-from: var(--color-brand-line);
+    --landing-mark-to: var(--color-brand-fg);
+    opacity: 0.16;
+  }
+  :root[data-theme="dark"] .landing .landing-cta-mark {
+    --landing-mark-from: var(--color-brand-btn);
+  }
+  @media (width >= 64rem) {
+    .landing-cta-mark {
+      opacity: 0.32;
+    }
+  }
+
+  /* Agent tiles (see landing/AgentTiles.tsx). The description shares the grid
+     cell of the tile face and shows on hover (pointer devices only, so a tap
+     does not leave it stuck), on keyboard focus and while the tile is pinned. */
+  .landing-agent-detail {
+    grid-area: 1 / 1;
+    opacity: 0;
+    transition: opacity 700ms var(--landing-ease);
+  }
+  .landing-agent-toggle {
+    transition: rotate 700ms var(--landing-ease);
+  }
+  .landing-agent[data-open="true"] .landing-agent-detail,
+  .landing-agent button:focus-visible + .landing-agent-detail {
+    opacity: 1;
+  }
+  .landing-agent[data-open="true"] .landing-agent-toggle {
+    rotate: 45deg;
+  }
+  @media (hover: hover) {
+    .landing-agent:hover .landing-agent-detail {
+      opacity: 1;
+    }
+  }
+
+  /* Hero report tabs (see landing/HeroReportTabs.tsx). The panels share one
+     grid cell, so the card keeps the height of the tallest one. A panel
+     leaves at once; the transition lives on the selected state, which eases
+     in. */
+  .landing-hero-panel {
+    grid-area: 1 / 1;
+  }
+  .landing-hero-panel[data-selected="false"] {
+    visibility: hidden;
+    opacity: 0;
+    translate: 0 0.5rem;
+  }
+  .landing-hero-panel[data-selected="true"] {
+    transition:
+      opacity 500ms var(--landing-ease),
+      translate 500ms var(--landing-ease);
+  }
+
+  /* Verification sequence (see landing/VerificationSequence.tsx). Without a
+     `data-beat` the comparison is resolved: that is the server render and the
+     resting state. A beat only hides what has not happened yet, with opacity
+     and a small offset, so every part keeps its place and the card its
+     height. Hiding is instant; the transition lives on the resolved state. */
+  .landing-verify [data-step] {
+    transition:
+      opacity 600ms var(--landing-ease),
+      translate 600ms var(--landing-ease);
+  }
+  .landing-verify[data-beat="idle"] [data-step="cited"],
+  .landing-verify:is([data-beat="idle"], [data-beat="cited"], [data-beat="lookup"])
+    [data-step="real"],
+  .landing-verify[data-beat] [data-step="verdict"] {
+    opacity: 0;
+    translate: 0 0.5rem;
+    transition: none;
+  }
+  /* Lookup beat: flat bars over the place of the PubMed title. */
+  .landing-verify-skeleton {
+    opacity: 0;
+  }
+  .landing-verify[data-beat="lookup"] .landing-verify-skeleton {
+    opacity: 1;
+    transition: opacity 300ms var(--landing-ease);
+  }
+  .landing-verify[data-beat="lookup"] .landing-verify-bar {
+    animation: landing-verify-pulse 700ms var(--landing-ease) infinite alternate;
+  }
+
+  /* Loading placeholders of the signed in routes (`/cuenta`, `/analizar`):
+     flat bars shaped like the content, with the same pulse as the lookup. */
+  .landing .landing-skeleton {
+    background-color: var(--color-border);
+    animation: landing-verify-pulse 700ms var(--landing-ease) infinite alternate;
+  }
+}
+
+/* Without JavaScript a tap cannot pin a tile: show every description under
+   its tile face instead of behind it. Declared outside any layer on purpose:
+   the element carries placement and padding utilities, and unlayered rules
+   are the only ones that win over the utilities layer. */
+@media (scripting: none) {
+  .landing .landing-agent-detail {
+    grid-area: 2 / 1;
+    padding-top: 0;
+    opacity: 1;
+  }
+  .landing .landing-agent-toggle {
+    display: none;
+  }
+  /* The hero tabs cannot switch either: the card shows its first hypothesis. */
+  .landing .landing-hero-tabs {
+    display: none;
+  }
+  /* The verification sequence never plays: there is nothing to replay. */
+  .landing .landing-verify-replay {
+    display: none;
+  }
+}
+
+/* With JavaScript the account link of the navigation waits for the session:
+   hidden while it loads, so "Ingresar" never flashes into the user's name.
+   `visibility` keeps its box, so the pill does not change width twice, and
+   takes the link out of the tab order. Without JavaScript the session never
+   resolves and the link stays visible. Unlayered for the same reason as the
+   blocks above.
+
+   Failsafe: scripting can be enabled and the script still never run (a chunk
+   that fails to load, an error during hydration). The delayed keyframe brings
+   the link back without JavaScript, after the 4 s the provider waits at most.
+   It is an instant switch, not motion, so it is kept under reduced motion:
+   `!important` plus the higher specificity beat the blanket `animation: none`
+   below. */
+@media (scripting: enabled) {
+  .landing [data-session-pending] {
+    visibility: hidden;
+    animation: landing-session-failsafe 0s linear 6s forwards !important;
+  }
+}
+
+@keyframes landing-session-failsafe {
+  to {
+    visibility: visible;
+  }
+}
+
+@keyframes landing-verify-pulse {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.45;
+  }
+}
+
+@keyframes landing-rise {
+  from {
+    opacity: 0;
+    translate: 0 4rem;
+    filter: blur(12px);
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+    filter: none;
+  }
+}
+
+/* Reduced motion wins over the motion system: no movement, no blur, no word
+   reveal, and the content is fully visible from the first paint. */
+@media (prefers-reduced-motion: reduce) {
+  .landing *,
+  .landing *::before,
+  .landing *::after {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+  }
+  .landing .landing-reveal[data-reveal="hidden"] {
+    opacity: 1 !important;
+    translate: none !important;
+    filter: none !important;
+  }
+  .landing .landing-tagline [data-word] {
+    opacity: 1 !important;
+  }
+  /* The comparison stays resolved and its replay control has nothing to do. */
+  .landing .landing-verify [data-step] {
+    opacity: 1 !important;
+    translate: none !important;
+  }
+  .landing .landing-verify-skeleton {
+    opacity: 0 !important;
+  }
+  .landing .landing-verify-replay {
+    display: none;
+  }
+}
+
+/* Printing the page before the sequence has played must still show the
+   resolved comparison: it is the landing's central real data. */
+@media print {
+  .landing .landing-verify [data-step] {
+    opacity: 1 !important;
+    translate: none !important;
+  }
+  .landing .landing-verify-skeleton {
+    opacity: 0 !important;
+  }
+  .landing .landing-verify-replay {
+    display: none;
+  }
+}
+
+/* Forced colours drop background images: give the hero heading real ink. */
+@media (forced-colors: active) {
+  .landing-hero-heading {
+    background-image: none;
+    -webkit-text-fill-color: currentColor;
+    color: CanvasText;
+  }
 }

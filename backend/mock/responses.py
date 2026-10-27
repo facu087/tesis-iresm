@@ -196,6 +196,33 @@ def get_recorded_entries() -> dict[str, list[dict[str, Any]]]:
     return _CACHE
 
 
+def get_recorded_rag() -> dict[str, Any] | None:
+    """
+    Lo que el RAG ofreció en la corrida grabada: `{"context", "articles"}`, o
+    `None` si la grabación es anterior a que se grabara el RAG.
+
+    Con esto el modo mock no consulta PubMed para la Ronda 1: los artículos que
+    devuelve PubMed cambian con el tiempo, y las recitaciones grabadas solo son
+    válidas sobre los artículos que se ofrecieron en esa corrida. No se cachea:
+    se consulta una vez por análisis y así sigue al archivo si un test lo cambia.
+    """
+    nombre = _ARCHIVO_GRABADAS.name
+    try:
+        datos = json.loads(_ARCHIVO_GRABADAS.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise _falla(nombre, f"no se pudo leer el bloque rag ({type(exc).__name__})") from exc
+    rag = datos.get("rag") if isinstance(datos, dict) else None
+    if rag is None:
+        return None
+    articulos = rag.get("articles") if isinstance(rag, dict) else None
+    if not isinstance(rag.get("context") if isinstance(rag, dict) else None, str) or not (
+        isinstance(articulos, list)
+        and all(isinstance(a, dict) and isinstance(a.get("pmid"), str) for a in articulos)
+    ):
+        raise _falla(nombre, "el bloque `rag` no tiene `context` de texto y `articles` con `pmid`")
+    return rag
+
+
 def get_recorded_responses() -> dict[str, dict[str, Any]]:
     """
     Procedencia de la primera respuesta grabada de cada tarea (agente, modelo,
