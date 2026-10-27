@@ -18,6 +18,17 @@ _VARIANT_IN_TEXT = re.compile(r"\b(?:p\.|c\.)[A-Za-z0-9>_*+\-]{3,}")
 _GENE_TOKEN = re.compile(r"\b[A-Z][A-Z0-9]{1,7}\b")
 _WARNING = "ADVERTENCIA: hallazgo no reportado en el caso. "
 
+# Alelos estrella con su gen (CYP2C19*2, TPMT*3A, HLA-B*15:02) y rsIDs (rs4149056).
+_ALLELE_OR_RSID = re.compile(
+    r"\b[A-Z][A-Z0-9]{1,9}(?:-[A-Z0-9]{1,4})?\*\d{1,4}(?::\d{2,4})*[A-Z]?\b"
+    r"|\b(?i:rs)\d{3,}\b"
+)
+
+
+def _allele_notations(text: str) -> set[str]:
+    """Alelos estrella y rsIDs del texto, en mayúsculas para comparar."""
+    return {m.upper() for m in _ALLELE_OR_RSID.findall(text or "")}
+
 
 def _normalize(finding: str) -> str:
     """Minúsculas, sin espacios ni prefijos c./p./g., para comparar hallazgos."""
@@ -125,7 +136,7 @@ class GenomicsSpecialistAgent(BaseAgent):
         )
         hypotheses = self.parse_hypotheses(raw)
         hypotheses = hypotheses[:4]
-        hypotheses = self._apply_invention_guard(hypotheses, raw)
+        hypotheses = self._apply_invention_guard(hypotheses, raw, enriched)
         return self._build_output(hypotheses, raw)
 
     def critique(self, clinical_context: str, own_output: AgentOutput, other_outputs: list[AgentOutput]) -> list:
@@ -138,7 +149,7 @@ class GenomicsSpecialistAgent(BaseAgent):
         enriched = self._build_context(clinical_context)
         output = super().revise(enriched, own_output, critiques)
         hypotheses = output.hypotheses[:4]
-        hypotheses = self._apply_invention_guard(hypotheses, output.raw_response)
+        hypotheses = self._apply_invention_guard(hypotheses, output.raw_response, enriched)
         return AgentOutput(
             agent_id=output.agent_id,
             agent_name=output.agent_name,
@@ -190,21 +201,30 @@ class GenomicsSpecialistAgent(BaseAgent):
         variants = [_normalize(v) for v in ctx.variants]
         return any(v and v in norm for v in variants) and genes <= set(ctx.genes)
 
-    def _apply_invention_guard(self, hypotheses: list[Hypothesis], raw: str) -> list[Hypothesis]:
+    def _apply_invention_guard(
+        self, hypotheses: list[Hypothesis], raw: str, context: str
+    ) -> list[Hypothesis]:
         """
         Degrada a LOW, sin descartar, las hipótesis que citan hallazgos
         genéticos no reportados en el caso.
 
-        Dos controles: (1) cada `case_genetic_findings` declarado en el JSON
+        Tres controles: (1) cada `case_genetic_findings` declarado en el JSON
         crudo tiene que estar en el caso; (2) en modo orientación (sin variantes
-        ni hallazgos positivos) ninguna notación de variante puede aparecer en
-        el enunciado.
+        ni hallazgos positivos) ninguna notación `p.`/`c.` puede aparecer en el
+        enunciado; (3) en los dos modos, todo alelo estrella o rsID del
+        enunciado tiene que aparecer en `context`, el texto que recibió el
+        agente (caso + bloque genómico, PharmGKB incluido). El control 3 no
+        distingue "solicitar genotipado de HLA-B*15:02" de "porta HLA-B*15:02":
+        solo atrapa notaciones que el agente no vio. Atribuirle al paciente un
+        alelo del contexto lo atrapa el control 1, si el agente lo declara.
         """
         declared = _declared_findings(raw)
         orientation = not self._genomic_context.has_genomic_findings
+        known_alleles = _allele_notations(context)
         marked = 0
         for h in hypotheses:
             invented = orientation and bool(_VARIANT_IN_TEXT.search(h.text or ""))
+            invented = invented or not _allele_notations(h.text) <= known_alleles
             findings = declared.get((h.text or "").strip(), [])
             invented = invented or any(not self._is_reported(f) for f in findings)
             if invented:

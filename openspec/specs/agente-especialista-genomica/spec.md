@@ -82,7 +82,14 @@ revisión del debate. Una hipótesis MUST considerarse sospechosa si:
 - declara como hallazgo del caso algo que no figura entre los hallazgos reportados ni los genes del perfil
   (comparación sin distinguir mayúsculas, espacios ni los prefijos `c.`/`p.`/`g.`), o
 - el perfil está en modo sin hallazgos y el texto de la hipótesis contiene una variante concreta (notación
-  `c.`, `p.`, `g.` o `rs`).
+  `c.`, `p.` o `g.`), o
+- en cualquier modo, el texto de la hipótesis contiene un alelo estrella (`CYP2C19*2`, `HLA-B*15:02`) o un
+  rsID (`rs4149056`) que no aparece en el contexto que recibió el agente: el texto del caso y el bloque
+  genómico, con las anotaciones de PharmGKB (comparación sin distinguir mayúsculas).
+
+El tercer control no distingue "solicitar genotipado de HLA-B*15:02" de "porta HLA-B*15:02": solo marca
+notaciones que el agente no vio. Que el agente le atribuya al paciente un alelo del contexto lo marca el
+primer control, si lo declara como hallazgo del caso.
 
 Una hipótesis sospechosa MUST NOT descartarse: SHALL conservarse con prioridad `LOW` y con una advertencia
 visible al inicio del `rationale` que indique qué hallazgo no figura en el caso. El registro de la guarda
@@ -106,6 +113,18 @@ hallazgos del caso, la primera verificación SHALL tratarla como lista vacía.
 - **WHEN** el perfil está en modo sin hallazgos y una hipótesis propone "amiloidosis hereditaria por TTR no
   cubierta por el panel CMT; considerar secuenciación de TTR" con la lista de hallazgos vacía
 - **THEN** la hipótesis conserva su prioridad y su `rationale` sin advertencias
+
+#### Scenario: Alelo estrella o rsID inventado
+- **WHEN** ni el caso ni el bloque genómico mencionan `CYP2C19*2` y una hipótesis dice "el paciente porta
+  CYP2C19*2", o menciona `rs4149056` sin que figure en el contexto
+- **THEN** la hipótesis se conserva con prioridad `LOW` y con la advertencia al inicio del `rationale`,
+  también cuando el perfil tiene hallazgos
+
+#### Scenario: Alelo que trae PharmGKB
+- **WHEN** PharmGKB, consultado por carbamazepina, trae `HLA-B*15:02` y una hipótesis propone "solicitar
+  genotipado de HLA-B*15:02 antes de carbamazepina"
+- **THEN** la hipótesis conserva su prioridad y su `rationale` sin advertencias; si en cambio menciona
+  `HLA-A*31:01`, que no está en el contexto, queda con prioridad `LOW`
 
 ### Requirement: Participación en la Ronda 1
 El orquestador SHALL ejecutar el Agente 02 en paralelo con los Agentes 01 y 03 sobre el mismo contexto
