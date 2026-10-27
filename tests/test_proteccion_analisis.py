@@ -82,6 +82,18 @@ def _pipeline_patches():
             new_callable=AsyncMock,
             return_value=TrialNavigationResult(summary=TrialSearchSummary()),
         ),
+        # Los mismos dos que tests/test_api.py::_pipeline_patches: sin ellos la
+        # verificación bibliográfica consultaba PubMed de verdad.
+        "verify_sources": patch(
+            "backend.api.router.verify_report_sources",
+            new_callable=AsyncMock,
+            return_value={},
+        ),
+        "arbitrate": patch(
+            "backend.api.router.ArbiterAgent.arbitrate",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("mock: sin llamada real a Groq"),
+        ),
     }
 
 
@@ -94,6 +106,8 @@ def _con_pipeline_mockeado(client, **request_kwargs):
         patches["run_round_1"],
         patches["run_debate"],
         patches["navigate"],
+        patches["verify_sources"],
+        patches["arbitrate"],
     ):
         return client.post("/api/analyze", **request_kwargs)
 
