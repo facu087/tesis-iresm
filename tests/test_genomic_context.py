@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from backend.external.pharmgkb import GeneAnnotation
+from backend.external.pharmgkb import DrugGeneInteraction, GeneAnnotation
 from backend.external.rate_limiter import ApiUnavailableError, RateLimitError
 from backend.models.biomarkers import BiomarkerProfile
 from backend.models.case import ClinicalCase, PICOSynthesis
@@ -481,3 +481,196 @@ class TestEnrichClinVar:
         bloque = ctx.to_prompt_block()
         assert "ambigua" in bloque and "5 registros" in bloque
         assert "Pathogenic" not in bloque
+
+
+# ── Sección 4: PharmGKB por fármaco del paciente ──────────────────────────────
+
+
+def _caso_con_farmacos(drugs: list[str], genes: list[str] | None = None) -> ClinicalCase:
+    return ClinicalCase(
+        raw_text=CASO_BASE_TEXTO,
+        pico=_pico_caso_base(),
+        biomarkers=BiomarkerProfile(
+            genes=genes or [], antibodies=[], lab_biomarkers=[], genetic_variants=[],
+            pathways=[], drugs=drugs, procedures=[], surgeries=[],
+        ),
+    )
+
+
+def _drug_ann(gene: str, drug: str, level: str, variant: str = "") -> GeneAnnotation:
+    return GeneAnnotation(
+        gene_symbol=gene, drug_name=drug, phenotype="Toxicity",
+        evidence_level=level, variant=variant, population="", url="",
+    )
+
+
+def _mock_por_farmaco(por_farmaco: dict[str, list[GeneAnnotation]], llamadas: list[str]):
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+
+    async def get_gene_annotations(gene: str, max_results: int = 10):
+        llamadas.append(f"gen:{gene}")
+        return []
+
+    async def get_drug_interactions(drug_name: str, max_results: int = 10):
+        llamadas.append(f"farmaco:{drug_name}")
+        anns = por_farmaco.get(drug_name)
+        if anns is None:
+            return None
+        return DrugGeneInteraction(
+            drug_name=drug_name, pharmgkb_id="PA0",
+            genes=sorted({a.gene_symbol for a in anns}), annotations=anns,
+        )
+
+    mock_client.get_gene_annotations = get_gene_annotations
+    mock_client.get_drug_interactions = get_drug_interactions
+    return mock_client
+
+
+class TestBuildFarmacos:
+    def test_traduce_los_farmacos_al_ingles(self):
+        ctx = build(_caso_con_farmacos(["carbamazepina", "Pregabalina"]))
+        assert ctx.drugs == ["carbamazepine", "pregabalin"]
+        assert ctx.drugs_without_english == []
+
+    def test_farmaco_sin_equivalente_queda_aparte(self):
+        ctx = build(_caso_con_farmacos(["carbamazepina", "farmacoraro"]))
+        assert ctx.drugs == ["carbamazepine"]
+        assert ctx.drugs_without_english == ["farmacoraro"]
+
+    def test_sin_repetidos(self):
+        ctx = build(_caso_con_farmacos(["carbamazepina", "Carbamazepine"]))
+        assert ctx.drugs == ["carbamazepine"]
+
+    def test_caso_base_sin_farmacos(self):
+        ctx = build(_caso_base())
+        assert ctx.drugs == []
+        assert ctx.drugs_without_english == []
+
+
+class TestEnrichPorFarmaco:
+    def test_consulta_por_farmaco_en_ingles_y_solo_con_el_nombre(self):
+        llamadas: list[str] = []
+        mock = _mock_por_farmaco({}, llamadas)
+        ctx = GenomicContext(drugs=["carbamazepine"])
+        with patch("backend.pipeline.genomic_context.PharmGKBClient", return_value=mock):
+            asyncio.run(enrich(ctx))
+        assert llamadas == ["farmaco:carbamazepine"]
+
+    def test_sin_genes_pero_con_farmacos_consulta(self):
+        llamadas: list[str] = []
+        anns = {"carbamazepine": [_drug_ann("HLA-B", "carbamazepine", "1A", "HLA-B*15:02")]}
+        mock = _mock_por_farmaco(anns, llamadas)
+        with patch("backend.pipeline.genomic_context.PharmGKBClient", return_value=mock):
+            resultado = asyncio.run(enrich(GenomicContext(drugs=["carbamazepine"])))
+        fuente = [s for s in resultado.sources if s.name == "PharmGKB"][0]
+        assert fuente.status == GenomicSourceStatus.consultada
+        assert len(resultado.annotations) == 1
+        ann = resultado.annotations[0]
+        assert (ann.gene, ann.drug, ann.level, ann.variant, ann.queried_by) == (
+            "HLA-B", "carbamazepine", "1A", "HLA-B*15:02", "drug",
+        )
+
+    def test_solo_niveles_1a_a_2b_y_sin_repetidos(self):
+        llamadas: list[str] = []
+        anns = {"carbamazepine": [
+            _drug_ann("HLA-B", "carbamazepine", "1A", "HLA-B*15:02"),
+            _drug_ann("HLA-B", "carbamazepine", "1A", "HLA-B*15:02"),
+            _drug_ann("SCN1A", "carbamazepine", "2B", "rs3812718"),
+            _drug_ann("EPHX1", "carbamazepine", "3", "rs1051740"),
+            _drug_ann("ABCB1", "carbamazepine", "4", "rs1045642"),
+        ]}
+        mock = _mock_por_farmaco(anns, llamadas)
+        with patch("backend.pipeline.genomic_context.PharmGKBClient", return_value=mock):
+            resultado = asyncio.run(enrich(GenomicContext(drugs=["carbamazepine"])))
+        assert [(a.gene, a.level) for a in resultado.annotations] == [("HLA-B", "1A"), ("SCN1A", "2B")]
+
+    def test_anotacion_sin_gen_se_descarta(self):
+        llamadas: list[str] = []
+        anns = {"carbamazepine": [_drug_ann("", "carbamazepine", "1A")]}
+        mock = _mock_por_farmaco(anns, llamadas)
+        with patch("backend.pipeline.genomic_context.PharmGKBClient", return_value=mock):
+            resultado = asyncio.run(enrich(GenomicContext(drugs=["carbamazepine"])))
+        assert resultado.annotations == []
+
+    def test_solo_evidencia_debil_queda_sin_resultados(self):
+        llamadas: list[str] = []
+        anns = {"pregabalin": [_drug_ann("SLC7A5", "pregabalin", "3", "rs4240803")]}
+        mock = _mock_por_farmaco(anns, llamadas)
+        with patch("backend.pipeline.genomic_context.PharmGKBClient", return_value=mock):
+            resultado = asyncio.run(enrich(GenomicContext(drugs=["pregabalin"])))
+        fuente = [s for s in resultado.sources if s.name == "PharmGKB"][0]
+        assert resultado.annotations == []
+        assert fuente.status == GenomicSourceStatus.sin_resultados
+
+    def test_como_maximo_tres_farmacos(self):
+        llamadas: list[str] = []
+        mock = _mock_por_farmaco({}, llamadas)
+        ctx = GenomicContext(drugs=["a", "b", "c", "d"])
+        with patch("backend.pipeline.genomic_context.PharmGKBClient", return_value=mock):
+            asyncio.run(enrich(ctx))
+        assert llamadas == ["farmaco:a", "farmaco:b", "farmaco:c"]
+
+    def test_genes_y_farmacos_se_consultan_los_dos(self):
+        llamadas: list[str] = []
+        mock = _mock_por_farmaco({}, llamadas)
+        ctx = GenomicContext(genes=["TTR"], drugs=["carbamazepine"])
+        with patch("backend.pipeline.genomic_context.PharmGKBClient", return_value=mock):
+            asyncio.run(enrich(ctx))
+        assert llamadas == ["gen:TTR", "farmaco:carbamazepine"]
+
+    def test_anotacion_por_gen_queda_marcada_por_gen(self):
+        mock_client = _make_mock_client({"TTR": [_gene_ann("TTR", "tafamidis")]})
+        with patch("backend.pipeline.genomic_context.PharmGKBClient", return_value=mock_client):
+            resultado = asyncio.run(enrich(GenomicContext(genes=["TTR"])))
+        assert resultado.annotations[0].queried_by == "gene"
+
+    def test_sin_genes_ni_farmacos_no_consulta(self):
+        with patch("backend.pipeline.genomic_context.PharmGKBClient") as mock_cls:
+            resultado = asyncio.run(enrich(GenomicContext()))
+        mock_cls.assert_not_called()
+        fuente = [s for s in resultado.sources if s.name == "PharmGKB"][0]
+        assert fuente.status == GenomicSourceStatus.no_consultada
+        assert fuente.detail == "Sin genes ni fármacos en el caso."
+
+
+class TestPromptBlockFarmacos:
+    def test_anotacion_por_farmaco_aclara_que_no_es_el_genotipo_del_paciente(self):
+        ctx = GenomicContext(
+            drugs=["carbamazepine"],
+            annotations=[PharmacogenomicAnnotation(
+                gene="HLA-B", drug="carbamazepine", significance="Toxicity",
+                level="1A", variant="HLA-B*15:02", queried_by="drug",
+            )],
+            sources=[GenomicSource(name="PharmGKB", status=GenomicSourceStatus.consultada)],
+        )
+        bloque = ctx.to_prompt_block()
+        assert "carbamazepine" in bloque
+        assert "HLA-B*15:02" in bloque
+        assert "1A" in bloque
+        assert "El genotipo del paciente para estos genes no está informado" in bloque
+
+    def test_farmaco_sin_equivalente_aparece_como_no_consultado(self):
+        ctx = GenomicContext(drugs_without_english=["farmacoraro"])
+        assert "farmacoraro" in ctx.to_prompt_block()
+        assert "no consultado" in ctx.to_prompt_block()
+
+    def test_anotacion_por_gen_se_muestra_como_antes(self):
+        ctx = GenomicContext(
+            annotations=[PharmacogenomicAnnotation(gene="TTR", drug="tafamidis", significance="efficacy")],
+        )
+        assert "  • TTR / tafamidis — efficacy" in ctx.to_prompt_block()
+        assert "genotipo del paciente" not in ctx.to_prompt_block()
+
+
+class TestAnonimizacionFarmacos:
+    def test_texto_libre_del_caso_nunca_se_envia(self):
+        """Solo viajan valores del diccionario cerrado: un fármaco con dosis no sale."""
+        llamadas: list[str] = []
+        mock = _mock_por_farmaco({}, llamadas)
+        ctx = build(_caso_con_farmacos(["pregabalina 75 mg c/12h", "carbamazepina"]))
+        with patch("backend.pipeline.genomic_context.PharmGKBClient", return_value=mock):
+            asyncio.run(enrich(ctx))
+        assert llamadas == ["farmaco:carbamazepine"]
+        assert ctx.drugs_without_english == ["pregabalina 75 mg c/12h"]
