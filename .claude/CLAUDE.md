@@ -208,6 +208,10 @@ que es local e ignorada por git. Lo que queda es el adjunto en Trello.
 Scripts disponibles:
 - `demo_pubmed.py` — cliente PubMed E-utilities (búsqueda + verificación PMIDs)
 - `demo_orphanet.py` — cliente Orphanet (enfermedades raras)
+- `demo_orphadata.py` — cliente Orphadata contra la API real: genes de ATTRV30M (ORPHA:85447,
+  devuelve `TTR`), y los códigos del caso base (ORPHA:271861 y ORPHA:64746), que **no tienen
+  asociación génica cargada** porque cuelga de los subtipos: un 404 `Query not found` que NO
+  significa "no se conoce gen". Distingue ese 404 del 404 de ruteo (URL mal armada)
 - `demo_pharmgkb.py` — cliente PharmGKB (fármaco-genómica)
 - `demo_clinvar.py` — cliente ClinVar: TTR `c.148G>A` (encontrada), `p.Val50Met`, `Val30Met`
   (ambigua) y una inexistente, más el bloque del Agente 02; `--sin-red` simula la caída de NCBI
@@ -350,7 +354,9 @@ tesis-iresm/
 │   ├── external/
 │   │   ├── clinical_trials.py  ← cliente ClinicalTrials.gov API v2
 │   │   ├── pubmed.py           ← cliente PubMed E-utilities + verificación PMIDs (S4)
-│   │   ├── orphanet.py         ← cliente Orphanet: enfermedades raras (S4)
+│   │   ├── orphanet.py         ← cliente Orphanet: enfermedades raras (S4); delega los
+│   │   │                          genes en orphadata.py
+│   │   ├── orphadata.py        ← cliente Orphadata: genes asociados a enfermedades raras (S4)
 │   │   ├── pharmgkb.py         ← cliente PharmGKB: fármaco-genómica (S4)
 │   │   ├── clinvar.py          ← cliente ClinVar: significancia de variantes (S4)
 │   │   └── rate_limiter.py     ← rate limits y fallbacks para APIs externas (S4)
