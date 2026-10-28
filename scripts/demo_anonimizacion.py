@@ -77,15 +77,33 @@ _IDENTIFICADORES = {
     "fecha de nacimiento": ["14/07/1983"],
     "historia clínica": ["HC-44821", "44821"],
     "médica derivante": ["María Elena Gutiérrez", "Gutiérrez"],
+    # Formato de informe de laboratorio (segundo bloque, otra identidad inventada).
+    "apellido (laboratorio)": ["RAMIREZ"],
+    "nombre partido en 2 líneas": ["NICOLAS"],
+    "DNI (laboratorio)": ["28765432", "28.765.432"],
+    "médico solicitante": ["GOMEZ LAURA", "SOSA"],
 }
 
-_ENCABEZADO = """Paciente: Juan Carlos Pérez. DNI 32.456.789. Historia clínica N° HC-44821.
+_ENCABEZADO_PROSA = """Paciente: Juan Carlos Pérez. DNI 32.456.789. Historia clínica N° HC-44821.
 Fecha de nacimiento: 14/07/1983.
 Domicilio: Av. Colón 1234, Villa Carlos Paz
 Tel: 0351 155-678901. Email: jcperez@example.com.
 Derivado por la Dra. María Elena Gutiérrez.
 
 """
+
+# La forma de un informe de laboratorio real (PDF de dos columnas): el nombre
+# partido en dos líneas, rótulos que no son "Paciente:", y el apellido repetido
+# sin rótulo en el pie. Los datos son inventados; la forma sale de estudios reales.
+_ENCABEZADO_LABORATORIO = """SOLICITANTE: GOMEZ LAURA INES AUTOR: LAURA INES SOSA
+PACIENTE: RAMIREZ MARTIN FEC. NAC.: 03/05/1980 (46 a)
+NICOLAS
+TIPO DOCUMENTO: D.N.I. NRO. DOCUMENTO: 28765432
+Estudio: Martin Ramirez - 12/09/2026
+
+"""
+
+_ENCABEZADO = _ENCABEZADO_PROSA + _ENCABEZADO_LABORATORIO
 
 
 def _caso_base() -> str:
@@ -203,7 +221,9 @@ def main() -> None:
     emitir(_SEP)
     emitir("DEMO — Anonimización: ¿qué identificadores llegan al modelo de lenguaje?")
     emitir(_SEP)
-    emitir("\nENTRADA — encabezado inyectado al caso clínico de la tesis:\n")
+    emitir("\nENTRADA — dos encabezados inyectados al caso clínico de la tesis: uno en prosa y")
+    emitir("otro con la forma de un informe de laboratorio real (nombre partido en dos líneas,")
+    emitir("otros rótulos, el apellido repetido en un título). Datos inventados:\n")
     for l in _ENCABEZADO.strip().splitlines():
         emitir(f"    {l}")
     emitir(f"\n  + el caso base de neuropatía axonal (varón de 42 años), sin tocar.")
@@ -218,7 +238,7 @@ def main() -> None:
                f"(llevan [NOMBRE], [DOCUMENTO]... en lugar del dato)")
         emitir(f"  prompts con identificadores: {con['prompts_con_fuga']}")
         for cat, n in con["fugas_por_identificador"].items():
-            emitir(f"      {cat:22} {'SE FILTRA en %d' % n if n else 'no aparece'}")
+            emitir(f"      {cat:28} {'SE FILTRA en %d' % n if n else 'no aparece'}")
         emitir(f"  en el reporte final        : "
                f"{con['identificadores_en_el_reporte'] or 'ninguno'}")
 
@@ -227,7 +247,7 @@ def main() -> None:
         emitir(f"  prompts enviados al modelo : {sin['prompts_salientes']}")
         emitir(f"  prompts con identificadores: {sin['prompts_con_fuga']}")
         for cat, n in sin["fugas_por_identificador"].items():
-            emitir(f"      {cat:22} {'SE FILTRA en %d prompts' % n if n else 'no aparece'}")
+            emitir(f"      {cat:28} {'SE FILTRA en %d prompts' % n if n else 'no aparece'}")
     finally:
         cliente.__exit__(None, None, None)
 
@@ -240,8 +260,10 @@ def main() -> None:
     emitir(f"{'[OK]' if instrumento_valido else '[X]'} Sin anonimización: "
            f"{sin['prompts_con_fuga']} de {sin['prompts_salientes']} prompts con identificadores"
            f" — el instrumento {'detecta' if instrumento_valido else 'NO detecta'} las fugas.")
-    emitir("\nAlcance: reglas deterministas sobre identificadores directos. Un nombre suelto,")
-    emitir("sin marcador que lo anuncie, no se detecta (ver docstring del módulo).")
+    emitir("\nAlcance: reglas deterministas sobre identificadores directos. Un nombre que nunca")
+    emitir("aparece con un marcador en el documento no se detecta (ver docstring del módulo).")
+    emitir("Esta corrida usa dos formatos inventados: no demuestra cobertura sobre cualquier")
+    emitir("documento. La medición sobre estudios reales está en el comentario de la tarjeta.")
     emitir(_SEP)
 
     _OUT_DIR.mkdir(parents=True, exist_ok=True)
