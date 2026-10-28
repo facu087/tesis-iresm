@@ -166,23 +166,39 @@ _PAGE_W = 17 * cm
 
 # ── Estilos ────────────────────────────────────────────────────────────────────
 
+# Ancho que realmente tiene una tabla dentro del marco: la hoja menos los márgenes
+# (2 cm a cada lado, ver `generate_pdf`) y menos los 6 pt de relleno interno que
+# `SimpleDocTemplate` deja a cada lado del marco. Las tablas de 17 cm exactos
+# desbordaban esos 12 pt y se asomaban fuera de la línea de los encabezados.
+_ANCHO_UTIL = A4[0] - 4 * cm - 12
+
+
+def _anchos(*columnas_cm: float) -> list[float]:
+    """Anchos de columna proporcionales a `columnas_cm`, sumando el ancho útil."""
+    total = sum(columnas_cm)
+    return [_ANCHO_UTIL * c / total for c in columnas_cm]
+
+
 def _styles() -> dict:
     base = getSampleStyleSheet()
     return {
         "title": ParagraphStyle(
             "NTitle", parent=base["Normal"],
-            fontSize=22, textColor=_NEXUS_BLUE,
+            # `leading` explícito: sin él hereda 12 de Normal, menos que el cuerpo
+            # de la letra (22), y el título pisaba al subtítulo de la portada.
+            fontSize=22, leading=28, textColor=_NEXUS_BLUE,
             spaceAfter=4, alignment=TA_CENTER, fontName="Helvetica-Bold",
         ),
         "subtitle": ParagraphStyle(
             "NSubtitle", parent=base["Normal"],
-            fontSize=10, textColor=_GRAY,
+            fontSize=10, leading=14, textColor=_GRAY,
             spaceAfter=6, alignment=TA_CENTER,
         ),
         "section": ParagraphStyle(
             "NSection", parent=base["Normal"],
-            fontSize=13, textColor=_NEXUS_BLUE,
+            fontSize=13, leading=16, textColor=_NEXUS_BLUE,
             spaceBefore=10, spaceAfter=4, fontName="Helvetica-Bold",
+            keepWithNext=1,
         ),
         "body": ParagraphStyle(
             "NBody", parent=base["Normal"],
@@ -196,6 +212,14 @@ def _styles() -> dict:
             "NCell", parent=base["Normal"],
             fontSize=8, leading=11,
         ),
+        "celda": ParagraphStyle(
+            "NCelda", parent=base["Normal"],
+            fontSize=9, leading=12,
+        ),
+        "celda_b": ParagraphStyle(
+            "NCeldaB", parent=base["Normal"],
+            fontSize=9, leading=12, fontName="Helvetica-Bold",
+        ),
         "disclaimer": ParagraphStyle(
             "NDisclaimer", parent=base["Normal"],
             fontSize=7, textColor=_GRAY, alignment=TA_CENTER,
@@ -204,7 +228,10 @@ def _styles() -> dict:
 
 
 def _hr() -> HRFlowable:
-    return HRFlowable(width="100%", thickness=0.5, color=_NEXUS_BLUE, spaceAfter=6)
+    # keepWithNext: la línea acompaña al encabezado y ambos a lo que sigue.
+    hr = HRFlowable(width="100%", thickness=0.5, color=_NEXUS_BLUE, spaceAfter=6)
+    hr.keepWithNext = 1
+    return hr
 
 
 def _section(title: str, s: dict) -> list:
@@ -353,22 +380,27 @@ def _case_summary(report: StructuredReport, s: dict) -> list:
     elems = _section("RESUMEN DEL CASO CLÍNICO", s)
     cs = report.case_summary
 
-    rows = []
+    datos = []
     if cs.patient_profile:
-        rows.append(["Perfil del paciente", cs.patient_profile])
+        datos.append(("Perfil del paciente", cs.patient_profile))
     if cs.chief_complaint:
-        rows.append(["Motivo de consulta", cs.chief_complaint])
+        datos.append(("Motivo de consulta", cs.chief_complaint))
     if cs.disease_duration:
-        rows.append(["Tiempo de evolución", cs.disease_duration])
+        datos.append(("Tiempo de evolución", cs.disease_duration))
     if cs.current_treatments:
-        rows.append(["Tratamientos actuales", ", ".join(cs.current_treatments)])
+        datos.append(("Tratamientos actuales", ", ".join(cs.current_treatments)))
     if cs.relevant_history:
-        rows.append(["Antecedentes relevantes", ", ".join(cs.relevant_history)])
+        datos.append(("Antecedentes relevantes", ", ".join(cs.relevant_history)))
     if cs.procedures_done:
-        rows.append(["Procedimientos realizados", ", ".join(cs.procedures_done)])
+        datos.append(("Procedimientos realizados", ", ".join(cs.procedures_done)))
+
+    # Paragraph y no string: una celda con un string no parte el texto en líneas
+    # y un antecedente largo se salía de la tabla y de la hoja.
+    rows = [[_par(_t(etiqueta), s["celda_b"]), _par(_t(valor), s["celda"])]
+            for etiqueta, valor in datos]
 
     if rows:
-        t = Table(rows, colWidths=[5 * cm, 12 * cm])
+        t = Table(rows, colWidths=_anchos(5, 12))
         t.setStyle(TableStyle([
             ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
             ("FONTSIZE", (0, 0), (-1, -1), 9),
@@ -474,7 +506,7 @@ def _hypothesis_block(h: RankedHypothesis, s: dict) -> list:
             s["small"],
         ),
     ]]
-    badge_t = Table(badge_row, colWidths=[1.2 * cm, 2.8 * cm, 3.8 * cm, 2.0 * cm, 7.2 * cm])
+    badge_t = Table(badge_row, colWidths=_anchos(1.2, 2.8, 3.8, 2.0, 7.2))
     badge_t.setStyle(TableStyle([
         ("FONTSIZE", (0, 0), (-1, -1), 8),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
@@ -556,11 +588,14 @@ def _debate_summary(report: StructuredReport, s: dict) -> list:
         else "No — se detectaron divergencias significativas."
     )
     rows = [
-        ["Rondas completadas", str(ds.rounds_completed)],
-        ["Total de críticas generadas", str(ds.total_critiques)],
-        ["Consenso alcanzado", consensus],
+        [_par(etiqueta, s["celda_b"]), _par(_t(valor), s["celda"])]
+        for etiqueta, valor in (
+            ("Rondas completadas", ds.rounds_completed),
+            ("Total de críticas generadas", ds.total_critiques),
+            ("Consenso alcanzado", consensus),
+        )
     ]
-    t = Table(rows, colWidths=[6 * cm, 11 * cm])
+    t = Table(rows, colWidths=_anchos(6, 11))
     t.setStyle(TableStyle([
         ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
         ("FONTSIZE", (0, 0), (-1, -1), 9),
