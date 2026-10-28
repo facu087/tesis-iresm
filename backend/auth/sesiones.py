@@ -21,6 +21,7 @@ from sqlmodel import Session
 
 from ..models.cuenta import CuentaMedico
 from ..models.sesion import Sesion
+from ..seguridad import es_produccion
 
 COOKIE_NAME = "nexus_sesion"
 
@@ -120,14 +121,13 @@ def set_session_cookie(response: Response, valor_cookie: str) -> None:
     Fija la cookie de sesión: `httpOnly`, `SameSite=Lax`, `Secure` cuando
     `ENVIRONMENT=production` (design.md — D3).
     """
-    es_produccion = os.getenv("ENVIRONMENT", "development") == "production"
     response.set_cookie(
         key=COOKIE_NAME,
         value=valor_cookie,
         max_age=_ttl_minutos() * 60,
         httponly=True,
         samesite="lax",
-        secure=es_produccion,
+        secure=es_produccion(),
         path="/",
     )
 

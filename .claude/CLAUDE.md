@@ -258,6 +258,12 @@ Scripts disponibles:
   grabador de `backend/mock/recorder.py` durante la pasada base y escribe
   `grabacion.json` (no graba en modo mock). Cada ejecución real gasta unos
   20.000 tokens extra en la comparación
+- `demo_seguridad_http.py` (Sprint 5, tarjeta #57) — sin red ni cuota: qué valores de
+  `ALLOWED_ORIGINS` acepta el servidor y cuáles impiden que arranque; un preflight por caso
+  contra la configuración anterior (reconstruida) y la real; el riesgo del `*` medido en la
+  configuración anterior; encabezados de seguridad antes y ahora; y producción (HSTS,
+  `/docs` en 404, http rechazado) en un proceso aparte. Sale con código 1 si algo falla.
+  Genera `resultado.txt` y `resumen.json` en `output/demo_seguridad_http/`
 - `demo_registro_medicos.py` — registro de médicos, revisión admin y pipeline
   protegido: dos altas → intento de análisis rechazado (pendiente, 403) → alta
   del primer admin por CLI → aprobación con auditoría → análisis permitido
@@ -341,6 +347,8 @@ tesis-iresm/
 │   │   ├── pricing.py          ← tabla de tarifas por modelo
 │   │   ├── medicion.py         ← lógica de la medición de costos
 │   │   └── __init__.py
+│   ├── seguridad.py            ← ALLOWED_ORIGINS validada, es_produccion(), encabezados
+│   │                              de seguridad y CORS mínimo (S5, tarjeta #57)
 │   ├── db.py                   ← engine SQLite + create_db_and_tables() (S4)
 │   ├── mantenimiento/
 │   │   └── limpieza.py         ← borra las sesiones vencidas en segundo plano; no hay
@@ -735,6 +743,40 @@ ensayos consultan PubMed y ClinicalTrials.gov en vivo.
 - No persistir datos clínicos más allá de la sesión
 - API keys SIEMPRE desde `.env`, nunca hardcodeadas
 
+### Seguridad HTTP y despliegue (Sprint 5, tarjeta #57)
+
+`backend/seguridad.py` concentra tres decisiones que antes estaban repartidas:
+
+- **Orígenes**: `origenes_permitidos()` es la única lectura de `ALLOWED_ORIGINS`; la usan
+  `main.py` (CORS) y `auth/origen.py` (validación CSRF). Antes cada una la parseaba a su
+  manera y nada impedía `*`, que con `allow_credentials=True` deja a cualquier sitio leer
+  respuestas autenticadas. Una configuración insegura **impide arrancar**.
+- **Producción**: `es_produccion()` (`ENVIRONMENT=production`, sin distinguir mayúsculas) es
+  la única decisión; la usan el HSTS, la cookie `Secure` y el apagado de `/docs`. Antes la
+  cookie comparaba el texto exacto, y con `Production` el HSTS se habría activado sin que
+  la cookie fuera `Secure`.
+- **Encabezados**: `EncabezadosDeSeguridad` (middleware ASGI) agrega `nosniff`,
+  `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`, COOP, una CSP de API
+  (`default-src 'none'`) y `Cache-Control: no-store` en `/api/*`. `Strict-Transport-Security`
+  solo en producción. El frontend suma los suyos en `next.config.ts` (sin CSP: ver abajo).
+
+CORS acepta solo los métodos (`GET`, `POST`, `PUT`) y el header (`Content-Type`) que usa
+`frontend/src/lib/api.ts`. Si el frontend empieza a usar otro método o header, hay que
+agregarlo en `METODOS_CORS`/`ENCABEZADOS_CORS`.
+
+**Despliegue.** El backend **no termina TLS**: va detrás de un proxy inverso (nginx, Caddy,
+un balanceador) que sí lo hace. Requisitos: `ENVIRONMENT=production`; `ALLOWED_ORIGINS` con
+los orígenes `https` del frontend; `ALLOWED_HOSTS` con los dominios del backend; y uvicorn
+con `--proxy-headers --forwarded-allow-ips=<ip del proxy>` para que vea el esquema real.
+El proxy tiene que redirigir http a https. Sin eso, la cookie `Secure` no viaja y el login
+no funciona: es lo esperado.
+
+**Pendiente, dicho a propósito**: el frontend no tiene `Content-Security-Policy`. Next
+inyecta scripts en línea para hidratar y una CSP estricta exige nonces por pedido
+(`node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md`); activarla sin
+probarla dejaría la aplicación en blanco. Una respuesta 500 sin manejar tampoco lleva estos
+encabezados: la arma el middleware más externo de Starlette.
+
 ### Testing
 - Cada módulo nuevo requiere su test en `tests/`
 - Caso de prueba base: neuropatía axonal sensitivomotora, paciente masculino 42 años
@@ -811,7 +853,13 @@ SECRET_KEY=              # Firma la cookie de sesión (HMAC). Obligatoria: sin
                          # SecretKeyNoConfigurada en el primer login.
 ALLOWED_ORIGINS=http://localhost:3000  # Lista blanca para CORS y para la
                          # validación de Origin/Referer (mitigación CSRF) en
-                         # todo endpoint que cambia estado.
+                         # todo endpoint que cambia estado. Una sola lectura
+                         # (backend/seguridad.py), validada al arrancar: el
+                         # servidor NO levanta con "*", sin esquema, con ruta,
+                         # ni con http fuera de localhost en producción.
+ALLOWED_HOSTS=           # Opcional. Hosts aceptados en el encabezado Host, por
+                         # coma. Sin definir no se restringe (en producción
+                         # avisa por stderr). No acepta "*".
 
 # Persistencia de cuentas (Sprint 4)
 NEXUS_DB_PATH=./data/nexus.db  # Cuentas, sesiones y auditoría (SQLite).
