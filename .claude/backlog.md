@@ -406,7 +406,7 @@ se probaron con una corrida real de `POST /api/analyze` sobre el caso de la tesi
 |---|-------|
 | 1 | Módulo de anonimización: nombres, fechas e identificadores |
 | 2 | Limpieza automática de archivos temporales (SESSION_TTL) |
-| 3 | Configuración CORS, validación de origins y HTTPS/TLS |
+| 3 | ✅ Configuración CORS, validación de origins y HTTPS/TLS — `backend/seguridad.py` (tarjeta #57). `ALLOWED_ORIGINS` se valida al arrancar (rechaza `*`, esquemas inválidos y `http` fuera de localhost en producción); CORS solo con los métodos y el header que usa el frontend; encabezados de seguridad en toda respuesta; HSTS y `/docs` apagado según `ENVIRONMENT=production`. TLS lo termina el proxy del despliegue. Evidencia: `scripts/demo_seguridad_http.py` (24 de 24 comprobaciones). Pendiente: CSP del frontend (exige nonces) |
 | 4 | Validación end-to-end: caso neuropatía axonal (42 años) |
 | 5 | Definición de criterios de calidad del reporte |
 | 6 | Evaluación del output con médico o tutor académico |

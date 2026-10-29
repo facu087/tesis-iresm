@@ -5,7 +5,6 @@ Arrancar con:
     uvicorn backend.main:app --reload
 """
 
-import os
 import sys
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -15,6 +14,7 @@ from fastapi import FastAPI
 
 load_dotenv()
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .api.admin_router import router as admin_router
 from .api.cuentas_router import router as cuentas_router
@@ -23,6 +23,15 @@ from .db import create_db_and_tables
 from .mantenimiento import limpieza
 from .mock.mode import ENV_VAR as _MOCK_ENV_VAR
 from .mock.mode import is_mock_active
+from .seguridad import (
+    ENCABEZADOS_CORS,
+    METODOS_CORS,
+    EncabezadosDeSeguridad,
+    es_produccion,
+    hosts_permitidos,
+    origenes_permitidos,
+    urls_de_documentacion,
+)
 
 
 @asynccontextmanager
@@ -62,20 +71,35 @@ app = FastAPI(
         "para el médico responsable."
     ),
     version="0.3.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
     lifespan=lifespan,
+    # La documentación interactiva solo existe fuera de producción.
+    **urls_de_documentacion(),
 )
 
-_ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
-
+# Configuración insegura = el servidor no arranca (ver backend/seguridad.py).
+# El orden importa: el último `add_middleware` es el más externo, y los
+# encabezados de seguridad tienen que cubrir también las respuestas que
+# generan el CORS (preflight) y la validación de host.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_ALLOWED_ORIGINS,
+    allow_origins=origenes_permitidos(),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    # Solo lo que el frontend usa (frontend/src/lib/api.ts), no "*".
+    allow_methods=METODOS_CORS,
+    allow_headers=ENCABEZADOS_CORS,
 )
+
+_HOSTS = hosts_permitidos()
+if _HOSTS is not None:
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=_HOSTS)
+elif es_produccion():
+    print(
+        "[NEXUS] ALLOWED_HOSTS no está definida en producción: el servidor acepta "
+        "cualquier encabezado Host. Definila con los dominios del despliegue.",
+        file=sys.stderr,
+    )
+
+app.add_middleware(EncabezadosDeSeguridad, hsts=es_produccion())
 
 app.include_router(cuentas_router)
 app.include_router(admin_router)
