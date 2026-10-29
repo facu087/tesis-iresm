@@ -270,6 +270,44 @@ Scripts disponibles:
   (pipeline mockeado) → rechazo con motivo → reenvío corregido. Contra una base
   SQLite temporal en memoria, cero llamadas a un LLM. Genera `flujo.json` y
   `resumen.txt` en `output/demo_registro/`
+- `demo_anonimizacion.py` (Sprint 5, tarjeta #55) — corre `POST /api/analyze` completo
+  en modo mock sobre un caso con identificadores inyectados (nombre, DNI, teléfono,
+  correo, domicilio, fecha de nacimiento, historia clínica, médica derivante, más un
+  segundo bloque con la forma de un informe de laboratorio real: nombre partido en dos
+  líneas, otros rótulos), interceptando `call_provider()`, y revisa cada prompt saliente.
+  Se corre dos veces: con la anonimización activa (0 de 22 prompts con identificadores)
+  y apagada, que es el control del instrumento (7 de 22 los filtran). Sale con código 1
+  si algo se filtra.
+  Genera `resultado.txt` y `resumen.json` en `output/demo_anonimizacion/`
+
+### Anonimización (Sprint 5)
+
+`backend/ingestion/anonimizador.py` se aplica en `POST /api/analyze` entre
+`normalize()` y `ClinicalCase(...)`: es la última parada antes de que el texto vaya a
+Groq, PubMed, ClinicalTrials.gov, Orphanet y PharmGKB. Detecta con reglas
+deterministas documentos argentinos (DNI, LC, LE, CI, CUIL, CUIT), historia clínica y
+afiliado, teléfonos, correos, fechas de calendario, domicilios y nombres propios
+**precedidos por un marcador explícito** ("Paciente:", "Sr.", "Dra.", "derivado por",
+"Solicitante:", "Apellido y nombre:"), en "Nombre Apellido", "Apellido, Nombre" o en
+mayúsculas. Además **aprende del propio documento**: lo que ya detectó con marcador (cada
+palabra de un nombre, cada DNI) lo enmascara en todas sus apariciones, porque los informes
+repiten el nombre sin rótulo en títulos y pies. Solo busca nombres con inicial mayúscula
+(nunca "tono blanco") y no propaga apellidos que son términos médicos ("Wilson").
+
+Medido sobre 22 estudios reales de una persona (un mismo sanatorio): de 167
+identificadores presentes, la primera versión dejaba pasar 85; la actual, 0. Son los
+mismos formatos con los que se escribieron las reglas, así que no prueba cobertura sobre
+informes de otros centros. **Los PDF reales nunca entran al repositorio ni a ningún
+servicio externo**; los tests usan datos inventados con la misma forma.
+
+Qué **no** hace, y es parte del diseño: un nombre que nunca aparece con un marcador en el
+documento no se detecta, y ante la duda no se enmascara. Una heurística de "palabras capitalizadas" destruiría
+Charcot-Marie-Tooth, Guillain-Barré, Villa Carlos Paz y los nombres de fármacos. Es una
+**red de seguridad determinista, no una garantía de desidentificación**; para eso haría
+falta un NER biomédico en español, evaluado con métricas propias (trabajo futuro).
+`InformeAnonimizacion` lleva conteos por categoría y **nunca** los valores encontrados:
+va a los logs. El caso base de `scripts/poc_test.py` ya viene anonimizado a mano y debe
+salir intacto (hay un test).
 
 - `demo_limpieza_temporales.py` (Sprint 5, tarjeta #56) — verifica la premisa de la tarjeta
   (el backend no escribe archivos temporales: el PDF se procesa en memoria) y muestra lo que
@@ -322,6 +360,8 @@ tesis-iresm/
 │   ├── ingestion/
 │   │   ├── extractor.py            ← PDF nativo (pdfplumber) + OCR (Tesseract)
 │   │   ├── normalizer.py           ← normalización INN y unidades de medida
+│   │   ├── anonimizador.py         ← enmascara identificadores directos antes de que el
+│   │   │                              texto salga del sistema (S5, tarjeta #55)
 │   │   ├── biomarker_extractor.py  ← extracción genes, anticuerpos, fármacos
 │   │   └── __init__.py
 │   ├── models/

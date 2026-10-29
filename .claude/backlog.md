@@ -404,7 +404,7 @@ se probaron con una corrida real de `POST /api/analyze` sobre el caso de la tesi
 
 | # | Tarea |
 |---|-------|
-| 1 | Módulo de anonimización: nombres, fechas e identificadores |
+| 1 | ✅ Módulo de anonimización: nombres, fechas e identificadores — `backend/ingestion/anonimizador.py` (tarjeta #55). Reglas deterministas sobre identificadores directos; un nombre suelto sin marcador no se detecta, por diseño. Evidencia: `scripts/demo_anonimizacion.py` (0 de 22 prompts filtran identificadores, 7 de 22 sin la anonimización, con un caso en prosa y otro con la forma de un informe de laboratorio real). Medido sobre 22 estudios reales: 85 de 167 identificadores se filtraban con la primera versión, 0 con la actual; no prueba cobertura en informes de otros centros |
 | 2 | Limpieza automática de archivos temporales (SESSION_TTL) |
 | 3 | ✅ Configuración CORS, validación de origins y HTTPS/TLS — `backend/seguridad.py` (tarjeta #57). `ALLOWED_ORIGINS` se valida al arrancar (rechaza `*`, esquemas inválidos y `http` fuera de localhost en producción); CORS solo con los métodos y el header que usa el frontend; encabezados de seguridad en toda respuesta; HSTS y `/docs` apagado según `ENVIRONMENT=production`. TLS lo termina el proxy del despliegue. Evidencia: `scripts/demo_seguridad_http.py` (24 de 24 comprobaciones). Pendiente: CSP del frontend (exige nonces) |
 | 4 | Validación end-to-end: caso neuropatía axonal (42 años) |
