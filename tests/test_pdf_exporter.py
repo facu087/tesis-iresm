@@ -935,3 +935,54 @@ def _alto_del_resumen(reporte) -> float:
 
     tabla = next(f for f in _case_summary(reporte, _styles()) if isinstance(f, Table))
     return tabla.wrap(_ANCHO_UTIL, 10_000)[1]
+
+
+# ── Tests: estado de la verificación en la portada (tarjeta #91) ──────────────
+
+def _plano(pdf: bytes) -> str:
+    """Texto del PDF con los saltos de línea del maquetado unidos en espacios."""
+    return " ".join(_texto_del_pdf(pdf).split())
+
+
+class TestEstadoVerificacionEnPdf:
+    def _report_con_estado(self, estado, causa, no_verificables=1) -> StructuredReport:
+        report = _make_report()
+        report.verification = VerificationSummary(
+            total_fuentes=1, no_verificables=no_verificables,
+            hipotesis_pendientes=1, estado=estado, causa=causa,
+        )
+        return report
+
+    def test_no_disponible_por_red_dice_que_pubmed_no_respondio(self):
+        texto = _plano(generate_pdf(self._report_con_estado("no_disponible", "red")))
+        assert "Verificación bibliográfica no disponible" in texto
+        assert "PubMed no respondió (sin conexión o tiempo de espera agotado)" in texto
+
+    def test_parcial_dice_cuantas_quedaron_sin_consultar(self):
+        report = self._report_con_estado("parcial", "error_api", no_verificables=3)
+        texto = _plano(generate_pdf(report))
+        assert "Verificación bibliográfica incompleta" in texto
+        assert "3 referencias no se pudieron consultar" in texto
+        assert "PubMed devolvió un error" in texto
+
+    def test_configuracion_no_atribuye_el_fallo_a_la_red(self):
+        texto = _plano(generate_pdf(self._report_con_estado("no_disponible", "configuracion")))
+        assert "posible clave de PubMed mal configurada" in texto
+        assert "PubMed no respondió" not in texto
+
+    def test_completa_no_muestra_el_aviso(self):
+        texto = _plano(generate_pdf(self._report_con_estado("completa", None, 0)))
+        assert "Verificación bibliográfica no disponible" not in texto
+        assert "Verificación bibliográfica incompleta" not in texto
+
+    def test_sin_estado_no_muestra_el_aviso(self):
+        texto = _plano(generate_pdf(self._report_con_estado(None, None)))
+        assert "Verificación bibliográfica no disponible" not in texto
+        assert "Verificación bibliográfica incompleta" not in texto
+
+    def test_hay_una_frase_para_cada_causa(self):
+        from backend.pipeline.pdf_exporter import _FRASES_CAUSA
+        from backend.pipeline.verification import CausaFallo
+
+        assert set(_FRASES_CAUSA) == {c.value for c in CausaFallo}
+        assert all(_FRASES_CAUSA.values())

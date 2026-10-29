@@ -70,6 +70,10 @@ Backend mergeado a `develop` (capa de recuperación de evidencia / RAG). Autor: 
 - [x] Fix: el RAG consultaba PubMed en español — ahora usa `condition_en`
 - [x] **Integrar** RAG + verificador de PMIDs en el flujo del pipeline (router/orchestrator)
 - [x] Verificación bibliográfica de PMIDs: título real vs. citado (backend/pipeline/verification.py)
+- [x] Reporte: estado global de la verificación (`completa`/`parcial`/`no_disponible`/
+      `sin_consulta`) y causa del fallo en categorías, en `/report` y en el PDF
+      (tarjeta #91, OpenSpec `reporte-motivo-verificacion`). `registro_de_consultas()`
+      anota cada consulta a PubMed, incluida la de la Ronda 5; nunca el texto del error
 - [x] Vista de reporte: estado de verificación de hipótesis y fuentes (frontend/src/app/report/page.tsx)
 - [x] PDF: estado de verificación en el reporte exportado (backend/pipeline/pdf_exporter.py)
 - [x] Agente 02 (Especialista Genómica): prompt + llamada LLM + parseo JSON
@@ -226,6 +230,11 @@ Scripts disponibles:
   sobre el caso de prueba (rankings, overlap y dispersión de scores)
 - `demo_verificacion.py` — verificación bibliográfica: contrasta contra PubMed los PMIDs
   citados por los agentes y muestra el título real al lado del citado (Agente 04)
+- `demo_estado_verificacion.py` (tarjeta #91) — sin red ni cuota: simula PubMed respondiendo,
+  sin conexión, 429, 400 (clave), 503 y una falla solo en la Ronda 5, y muestra estado, causa
+  y el aviso del PDF; comprueba que ni la URL ni la clave llegan al reporte. Genera
+  `resultado.txt`, `resumen.json`, `reporte_no_disponible.pdf` y `.json` en
+  `output/demo_estado_verificacion/`. Sale con código 1 si algo falla
 - `demo_priorizacion_evidencia.py` — priorización EBM: nivel declarado vs. efectivo, estado
   y orden del reporte; genera `priorizacion.txt`, `reporte.json` y `reporte.pdf`
   (`--pubmed` verifica PMIDs reales)
@@ -359,7 +368,8 @@ tesis-iresm/
 │   │   ├── genomic_context.py  ← build() determinista + enrich() PharmGKB/ClinVar (S4)
 │   │   ├── orchestrator.py     ← distribución paralela asyncio (Ronda 1)
 │   │   ├── debate.py           ← motor de debate adversarial (Rondas 2–4)
-│   │   ├── verification.py     ← verificación de PMIDs citados contra PubMed (S4)
+│   │   ├── verification.py     ← verificación de PMIDs citados contra PubMed (S4);
+│   │   │                          estado global y causa del fallo (registro_de_consultas)
 │   │   ├── evidence.py         ← clasificación EBM: tope de nivel, estado y orden (S4)
 │   │   ├── consensus.py        ← lógica determinista del Agente 04: partición,
 │   │   │                          representante, contradicciones, solapamiento RAG (S4)

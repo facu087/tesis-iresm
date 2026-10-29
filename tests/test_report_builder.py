@@ -541,3 +541,33 @@ class TestNavegacionDeEnsayos:
         segundo = _make_trial().model_copy(update={"nct_id": "NCT_B"})
         result = _build(trials=[primero, segundo])
         assert [t.nct_id for t in result.clinical_trials] == ["NCT_A", "NCT_B"]
+
+
+# ── Estado y causa de la verificación (tarjeta #91) ────────────────────────────
+
+class TestEstadoDeLaVerificacion:
+    def test_sin_estado_los_campos_quedan_nulos(self):
+        reporte = build_export(_make_case(), _make_report(), trials=[], processing_time=1.0)
+        assert reporte.verification.estado is None
+        assert reporte.verification.causa is None
+
+    def test_con_estado_el_json_lo_contiene(self):
+        from backend.pipeline.verification import CausaFallo, EstadoVerificacion
+
+        reporte = build_export(
+            _make_case(), _make_report(), trials=[], processing_time=1.0,
+            estado_verificacion=(EstadoVerificacion.NO_DISPONIBLE, CausaFallo.RED),
+        )
+        datos = reporte.model_dump(mode="json")["verification"]
+        assert datos["estado"] == "no_disponible"
+        assert datos["causa"] == "red"
+
+    def test_completa_no_lleva_causa(self):
+        from backend.pipeline.verification import EstadoVerificacion
+
+        reporte = build_export(
+            _make_case(), _make_report(), trials=[], processing_time=1.0,
+            estado_verificacion=(EstadoVerificacion.COMPLETA, None),
+        )
+        assert reporte.verification.estado == "completa"
+        assert reporte.verification.causa is None

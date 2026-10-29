@@ -31,7 +31,12 @@ from ..pipeline.pdf_exporter import generate_pdf
 from ..pipeline.report_builder import build_export
 from ..pipeline.consensus import build_arbitration_input, degraded, summarize
 from ..pipeline.trial_matching import build_navigation_input
-from ..pipeline.verification import SourceVerification, verify_report_sources
+from ..pipeline.verification import (
+    SourceVerification,
+    estado_verificacion,
+    registro_de_consultas,
+    verify_report_sources,
+)
 from ..mock import responses as mock_responses
 from ..mock.mode import is_mock_active
 from ..telemetry import usage as usage_telemetry
@@ -221,13 +226,18 @@ async def analyze(
         # ── 5. Debate adversarial: Rondas 2–4 ───────────────────────────────
         final_report = await debate.run_debate(case_with_pico, round_1_report)
 
-        # ── 6. Verificación bibliográfica de los PMIDs citados (Agente 04) ──
-        verifications = await verify_report_sources(final_report)
+        # El registro anota el resultado de cada consulta a PubMed: la de la
+        # verificación (paso 6) y la re-verificación de la Ronda 5 que hace el
+        # Árbitro (paso 7). Con eso el reporte dice si la verificación corrió
+        # y, si no, por qué (tarjeta #91).
+        with registro_de_consultas() as consultas_pubmed:
+            # ── 6. Verificación bibliográfica de los PMIDs citados (Agente 04) ──
+            verifications = await verify_report_sources(final_report)
 
-        # ── 7. Arbitraje: consenso, contradicciones y Ronda 5 (Agente 04) ───
-        # Va después de la verificación porque el Árbitro necesita saber qué
-        # citas resistieron para decidir qué hipótesis se recitan.
-        arbitration = await _arbitrate_safe(final_report, verifications, case_with_pico)
+            # ── 7. Arbitraje: consenso, contradicciones y Ronda 5 (Agente 04) ───
+            # Va después de la verificación porque el Árbitro necesita saber qué
+            # citas resistieron para decidir qué hipótesis se recitan.
+            arbitration = await _arbitrate_safe(final_report, verifications, case_with_pico)
 
         # ── 8. Navegación de ensayos (Agente 05) ────────────────────────────
         # Ahora busca sobre el consenso y no sobre la concatenación del
@@ -250,6 +260,7 @@ async def analyze(
             navigation=navigation,
             arbitration=arbitration,
             mock=is_mock_active(),
+            estado_verificacion=estado_verificacion(consultas_pubmed),
         )
 
         # ── 9. Resumen ejecutivo (Agente 06) ────────────────────────────────

@@ -124,6 +124,7 @@ Suite de tests: **82 tests, 100% passing** (`pytest tests/`)
 | 20 | Landing explicativa en `/` + reubicación de la carga de casos a `/analizar` (EP-08) | ✅ Hecho (OpenSpec `landing-explicativa`) |
 | 21 | Control de costos del pipeline: punto único de llamada al proveedor, telemetría de tokens, tarifas configurables, techo/modelo por tarea, modo mock | 🔄 Casi listo — ver nota (21) |
 | 22 | Registro de médicos, matrícula, revisión admin y protección de `/api/analyze` (EP-09) | ✅ Hecho (OpenSpec `registro-medicos-matricula`) |
+| 23 | Reporte: mostrar por qué no se pudo verificar la bibliografía (tarjeta #91) | ✅ Hecho (OpenSpec `reporte-motivo-verificacion`): estado global y causa en categorías en `/report` y el PDF; el aviso ya no sale en verde ni dice "fallo de red" fijo. Evidencia: `scripts/demo_estado_verificacion.py` |
 
 > Nota (12) — **RESUELTA**: se integró la búsqueda semántica RAG como contexto
 > bibliográfico en `backend/pipeline/orchestrator.py` (Ronda 1), y desde la tarea 16
