@@ -27,7 +27,13 @@ from ..models.hypothesis import Source
 from ..models.report import Report
 from ..models.trial import ClinicalTrial, TrialNavigationResult
 from .evidence import HypothesisStatus, prioritize
-from .verification import SourceStatus, SourceVerification, source_key
+from .verification import (
+    CausaFallo,
+    EstadoVerificacion,
+    SourceStatus,
+    SourceVerification,
+    source_key,
+)
 
 _VERSION = "0.3.0"
 
@@ -218,8 +224,16 @@ def _build_bibliography(
 def _build_verification_summary(
     verifications: dict[str, SourceVerification],
     hypotheses: list[RankedHypothesis],
+    estado_verificacion: tuple[EstadoVerificacion, CausaFallo | None] | None = None,
 ) -> VerificationSummary:
-    """Cuenta el resultado de la verificación bibliográfica para el reporte."""
+    """
+    Cuenta el resultado de la verificación bibliográfica para el reporte.
+
+    `estado_verificacion` es el par (estado, causa) que calcula el router a
+    partir de las consultas a PubMed (tarjeta #91). Sin él, los dos campos
+    quedan nulos, igual que en un reporte anterior al cambio.
+    """
+    estado, causa = estado_verificacion or (None, None)
     conteo = {status: 0 for status in SourceStatus}
     for veredicto in verifications.values():
         conteo[veredicto.status] += 1
@@ -243,6 +257,8 @@ def _build_verification_summary(
         hipotesis_pendientes=por_estado[HypothesisStatus.PENDIENTE],
         hipotesis_especulativas=por_estado[HypothesisStatus.ESPECULATIVA],
         hipotesis_topeadas=topeadas,
+        estado=estado.value if estado else None,
+        causa=causa.value if causa else None,
     )
 
 
@@ -305,6 +321,7 @@ def build_export(
     navigation: TrialNavigationResult | None = None,
     arbitration: ArbitrationResult | None = None,
     mock: bool = False,
+    estado_verificacion: tuple[EstadoVerificacion, CausaFallo | None] | None = None,
 ) -> StructuredReport:
     """
     Ensambla el StructuredReport de exportación a partir de los outputs del pipeline.
@@ -328,6 +345,10 @@ def build_export(
                           D7): el reporte lo declara en `metadata.mock` para
                           que el frontend y el PDF lo muestren, y nadie lo
                           confunda con un análisis real.
+        estado_verificacion: Par (estado, causa) de las consultas a PubMed,
+                          calculado con `verification.estado_verificacion()`
+                          (tarjeta #91). Si se omite, `verification.estado` y
+                          `verification.causa` quedan nulos.
 
     Returns:
         StructuredReport listo para serializar a JSON o exportar a PDF.
@@ -347,7 +368,9 @@ def build_export(
         debate_summary=_build_debate_summary(report, arbitration),
         clinical_trials=trials,
         bibliography=_build_bibliography(report, verifications),
-        verification=_build_verification_summary(verifications, hypotheses),
+        verification=_build_verification_summary(
+            verifications, hypotheses, estado_verificacion
+        ),
         rare_diseases=list(navigation.rare_diseases) if navigation else [],
         trial_search=navigation.summary if navigation else None,
         arbitration=_build_arbitration_out(arbitration) if arbitration else None,

@@ -74,7 +74,7 @@ const STATUS_GROUPS: { status: HypothesisStatus; title: string; description: str
   {
     status: "pendiente",
     title: "Pendientes de verificación",
-    description: "PubMed no respondió: el nivel queda en III hasta poder confirmar las fuentes.",
+    description: "Sus referencias no se pudieron consultar en PubMed: el nivel queda en III hasta poder confirmar las fuentes.",
   },
   {
     status: "especulativa",

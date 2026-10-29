@@ -54,7 +54,7 @@ _STATUS_GROUPS = [
     ("respaldada", "Hipótesis respaldadas",
      "Al menos una referencia confirmada contra PubMed."),
     ("pendiente", "Pendientes de verificación",
-     "PubMed no respondió: el nivel queda en III hasta poder confirmar las fuentes."),
+     "Sus referencias no se pudieron consultar en PubMed: el nivel queda en III hasta poder confirmar las fuentes."),
     ("especulativa", "Hipótesis especulativas",
      "Ninguna referencia resistió la verificación. Se muestran, no se descartan."),
 ]
@@ -238,6 +238,19 @@ def _section(title: str, s: dict) -> list:
     return [Spacer(1, 0.3 * cm), _par(title, s["section"]), _hr()]
 
 
+# Frase en lenguaje llano por cada causa de fallo de la verificación (tarjeta
+# #91). El JSON lleva solo la categoría; un test exige una frase por categoría.
+_FRASES_CAUSA: dict[str, str] = {
+    "red": "PubMed no respondió (sin conexión o tiempo de espera agotado).",
+    "limite_velocidad": "PubMed rechazó la consulta por exceso de pedidos.",
+    "configuracion": (
+        "PubMed rechazó la consulta: posible clave de PubMed mal configurada en el servidor."
+    ),
+    "error_api": "PubMed devolvió un error.",
+    "desconocida": "Ocurrió un error no identificado al consultar PubMed.",
+}
+
+
 # ── Secciones del PDF ──────────────────────────────────────────────────────────
 
 def _cover(report: StructuredReport, s: dict) -> list:
@@ -317,6 +330,28 @@ def _cover(report: StructuredReport, s: dict) -> list:
         ))
         elems.append(Spacer(1, 0.5 * cm))
 
+    # Verificación que no corrió completa (tarjeta #91): va junto al aviso de
+    # mock porque cambia cómo se leen todas las hipótesis pendientes.
+    if v and v.estado in ("parcial", "no_disponible"):
+        titulo = (
+            "Verificación bibliográfica no disponible:"
+            if v.estado == "no_disponible"
+            else "Verificación bibliográfica incompleta:"
+        )
+        frase = _FRASES_CAUSA.get(v.causa or "desconocida", _FRASES_CAUSA["desconocida"])
+        sin_consultar = (
+            "1 referencia no se pudo consultar."
+            if v.no_verificables == 1
+            else f"{v.no_verificables} referencias no se pudieron consultar."
+        )
+        elems.append(_par(
+            f"<font color='{_hex(_RED)}'><b>{titulo}</b> "
+            f"{sin_consultar} {frase} "
+            "Las hipótesis afectadas quedan pendientes, no invalidadas.</font>",
+            s["disclaimer"],
+        ))
+        elems.append(Spacer(1, 0.5 * cm))
+
     # Aviso de verificación: si las referencias no resisten el contraste contra
     # PubMed, el lector tiene que enterarse en la portada, no en la bibliografía.
     if v and v.total_fuentes:
@@ -338,9 +373,16 @@ def _cover(report: StructuredReport, s: dict) -> list:
                     f"marcadas como especulativas y deben leerse como tales."
                 )
             if v.hipotesis_pendientes:
+                # Solo se afirma "no respondió" cuando esa es la causa, o cuando
+                # el reporte es anterior a la tarjeta #91 y no trae causa.
+                motivo = (
+                    "PubMed no respondió"
+                    if v.causa in (None, "red")
+                    else "sus referencias no se pudieron consultar en PubMed"
+                )
                 aviso += (
                     f" {v.hipotesis_pendientes} de {total_hipotesis} hipótesis quedan "
-                    f"pendientes: PubMed no respondió y su nivel queda en III."
+                    f"pendientes: {motivo} y su nivel queda en III."
                 )
             elems.append(_par(f"<font color='{_hex(_RED)}'>{aviso}</font>", s["disclaimer"]))
             elems.append(Spacer(1, 0.5 * cm))
