@@ -186,6 +186,10 @@ def _bloque(e: Escenario, evaluacion: EvaluacionCalidad) -> str:
     return "\n".join(lineas)
 
 
+def _coma(valor: float) -> str:
+    return f"{valor:.2f}".replace(".", ",")
+
+
 def _criterios() -> str:
     c = CRITERIOS
     return "\n".join([
@@ -197,9 +201,9 @@ def _criterios() -> str:
         "  nivel efectivo I o II sin fuente verificada, o falla alguna métrica.",
         "",
         "Métrica                 Cálculo                                               Pasa si",
-        f"Cobertura de respaldo   respaldadas / hipótesis                               ≥ {c.min_cobertura_respaldo:.2f}",
-        f"Precisión de citas      verificadas / (verificadas+discordantes+inexistentes) ≥ {c.min_precision_citas:.2f}",
-        f"Sobredeclaración        efectivo < declarado / hipótesis                      ≤ {c.max_sobredeclaracion:.2f}",
+        f"Cobertura de respaldo   respaldadas / hipótesis                               ≥ {_coma(c.min_cobertura_respaldo)}",
+        f"Precisión de citas      verificadas / (verificadas+discordantes+inexistentes) ≥ {_coma(c.min_precision_citas)}",
+        f"Sobredeclaración        efectivo < declarado / hipótesis                      ≤ {_coma(c.max_sobredeclaracion)}",
         "",
         "Una métrica sin datos (denominador cero) no se cumple.",
     ]) + "\n"
