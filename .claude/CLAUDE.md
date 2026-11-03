@@ -266,7 +266,22 @@ Scripts disponibles:
   `output/medicion_costos/`. `--mock` lo recorre sin cuota. `--grabar` abre el
   grabador de `backend/mock/recorder.py` durante la pasada base y escribe
   `grabacion.json` (no graba en modo mock). Cada ejecución real gasta unos
-  20.000 tokens extra en la comparación
+  20.000 tokens extra en la comparación. También guarda `reporte.json` con el
+  reporte de la pasada base (con el estado de la verificación), para evaluarlo
+  con `evaluar_reporte.py`
+- `evaluar_reporte.py <reporte.json>` (Sprint 5, tarjeta #59; no es un demo) — evalúa un
+  reporte guardado contra los criterios de calidad de `backend/pipeline/calidad.py`:
+  veredicto (`cumple`/`no_cumple`/`no_evaluable`), motivos, tres métricas contra umbral
+  (cobertura de respaldo, precisión de citas, sobredeclaración) e indicadores. Sin red ni
+  cuota. Guarda `evaluacion.json` y `evaluacion.txt` en `output/evaluacion_calidad/<nombre>/`.
+  Sale con 0/1/2 según el veredicto y 3 si el archivo no es un reporte válido. La evaluación
+  no copia texto clínico. Los umbrales son **provisionales** (versión `2026-11-provisional`)
+  y se recalibran con la corrida real de la tarjeta #58
+- `demo_criterios_calidad.py` (Sprint 5, tarjeta #59) — sin red ni cuota: siete reportes
+  sintéticos del caso base (cumple, cada métrica fallando, nivel II sin respaldo, modo mock,
+  verificación caída) con su veredicto. Genera `resultado.txt`, `resumen.json` y
+  `criterios.txt` en `output/demo_criterios_calidad/`. Sale con código 1 si algún veredicto
+  no es el esperado
 - `demo_seguridad_http.py` (Sprint 5, tarjeta #57) — sin red ni cuota: qué valores de
   `ALLOWED_ORIGINS` acepta el servidor y cuáles impiden que arranque; un preflight por caso
   contra la configuración anterior (reconstruida) y la real; el riesgo del `*` medido en la
@@ -376,6 +391,9 @@ tesis-iresm/
 │   │   ├── recitation.py       ← Ronda 5: qué se recita y qué se acepta (S4)
 │   │   ├── trial_matching.py   ← lógica determinista del Agente 05: términos,
 │   │   │                          filtros edad/sexo, Orphanet, orden (S4)
+│   │   ├── calidad.py          ← criterios de calidad del reporte: evaluar() puro,
+│   │   │                          umbrales versionados (S5, tarjeta #59). No lo
+│   │   │                          llama el pipeline: lo usa scripts/evaluar_reporte.py
 │   │   ├── report_builder.py   ← generación de JSON estructurado del reporte
 │   │   ├── pdf_exporter.py     ← exportación a PDF con ReportLab
 │   │   └── __init__.py
