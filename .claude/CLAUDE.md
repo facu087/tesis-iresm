@@ -323,6 +323,13 @@ Scripts disponibles:
   qué fuentes quedan, las descartadas por hipótesis, `fuera_del_rag` y el pedido de revisión
   con la lista de literatura. Genera `resultado.txt` y `resumen.json` en
   `output/demo_citas_ancladas/`. Sale con código 1 si falla una comprobación
+- `revision_medica.py` (Sprint 5, tarjeta #60; no es un demo) — material de la revisión del
+  reporte con un médico o el tutor. `preparar <reporte.json>` genera el PDF del reporte, la
+  planilla imprimible y los CSV para cargar las respuestas (rechaza reportes de modo mock y
+  no pisa una planilla existente); `tabular <carpeta>` valida las respuestas contra sus
+  opciones y resume pertinencia, citas que respaldan, nivel razonable y las hipótesis con
+  respaldo verificado sin respaldo clínico. El resumen no copia texto clínico. El protocolo
+  de la sesión está en `docs/revision-medica.md`
 
 También se corrigió un bug del Sprint 2: falsos positivos en el extractor de
 biomarcadores (regex de anticuerpos y de marcadores de lab). Ver commit `e72e004`.
@@ -344,6 +351,8 @@ tesis-iresm/
 │   ├── config.yaml             ← contexto del proyecto + reglas para los artefactos
 │   ├── specs/                  ← specs vigentes del sistema (por capacidad)
 │   └── changes/                ← cambios en curso; archive/ guarda los cerrados
+├── docs/
+│   └── revision-medica.md      ← protocolo de la revisión del reporte con un médico (S5, #60)
 ├── .vscode/
 │   ├── extensions.json         ← extensiones recomendadas del equipo
 │   └── settings.json           ← configuración compartida
@@ -417,6 +426,9 @@ tesis-iresm/
 │   │   ├── calidad.py          ← criterios de calidad del reporte: evaluar() puro,
 │   │   │                          umbrales versionados (S5, tarjeta #59). No lo
 │   │   │                          llama el pipeline: lo usa scripts/evaluar_reporte.py
+│   │   ├── revision_medica.py  ← planilla de la revisión médica y tabulación de las
+│   │   │                          respuestas (S5, tarjeta #60); la usa
+│   │   │                          scripts/revision_medica.py
 │   │   ├── report_builder.py   ← generación de JSON estructurado del reporte
 │   │   ├── pdf_exporter.py     ← exportación a PDF con ReportLab
 │   │   └── __init__.py
