@@ -50,6 +50,19 @@ class TestOrigenesPermitidos:
         monkeypatch.setenv("ALLOWED_ORIGINS", "http://localhost:5173")
         assert origenes_permitidos() == ["http://localhost:5173"]
 
+    @pytest.mark.parametrize("valor, esperado", [
+        ("https://nexus.example:443", "https://nexus.example"),
+        ("http://localhost:80", "http://localhost"),
+        ("https://[::1]:443", "https://[::1]"),
+        ("https://nexus.example:8443", "https://nexus.example:8443"),
+        ("http://localhost:443", "http://localhost:443"),
+    ])
+    def test_quita_el_puerto_por_defecto_del_esquema(self, monkeypatch, valor, esperado):
+        # El navegador nunca manda el puerto por defecto en `Origin`: con él en la
+        # lista, el frontend legítimo quedaría afuera de CORS y del chequeo CSRF.
+        monkeypatch.setenv("ALLOWED_ORIGINS", valor)
+        assert origenes_permitidos() == [esperado]
+
     @pytest.mark.parametrize("valor", [
         "*",
         "http://localhost:3000,*",

@@ -41,6 +41,7 @@ ORIGEN_POR_DEFECTO = "http://localhost:3000"
 
 # Hosts donde `http` es aceptable aun en producción: el tráfico no sale de la máquina.
 _HOSTS_LOCALES = frozenset({"localhost", "127.0.0.1", "::1"})
+_PUERTO_POR_DEFECTO = {"http": 80, "https": 443}
 
 # Métodos y encabezados de pedido que el frontend realmente usa (api.ts): sin
 # esto, CORS aceptaba cualquier método y cualquier header ("*").
@@ -93,7 +94,11 @@ def _normalizar_origen(valor: str) -> str:
         raise ConfiguracionInsegura(
             f"En producción los orígenes tienen que ser https: {valor!r} no lo es."
         )
-    return f"{partes.scheme}://{partes.netloc}".lower()
+    netloc = partes.netloc
+    if partes.port == _PUERTO_POR_DEFECTO[partes.scheme]:
+        # El navegador nunca manda el puerto por defecto en `Origin`.
+        netloc = netloc.rsplit(":", 1)[0]
+    return f"{partes.scheme}://{netloc}".lower()
 
 
 def origenes_permitidos() -> list[str]:

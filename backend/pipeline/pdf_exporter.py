@@ -160,10 +160,6 @@ def _source_line(src, indice: str = "") -> str:
         )
     return linea
 
-# Ancho útil de la página A4 con márgenes de 2 cm a cada lado
-_PAGE_W = 17 * cm
-
-
 # ── Estilos ────────────────────────────────────────────────────────────────────
 
 # Ancho que realmente tiene una tabla dentro del marco: la hoja menos los márgenes
