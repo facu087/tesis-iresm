@@ -409,7 +409,7 @@ se probaron con una corrida real de `POST /api/analyze` sobre el caso de la tesi
 | 2 | Limpieza automática de archivos temporales (SESSION_TTL) |
 | 3 | ✅ Configuración CORS, validación de origins y HTTPS/TLS — `backend/seguridad.py` (tarjeta #57). `ALLOWED_ORIGINS` se valida al arrancar (rechaza `*`, esquemas inválidos y `http` fuera de localhost en producción); CORS solo con los métodos y el header que usa el frontend; encabezados de seguridad en toda respuesta; HSTS y `/docs` apagado según `ENVIRONMENT=production`. TLS lo termina el proxy del despliegue. Evidencia: `scripts/demo_seguridad_http.py` (24 de 24 comprobaciones). Pendiente: CSP del frontend (exige nonces) |
 | 4 | Validación end-to-end: caso neuropatía axonal (42 años) |
-| 5 | Definición de criterios de calidad del reporte |
+| 5 | ✅ Definición de criterios de calidad del reporte — `backend/pipeline/calidad.py` (tarjeta #59, OpenSpec `criterios-calidad-reporte`). Veredicto `cumple`/`no_cumple`/`no_evaluable` con tres métricas: cobertura de respaldo ≥ 0,50, precisión de citas ≥ 0,70 y sobredeclaración ≤ 0,50. Umbrales **provisionales**: se recalibran con la corrida real de la #58. `scripts/evaluar_reporte.py` evalúa el `reporte.json` que ahora guarda `scripts/medir_costos.py`. Con el reporte grabado del modo mock fallan las tres (0,33, 0,28 y 0,67). La cobertura clínica queda para la revisión con el médico (#60). Evidencia: `scripts/demo_criterios_calidad.py` (7 de 7 escenarios) |
 | 6 | Evaluación del output con médico o tutor académico |
 | 7 | Documentación final para entrega de tesis |
 

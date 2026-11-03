@@ -83,7 +83,13 @@ from backend.pipeline import debate, orchestrator, pico
 from backend.pipeline.consensus import build_arbitration_input
 from backend.pipeline.report_builder import build_export
 from backend.pipeline.trial_matching import build_navigation_input
-from backend.pipeline.verification import SourceVerification, verify_report_sources
+from backend.api.schemas import StructuredReport
+from backend.pipeline.verification import (
+    SourceVerification,
+    estado_verificacion,
+    registro_de_consultas,
+    verify_report_sources,
+)
 from backend.telemetry import medicion
 from backend.telemetry import usage as usage_telemetry
 from backend.telemetry.usage import CallRecord
@@ -153,6 +159,23 @@ def preservar_grabacion_anterior(carpeta: Path) -> None:
         previa.rename(carpeta / f"grabacion.{sello}.json")
 
 
+def guardar_reporte(carpeta: Path, reporte: StructuredReport) -> Path:
+    """
+    Escribe `reporte.json` con el reporte de la pasada base, para evaluarlo con
+    `scripts/evaluar_reporte.py` (tarjeta #59). No pisa uno previo: lo renombra
+    con su fecha de modificación. Contiene el texto del caso de prueba
+    anonimizado; queda en `output/`, ignorada por git.
+    """
+    ruta = carpeta / "reporte.json"
+    if ruta.exists():
+        sello = datetime.fromtimestamp(ruta.stat().st_mtime).strftime("%Y%m%d_%H%M%S")
+        ruta.rename(carpeta / f"reporte.{sello}.json")
+    tmp = carpeta / "reporte.json.tmp"
+    tmp.write_text(reporte.model_dump_json(indent=2), encoding="utf-8")
+    tmp.replace(ruta)
+    return ruta
+
+
 def _error(exc: BaseException) -> str:
     """Solo el tipo de la excepción: el mensaje puede arrastrar texto clínico."""
     return type(exc).__name__
@@ -170,6 +193,7 @@ class ResultadoBase:
     nav_input: TrialNavigationInput | None = None
     navigation: TrialNavigationResult | None = None
     executive_summary: str | None = None
+    structured: StructuredReport | None = None
     tiempos: dict[str, float] = field(default_factory=dict)
 
 
@@ -204,12 +228,15 @@ async def pasada_base(res: ResultadoBase) -> None:
     final_report = await _paso(res, "debate_rondas_2_a_4", debate.run_debate(case_pico, round_1))
     res.report = final_report
 
-    verifications: dict[str, SourceVerification] = await _paso(
-        res, "verificacion_pmids", verify_report_sources(final_report)
-    )
-    res.arbitration = await _paso(
-        res, "arbitro", _arbitrate_safe(final_report, verifications, case_pico)
-    )
+    # Como en `router.analyze()`: el registro anota la verificación y la
+    # re-verificación de la Ronda 5 para el estado global (tarjeta #91).
+    with registro_de_consultas() as consultas_pubmed:
+        verifications: dict[str, SourceVerification] = await _paso(
+            res, "verificacion_pmids", verify_report_sources(final_report)
+        )
+        res.arbitration = await _paso(
+            res, "arbitro", _arbitrate_safe(final_report, verifications, case_pico)
+        )
 
     consenso = [c.hypothesis for c in res.arbitration.consensus]
     res.nav_input = build_navigation_input(case_pico, consenso or final_report.hypotheses)
@@ -219,8 +246,11 @@ async def pasada_base(res: ResultadoBase) -> None:
         case=case_pico, report=final_report, trials=res.navigation.trials,
         processing_time=sum(res.tiempos.values()), verifications=verifications,
         navigation=res.navigation, arbitration=res.arbitration, mock=is_mock_active(),
+        estado_verificacion=estado_verificacion(consultas_pubmed),
     )
     res.executive_summary = await _paso(res, "agente_06", _synthesize_safe(structured))
+    structured.executive_summary = res.executive_summary
+    res.structured = structured
 
 
 # ── Comparación controlada (5.4) ──────────────────────────────────────────────
@@ -521,6 +551,10 @@ async def correr(carpeta: Path, mock: bool, grabar: bool = False) -> int:
             "trial_evaluation": res.navigation.summary.evaluacion if res.navigation else None,
         }
     m.datos["debate_rounds_3_4"] = rondas_3_y_4(res.report)
+    if res.structured is not None:
+        ruta_reporte = guardar_reporte(carpeta, res.structured)
+        print(f"[medir_costos] reporte: {ruta_reporte} "
+              "(evaluarlo con scripts/evaluar_reporte.py)", file=sys.stderr)
     m.etapa("pasada_base", "error" if error_base else "ok", espera, error_base)
 
     # Comparación: cada rama es independiente de las otras.
