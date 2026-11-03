@@ -693,6 +693,10 @@ muestra sintética. Los números de una corrida real **ya están medidos**
 tokens. Cada ejecución del script gasta además unos 20.000 tokens en la
 comparación de modelos. Las cifras anteriores (77.516 y 78.158) quedan
 superadas: se midieron sin que las críticas del debate llegaran a los agentes.
+La corrida de validación del 2026-11-03 (tarjeta #58) midió 85.556 tokens en 30
+llamadas (8 reintentadas) y 517 s; el reporte no cumple los criterios de calidad
+(precisión de citas 0,08, ninguna cita sale del RAG). Ver la nota de la #58 en
+`.claude/backlog.md`.
 El costo equivalente con Claude, GPT-4o o Gemini sigue estimado sobre la
 muestra sintética; con el `costos.jsonl` real se puede recalcular con
 `usage.recalculate()`.
