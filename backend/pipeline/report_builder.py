@@ -370,7 +370,7 @@ def build_export(
         bibliography=_build_bibliography(report, verifications),
         verification=_build_verification_summary(
             verifications, hypotheses, estado_verificacion
-        ),
+        ).model_copy(update={"fuera_del_rag": report.citas_fuera_del_rag}),
         rare_diseases=list(navigation.rare_diseases) if navigation else [],
         trial_search=navigation.summary if navigation else None,
         arbitration=_build_arbitration_out(arbitration) if arbitration else None,

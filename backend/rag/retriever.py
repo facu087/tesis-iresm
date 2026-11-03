@@ -226,8 +226,8 @@ class PubMedRetriever:
             return (
                 "LITERATURA CIENTÍFICA DISPONIBLE:\n"
                 "No se encontraron artículos relevantes en la base local de PubMed. "
-                "Basá tus hipótesis en tu conocimiento clínico y marcá las fuentes "
-                "con evidence_level: 'III' si no tenés respaldo bibliográfico verificado."
+                "Basá tus hipótesis en tu conocimiento clínico, dejá `sources` vacío "
+                "y usá evidence_level: \"III\". Cualquier PMID citado se descarta."
             ), []
 
         lines = ["LITERATURA CIENTÍFICA RELEVANTE (fuente: PubMed):"]
@@ -236,8 +236,7 @@ class PubMedRetriever:
             lines.append(article.to_prompt_block())
 
         lines.append(
-            "\nINSTRUCCIÓN: Cuando cites estas referencias, usá el PMID exacto "
-            "provisto. No inventes PMIDs adicionales."
+            "\nOBLIGATORIO: citá solo PMIDs de esta lista. Cualquier otro PMID se descarta."
         )
 
         return "\n".join(lines), articles

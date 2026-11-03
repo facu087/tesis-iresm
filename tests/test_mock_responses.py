@@ -92,7 +92,7 @@ class TestGrabacionFiel:
             assert entrada["model"].startswith("openai/gpt-oss-")
             assert isinstance(entrada["seq"], int)
             assert "agent_id" in entrada
-            assert entrada["recorded_at"] == "2026-10-26"
+            assert entrada["recorded_at"] == "2026-11-03"
 
     @pytest.mark.parametrize("tarea", sorted(_ESPERADAS_GRABADAS))
     def test_el_modelo_de_la_grabacion_coincide_con_el_presupuesto_de_la_tarea(self, tarea):
@@ -222,35 +222,36 @@ class TestParseoRealPorSitioDeLlamada:
     def test_la_critica_grabada_parsea_con_ids_canonicos(self):
         """El parser real lleva el destinatario que nombra el modelo a un ID canónico."""
         criticas = ArbiterAgent()._parse_critiques(mock_responses.get_mock_response("debate_critica"))
-        assert len(criticas) == 4
+        assert len(criticas) == 10
         assert all(re.fullmatch(r"\d{2}", c.target_agent_id) for c in criticas)
-        assert sorted(c.target_agent_id for c in criticas) == ["01"] * 2 + ["03"] * 2
+        assert sorted(c.target_agent_id for c in criticas) == ["02"] * 4 + ["03"] * 6
 
     def test_la_critica_grabada_llega_a_un_agente_del_debate(self):
         from backend.pipeline.debate import _critiques_for
 
         criticas = ArbiterAgent()._parse_critiques(mock_responses.get_mock_response("debate_critica"))
-        assert len(_critiques_for("01", criticas)) == 2
-        assert len(_critiques_for("03", criticas)) == 2
-        assert _critiques_for("02", criticas) == []  # nadie critica al autor de la grabación
+        assert len(_critiques_for("02", criticas)) == 4
+        assert len(_critiques_for("03", criticas)) == 6
+        assert _critiques_for("01", criticas) == []  # nadie critica al autor de la grabación
 
     def test_recitacion_parsea_con_fuentes(self, capsys):
         """
-        Grabación del 2026-10-26, con el prompt de la tarjeta #90: los tres
-        agentes respondieron con el esquema pedido. El 01 y el 03 recitaron con
-        fuentes; el 02 devolvió una lista vacía, que el prompt permite cuando
-        ningún artículo ofrecido es pertinente.
+        Grabación del 2026-11-03 (tarjeta #92, citas ancladas al RAG): solo
+        tres hipótesis quedaron sin respaldo, de los Agentes 02 y 03, así que
+        el 01 no recitó. Los dos respondieron con el esquema pedido: el 02
+        recitó con fuentes; el 03 devolvió una lista vacía, que el prompt
+        permite cuando ningún artículo ofrecido es pertinente.
         """
         por_agente = {
             e["agent_id"]: e["response"]
             for e in mock_responses.get_recorded_entries()["debate_recitacion"]
         }
-        for agente in ("01", "02", "03"):
+        assert sorted(por_agente) == ["02", "03"]
+        for agente in ("02", "03"):
             assert '"recitations"' in por_agente[agente]
-        for agente in ("01", "03"):
-            recitadas = ArbiterAgent()._parse_recitation(por_agente[agente], total=5)
-            assert recitadas and all(fuentes for fuentes in recitadas.values())
-        assert ArbiterAgent()._parse_recitation(por_agente["02"], total=5) == {}
+        recitadas = ArbiterAgent()._parse_recitation(por_agente["02"], total=5)
+        assert recitadas and all(fuentes for fuentes in recitadas.values())
+        assert ArbiterAgent()._parse_recitation(por_agente["03"], total=5) == {}
         assert capsys.readouterr().err == ""  # ningún aviso de esquema
 
     def test_pico_parsea(self):

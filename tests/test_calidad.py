@@ -326,6 +326,20 @@ class TestIndicadores:
         assert evaluacion.veredicto == "cumple"
 
 
+    def test_citas_descartadas_por_no_venir_del_rag(self):
+        base = evaluar(_reporte())
+        verificacion = _verificacion()
+        verificacion.fuera_del_rag = 23
+        evaluacion = evaluar(_reporte(verificacion=verificacion))
+        assert evaluacion.indicadores.citas_fuera_del_rag == 23
+        assert evaluacion.veredicto == base.veredicto
+        assert evaluacion.motivos == base.motivos
+
+    def test_reporte_anterior_sin_el_conteo(self):
+        assert _verificacion().fuera_del_rag is None
+        assert evaluar(_reporte()).indicadores.citas_fuera_del_rag is None
+
+
 # ── Privacidad ─────────────────────────────────────────────────────────────────
 
 class TestSinTextoClinico:

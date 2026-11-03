@@ -160,7 +160,8 @@ class TestEnrichContextWithRag:
 
         assert result.startswith(base)
         assert "No se pudo acceder a la base local de PubMed" in result
-        assert "evidence_level: 'III'" in result
+        assert 'evidence_level: "III"' in result
+        assert "Dejá `sources` vacío" in result
         assert "PMID: 99999901" not in result
 
     def test_sin_biomarkers_indexa_solo_la_condicion(self, monkeypatch) -> None:

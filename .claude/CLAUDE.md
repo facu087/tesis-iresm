@@ -126,6 +126,22 @@ Backend mergeado a `develop` (capa de recuperación de evidencia / RAG). Autor: 
 > figuraba en `architecture.md` ("toda hipótesis con referencia verificable"),
 > que con 15 de 15 citas discordantes no se cumplía nunca.
 >
+> **Citas ancladas al RAG** (Sprint 5, tarjeta #92, OpenSpec `citas-ancladas-rag`):
+> una cita con PMID solo vale si ese PMID lo ofreció el RAG. `run_debate()`
+> filtra las fuentes de las hipótesis finales con `recitation.filtrar_citas()`
+> antes de la verificación: lo descartado no se consulta en PubMed ni aparece en
+> el reporte, y el total queda en `verification.fuera_del_rag` (`None` en un
+> reporte anterior). Las fuentes sin PMID se conservan; sin literatura recuperada
+> se descartan todas las que tienen PMID. Ninguna hipótesis se descarta: la que
+> se queda sin fuentes es especulativa y entra en la Ronda 5. El Árbitro toma las
+> hipótesis de `report.hypotheses`, ya filtradas, nunca de las rondas del debate.
+> Los prompts de los Agentes 01, 02 y 03 llevan la regla (`base_agent.REGLA_CITAS`),
+> las revisiones de las Rondas 3 y 4 reciben la lista corta de artículos ofrecidos
+> (`recitation.lista_de_literatura()`, sin resúmenes) y el RAG ofrece hasta
+> `MAX_ARTICULOS_RAG = 10` artículos (`pipeline/orchestrator.py`). Con el filtro,
+> el anclaje en el RAG del Árbitro deja de medir algo: toda cita que le llega ya
+> es del RAG. El dato que lo reemplaza es "citas fuera del RAG".
+>
 > El Agente 05 es **híbrido**: el LLM solo traduce hipótesis a términos de
 > condición en inglés y etiqueta compatibilidad (`alta`/`media`/`baja`); la
 > búsqueda, los filtros duros por edad y sexo, la coincidencia exacta con
@@ -301,6 +317,12 @@ Scripts disponibles:
   después de la limpieza, que el comportamiento observable no cambia (una sesión viva sigue
   resolviéndose) y que una limpieza que falla devuelve `ok=False` sin levantar. Sin red ni
   cuota. Sale con código 1 si falla una comprobación
+- `demo_citas_ancladas.py` (Sprint 5, tarjeta #92) — sin red ni cuota: un debate del caso
+  base con agentes de respuesta fija, con literatura (5 artículos ofrecidos; citas de
+  memoria, ofrecidas, repetidas y una guía sin PMID) y sin literatura (12 PMIDs). Muestra
+  qué fuentes quedan, las descartadas por hipótesis, `fuera_del_rag` y el pedido de revisión
+  con la lista de literatura. Genera `resultado.txt` y `resumen.json` en
+  `output/demo_citas_ancladas/`. Sale con código 1 si falla una comprobación
 
 También se corrigió un bug del Sprint 2: falsos positivos en el extractor de
 biomarcadores (regex de anticuerpos y de marcadores de lab). Ver commit `e72e004`.
@@ -363,7 +385,7 @@ tesis-iresm/
 │   ├── mock/                   ← modo mock del pipeline (S4)
 │   │   ├── mode.py             ← activación de `NEXUS_MOCK_LLM`
 │   │   ├── responses.py        ← respuestas por tarea, carga diferida de grabadas.json
-│   │   ├── grabadas.json       ← respuestas y RAG de la corrida real del 2026-10-26
+│   │   ├── grabadas.json       ← respuestas y RAG de la corrida real del 2026-11-03
 │   │   ├── recorder.py         ← grabador de respuestas crudas (solo lo abre un script)
 │   │   └── __init__.py
 │   ├── telemetry/              ← control de costos (S4)
@@ -388,7 +410,8 @@ tesis-iresm/
 │   │   ├── evidence.py         ← clasificación EBM: tope de nivel, estado y orden (S4)
 │   │   ├── consensus.py        ← lógica determinista del Agente 04: partición,
 │   │   │                          representante, contradicciones, solapamiento RAG (S4)
-│   │   ├── recitation.py       ← Ronda 5: qué se recita y qué se acepta (S4)
+│   │   ├── recitation.py       ← Ronda 5: qué se recita y qué se acepta (S4);
+│   │   │                          filtro de citas fuera del RAG (S5, tarjeta #92)
 │   │   ├── trial_matching.py   ← lógica determinista del Agente 05: términos,
 │   │   │                          filtros edad/sexo, Orphanet, orden (S4)
 │   │   ├── calidad.py          ← criterios de calidad del reporte: evaluar() puro,
@@ -696,6 +719,11 @@ superadas: se midieron sin que las críticas del debate llegaran a los agentes.
 La corrida de validación del 2026-11-03 (tarjeta #58) midió 85.556 tokens en 30
 llamadas (8 reintentadas) y 517 s; el reporte no cumple los criterios de calidad
 (precisión de citas 0,08, ninguna cita sale del RAG). Ver la nota de la #58 en
+`.claude/backlog.md`. La corrida de verificación de la tarjeta #92 (citas
+ancladas al RAG, 2026-11-03, misma fecha) midió 84.666 tokens en 27 llamadas (6
+reintentadas) y 502 s, y el reporte **cumple** los tres criterios: cobertura 0,91
+(10/11), precisión 1,00 (8/8) y sobredeclaración 0,45 (5/11), con 0 citas fuera
+del RAG (los agentes citaron solo lo ofrecido). Ver la nota de la #92 en
 `.claude/backlog.md`.
 El costo equivalente con Claude, GPT-4o o Gemini sigue estimado sobre la
 muestra sintética; con el `costos.jsonl` real se puede recalcular con
@@ -715,8 +743,8 @@ en el frontend con la misma visibilidad que la advertencia del consenso de
 IA.
 
 Las trece tareas de `TASK_BUDGETS` usan respuestas **textuales de la corrida
-real del 2026-10-26** (22 respuestas: una por llamada, con el agente que la
-pidió), guardadas en `backend/mock/grabadas.json` (versionado) y
+real del 2026-11-03** (21 respuestas: una por llamada, con el agente que la
+pidió; corrida de verificación de la tarjeta #92), guardadas en `backend/mock/grabadas.json` (versionado) y
 cargadas de forma diferida por `backend/mock/responses.py` en el primer uso en
 modo mock: el modo real nunca lee ese archivo, y si falta o está malformado se
 levanta `RespuestasGrabadasInvalidas`. Salieron de `backend/mock/recorder.py`,
@@ -727,8 +755,8 @@ script** (nunca una variable de entorno ni `POST /api/analyze`) y guarda
 `output/medicion_costos/grabacion.json` (gitignoreado);
 `scripts/regenerar_mock.py` la convierte en `grabadas.json`. Como cada agente
 recibe su propia grabación en el orden en que la pidió, el modo mock reproduce
-la corrida: 12 hipótesis de consenso sin repetidas, 10 ensayos y el
-`executive_summary` del Agente 06, igual en cada pasada. En la corrida del
+la corrida: 11 hipótesis de consenso sin repetidas (10 respaldadas), 8 ensayos
+y el `executive_summary` del Agente 06, igual en cada pasada. En la corrida del
 2026-10-20 los Agentes 01 y 02 respondieron la Ronda 5 con el esquema equivocado
 (`hypotheses` en vez de `recitations`) y su recitación falló (2 hipótesis
 mejoradas). Desde la tarjeta #90 el prompt de recitación prohíbe esa clave y
@@ -736,8 +764,9 @@ reescribir hipótesis, y `_parse_recitation()` acepta la forma `hypotheses` solo
 para la hipótesis cuyo texto coincide con la ofrecida (una reescrita no hereda
 citas) y avisa por stderr, con claves y conteos, cuando falta `recitations`. En
 la corrida del 2026-10-26, ya con ese prompt, los tres agentes usaron el esquema
-pedido: 12 hipótesis recitadas y 4 mejoradas (el 02 no recitó ninguna, que el
-prompt permite). Es una sola corrida: la variación entre corridas del modelo
+pedido: 12 hipótesis recitadas y 4 mejoradas. En la del 2026-11-03, con las citas
+ancladas al RAG, solo 3 hipótesis llegaron sin respaldo a la Ronda 5 (de los
+Agentes 02 y 03) y 2 mejoraron; el 03 no recitó ninguna, que el prompt permite. Es una sola corrida: la variación entre corridas del modelo
 no está medida. La grabación incluye además lo que el RAG
 ofreció en la Ronda 1 (bloque `rag` de `grabadas.json`): en modo mock la Ronda 1
 usa esos artículos y no consulta PubMed. Sin ese bloque se consultaba en vivo y,

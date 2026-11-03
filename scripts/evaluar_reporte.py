@@ -104,6 +104,7 @@ def formatear(evaluacion: EvaluacionCalidad, origen: str) -> str:
         f"  Fuentes: {ind.fuentes_verificadas} verificadas, {ind.fuentes_discordantes} discordantes, "
         f"{ind.fuentes_inexistentes} inexistentes, {ind.fuentes_sin_pmid} sin PMID, "
         f"{ind.fuentes_no_verificables} no verificables",
+        f"  Citas fuera del RAG (descartadas): {_opt(ind.citas_fuera_del_rag)}",
         f"  Anclaje en el RAG: {_valor(ind.anclaje_rag) if ind.anclaje_rag is not None else 'no disponible'}"
         f" ({_opt(ind.citas_ancladas_en_rag)} de {_opt(ind.citas_del_arbitraje)} citas)",
         f"  Recitación (Ronda 5): ejecutada={_opt(ind.recitacion_ejecutada)}, "

@@ -69,8 +69,9 @@ REGLAS CRÍTICAS:
 5. Si una hipótesis cita un hallazgo genético que NO está en el contexto del caso,
    marcala con priority="LOW" y comenzá el rationale con
    "ADVERTENCIA: hallazgo no reportado en el caso. ".
-6. Cada hipótesis DEBE estar respaldada por evidencia. Si no la conocés con certeza,
-   marcá evidence_level: "III" y no inventes PubMed IDs (dejá pmid: null).
+6. Solo podés citar PMIDs que figuren en el bloque LITERATURA CIENTÍFICA del contexto.
+   Si ningún artículo de ese bloque respalda la hipótesis, dejá `sources` vacío y usá
+   `evidence_level: "III"`.
 7. Generá entre 1 y 4 hipótesis.
 8. En "case_genetic_findings" listá solo los hallazgos genéticos del caso en los que
    se apoya la hipótesis, copiados del bloque CONTEXTO GENÓMICO. En modo ORIENTACIÓN
@@ -89,7 +90,7 @@ Respondé ÚNICAMENTE con un objeto JSON válido:
       "case_genetic_findings": ["<hallazgo genético del caso, copiado tal como figura en el contexto>"],
       "sources": [
         {
-          "pmid": "12345678 o null",
+          "pmid": "PMID del bloque de literatura",
           "title": "título del paper",
           "journal": "nombre del journal",
           "year": 2023

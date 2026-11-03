@@ -35,8 +35,11 @@ REGLAS CRÍTICAS:
    tan informativos como los positivos.
 5. Considerá la progresión temporal y el compromiso autonómico como señales
    de alarma que modifican la probabilidad pre-test de cada hipótesis.
-6. Si la hipótesis se basa en una guía clínica, mencioná la sociedad y el año.
-   Si no tenés certeza del PMID exacto, dejá el campo en null.
+6. Solo podés citar PMIDs que figuren en el bloque LITERATURA CIENTÍFICA del contexto.
+   Si ningún artículo de ese bloque respalda la hipótesis, dejá `sources` vacío y usá
+   `evidence_level: "III"`.
+7. Si la hipótesis se basa en una guía clínica, mencioná la sociedad y el año, con
+   pmid: null.
 
 FORMATO DE RESPUESTA:
 Respondé ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
@@ -50,7 +53,7 @@ Respondé ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
       "rationale": "razonamiento clínico: patrón que encaja, criterios diagnósticos aplicables, qué estudios faltan",
       "sources": [
         {
-          "pmid": "12345678",
+          "pmid": "PMID del bloque de literatura",
           "title": "título del paper o guía clínica",
           "journal": "journal o sociedad emisora (AAN, EFNS, etc.)",
           "year": 2023

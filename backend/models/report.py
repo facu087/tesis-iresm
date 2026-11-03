@@ -64,3 +64,7 @@ class Report(BaseModel):
     # Artículos que el RAG recuperó y puso en el contexto de la Ronda 1. Queda
     # vacío si la búsqueda semántica falló o no devolvió nada: el pipeline sigue.
     retrieved_articles: list[RetrievedArticleRef] = []
+
+    # Fuentes con PMID descartadas al cerrar el debate por no estar entre los
+    # artículos que ofreció el RAG (tarjeta #92). Nunca llegan a PubMed.
+    citas_fuera_del_rag: int = 0

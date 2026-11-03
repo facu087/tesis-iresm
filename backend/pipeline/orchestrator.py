@@ -60,6 +60,11 @@ def _build_sources_summary(hypotheses: list[Hypothesis]) -> dict[str, int]:
 
 # ── RAG: indexación y enriquecimiento del contexto ────────────────────────────
 
+# Artículos que el RAG ofrece a los agentes. Era 5; con la opción estricta de la
+# tarjeta #92 solo vale citar lo ofrecido, así que se ofrece más. El umbral de
+# relevancia (NEXUS_RAG_MIN_SCORE) no cambia: si menos lo superan, van menos.
+MAX_ARTICULOS_RAG = 10
+
 async def _enrich_context_with_rag(
     case: ClinicalCase, base_context: str
 ) -> tuple[str, list[RetrievedArticleRef]]:
@@ -115,7 +120,7 @@ async def _enrich_context_with_rag(
     try:
         retriever = PubMedRetriever()
         rag_context, retrieved = retriever.get_context_with_articles(
-            rag_query, max_results=5
+            rag_query, max_results=MAX_ARTICULOS_RAG
         )
         articles = [
             RetrievedArticleRef(
@@ -133,7 +138,8 @@ async def _enrich_context_with_rag(
         rag_context = (
             "LITERATURA CIENTÍFICA DISPONIBLE:\n"
             "No se pudo acceder a la base local de PubMed. "
-            "Usá evidence_level: 'III' para hipótesis sin respaldo bibliográfico verificado."
+            "Dejá `sources` vacío y usá evidence_level: \"III\". "
+            "Cualquier PMID citado se descarta."
         )
 
     recorder.record_rag(context=rag_context, articles=[a.model_dump() for a in articles])
