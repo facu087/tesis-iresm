@@ -25,9 +25,10 @@ from ..agents.agent_02_genomics import GenomicsSpecialistAgent
 from ..agents.agent_03_clinical import ClinicalConsultantAgent
 from ..agents.base_agent import BaseAgent
 from ..models.case import ClinicalCase
-from ..models.report import AgentOutput, Critique, DebateRound, Report
+from ..models.hypothesis import Hypothesis
+from ..models.report import AgentOutput, Critique, DebateRound, Report, RetrievedArticleRef
 from . import genomic_context as gc_module
-from . import pico
+from . import pico, recitation
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -152,6 +153,42 @@ async def _round_revision(
     return DebateRound(round_number=round_number, agent_outputs=revised_outputs), updated
 
 
+def _anclar_citas(
+    hypotheses: list[Hypothesis],
+    retrieved: list[RetrievedArticleRef],
+) -> tuple[list[Hypothesis], int]:
+    """
+    Filtro estricto al cerrar el debate (tarjeta #92): deja en cada hipótesis
+    solo las fuentes cuyo PMID ofreció el RAG. Las fuentes sin PMID se
+    conservan. Ninguna hipótesis se descarta: la que se queda sin fuentes
+    queda especulativa y entra en la recitación de la Ronda 5.
+
+    Returns:
+        (hipótesis con las fuentes filtradas, total de fuentes descartadas).
+    """
+    allowed = recitation.allowed_pmids(retrieved)
+    resultado: list[Hypothesis] = []
+    descartadas = 0
+    for hypothesis in hypotheses:
+        sources, n = recitation.filtrar_citas(hypothesis.sources, allowed)
+        descartadas += n
+        resultado.append(hypothesis.model_copy(update={"sources": sources}))
+    return resultado, descartadas
+
+
+def _sources_summary(hypotheses: list[Hypothesis]) -> dict[str, int]:
+    """Cuenta fuentes distintas por nivel de evidencia de la hipótesis que las cita."""
+    summary: dict[str, int] = {"I": 0, "II": 0, "III": 0}
+    seen: set[str] = set()
+    for h in hypotheses:
+        for s in h.sources:
+            key = s.pmid or s.title
+            if key and key not in seen:
+                seen.add(key)
+                summary[h.evidence_level.value] += 1
+    return summary
+
+
 # ── Punto de entrada ───────────────────────────────────────────────────────────
 
 async def run_debate(case: ClinicalCase, round_1_report: Report) -> Report:
@@ -216,38 +253,47 @@ async def run_debate(case: ClinicalCase, round_1_report: Report) -> Report:
             f"{len(agents)}. Se devuelven las hipótesis de la Ronda 1.",
             file=sys.stderr,
         )
+        hypotheses, descartadas = _anclar_citas(
+            round_1_report.hypotheses, round_1_report.retrieved_articles
+        )
         return Report(
             case_summary=round_1_report.case_summary,
-            hypotheses=round_1_report.hypotheses,
+            hypotheses=hypotheses,
             agent_outputs=round_1_report.agent_outputs,
             debate_rounds=[],
             divergences=[],
-            sources_summary=round_1_report.sources_summary,
+            sources_summary=_sources_summary(hypotheses),
             absent_agents=absent_agents,
             retrieved_articles=round_1_report.retrieved_articles,
+            citas_fuera_del_rag=descartadas,
         )
 
     # ── Ronda 2: críticas ─────────────────────────────────────────
     round_2 = await _round_2(agents, context, outputs_by_id)
 
     # ── Ronda 3: primera revisión ─────────────────────────────────
-    round_3, outputs_r3 = await _round_revision(3, agents, context, outputs_by_id, round_2.critiques)
+    # Las revisiones ven la literatura ofrecida en formato corto (PMID, título y
+    # año), para poder reemplazar una cita de memoria por un artículo real. La
+    # Ronda 2 no la recibe: las críticas no citan fuentes (tarjeta #92).
+    revision_context = (
+        f"{context}\n\n{recitation.lista_de_literatura(round_1_report.retrieved_articles)}"
+    )
+    round_3, outputs_r3 = await _round_revision(
+        3, agents, revision_context, outputs_by_id, round_2.critiques
+    )
 
     # ── Ronda 4: revisión final ───────────────────────────────────
-    round_4, outputs_r4 = await _round_revision(4, agents, context, outputs_r3, round_2.critiques)
+    round_4, outputs_r4 = await _round_revision(
+        4, agents, revision_context, outputs_r3, round_2.critiques
+    )
 
     # ── Consolidar resultado ───────────────────────────────────────
-    final_hypotheses = [h for o in outputs_r4.values() for h in o.hypotheses]
+    final_hypotheses, descartadas = _anclar_citas(
+        [h for o in outputs_r4.values() for h in o.hypotheses],
+        round_1_report.retrieved_articles,
+    )
     divergences = _detect_divergences(round_2.critiques, list(outputs_r4.values()))
-
-    sources_summary: dict[str, int] = {"I": 0, "II": 0, "III": 0}
-    seen: set[str] = set()
-    for h in final_hypotheses:
-        for s in h.sources:
-            key = s.pmid or s.title
-            if key and key not in seen:
-                seen.add(key)
-                sources_summary[h.evidence_level.value] += 1
+    sources_summary = _sources_summary(final_hypotheses)
 
     return Report(
         case_summary=round_1_report.case_summary,
@@ -260,4 +306,5 @@ async def run_debate(case: ClinicalCase, round_1_report: Report) -> Report:
         # El Árbitro los necesita al final del pipeline: si el debate no los
         # propaga, la literatura que el RAG ofreció se pierde acá.
         retrieved_articles=round_1_report.retrieved_articles,
+        citas_fuera_del_rag=descartadas,
     )

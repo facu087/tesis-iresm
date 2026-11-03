@@ -156,6 +156,11 @@ class VerificationSummary(BaseModel):
     causa: Literal[
         "red", "limite_velocidad", "configuracion", "error_api", "desconocida"
     ] | None = None
+    # Tarjeta #92 — fuentes con PMID descartadas al cerrar el debate por no
+    # venir de la literatura que ofreció el RAG; nunca se consultan en PubMed.
+    # None = reporte anterior al filtro (no informado); 0 = se filtró y no
+    # descartó nada.
+    fuera_del_rag: int | None = None
 
 
 class StructuredReport(BaseModel):

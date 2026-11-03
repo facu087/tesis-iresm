@@ -142,6 +142,22 @@ class TestBuildArbitrationInput:
         assert entrada.hypotheses == []
         assert entrada.hypothesis_agents == []
 
+    def test_usa_las_fuentes_filtradas_del_reporte_y_no_las_del_debate(self):
+        """
+        Tarjeta #92: `run_debate()` filtra las citas fuera del RAG en
+        `report.hypotheses`, pero las rondas del debate guardan lo que dijo cada
+        agente. Si el Árbitro tomara las de la ronda, las citas descartadas
+        volverían al consenso sin veredicto y la hipótesis quedaría pendiente.
+        """
+        report = _report()
+        report.hypotheses = [h.model_copy(update={"sources": []}) for h in report.hypotheses]
+
+        entrada = build_arbitration_input(report)
+
+        assert [h.text for h in entrada.hypotheses] == [ATTR, ATTR_OTRA, B12]
+        assert all(h.sources == [] for h in entrada.hypotheses)
+        assert entrada.hypothesis_agents == ["01", "01", "03"]
+
 
 # ── 9.2 y 9.3 El consenso en el reporte exportado ─────────────────────────────
 

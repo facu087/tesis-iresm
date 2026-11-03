@@ -20,8 +20,9 @@ fundamentadas en evidencia publicada.
 REGLAS CRÍTICAS:
 1. NO emitas diagnósticos. Solo hipótesis de investigación a explorar.
 2. NO recomiendes tratamientos ni dosis.
-3. Cada hipótesis DEBE estar respaldada por evidencia publicada. Si no la conocés con certeza,
-   marcá la hipótesis como especulativa (evidence_level: "III") y no inventes PubMed IDs.
+3. Solo podés citar PMIDs que figuren en el bloque LITERATURA CIENTÍFICA del contexto.
+   Si ningún artículo de ese bloque respalda la hipótesis, dejá `sources` vacío y usá
+   `evidence_level: "III"`.
 4. Priorizá enfermedades raras y condiciones de difícil diagnóstico.
 5. Considerá el patrón completo del caso: síntomas, evolución temporal, estudios negativos
    y antecedentes familiares.
@@ -38,7 +39,7 @@ Respondé ÚNICAMENTE con un objeto JSON válido con esta estructura exacta:
       "rationale": "explicación del razonamiento clínico y qué evidencia la sustenta",
       "sources": [
         {
-          "pmid": "12345678",
+          "pmid": "PMID del bloque de literatura",
           "title": "título del paper",
           "journal": "nombre del journal",
           "year": 2023

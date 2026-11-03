@@ -89,6 +89,8 @@ class Indicadores(BaseModel):
     fuentes_inexistentes: int
     fuentes_sin_pmid: int
     fuentes_no_verificables: int
+    # Tarjeta #92: fuentes descartadas al cerrar el debate por no venir del RAG.
+    citas_fuera_del_rag: int | None
     citas_del_arbitraje: int | None
     citas_ancladas_en_rag: int | None
     anclaje_rag: float | None
@@ -223,6 +225,7 @@ def _indicadores(reporte: StructuredReport, detalle: list[DetalleHipotesis]) -> 
         fuentes_inexistentes=v.inexistentes,
         fuentes_sin_pmid=v.sin_pmid,
         fuentes_no_verificables=v.no_verificables,
+        citas_fuera_del_rag=v.fuera_del_rag,
         citas_del_arbitraje=a.cited_sources if a else None,
         citas_ancladas_en_rag=a.rag_overlap if a else None,
         anclaje_rag=_proporcion(a.rag_overlap, a.cited_sources) if a else None,

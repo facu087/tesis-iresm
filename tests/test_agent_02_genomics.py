@@ -378,5 +378,5 @@ def test_system_prompt_no_nombra_genes_ni_variantes():
     siglas = set(re.findall(r"\b[A-Z][A-Z0-9]{1,7}\b", prompt))
     permitidas = {"NO", "JSON", "ORIENTACIÓN", "HIGH", "MEDIUM", "LOW", "DEBE", "PubMed",
                   "ID", "IDs", "RCT", "RCTs", "II", "III", "I", "X", "CONTEXTO", "GENÓMICO",
-                  "ADVERTENCIA", "ÚNICAMENTE", "REGLAS", "FORMATO", "DE"}
+                  "ADVERTENCIA", "ÚNICAMENTE", "REGLAS", "FORMATO", "DE", "PMID", "PMIDs"}
     assert siglas <= permitidas, f"siglas con forma de gen en el prompt: {siglas - permitidas}"

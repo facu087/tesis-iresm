@@ -150,7 +150,7 @@ class TestPubMedRetriever:
         context = retriever.get_context_for_agent("TTR amyloidosis")
         assert "PMID" in context
         assert "29470523" in context
-        assert "INSTRUCCIÓN" in context
+        assert "OBLIGATORIO: citá solo PMIDs de esta lista" in context
 
     def test_get_context_for_agent_sin_articulos_da_fallback(self, in_memory_collection):
         retriever = PubMedRetriever(collection=in_memory_collection)

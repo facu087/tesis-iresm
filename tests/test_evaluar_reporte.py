@@ -113,3 +113,15 @@ def test_medir_costos_guarda_un_reporte_evaluable_sin_pisar_el_anterior(script, 
     assert not list(tmp_path.glob("*.tmp"))
     # El que quedó en reporte.json es el último y el evaluador lo lee.
     assert script.main([str(ruta)], salida=tmp_path / "salida") == 2
+
+
+def test_la_salida_muestra_las_citas_fuera_del_rag(script, tmp_path, capsys):
+    verificacion = _verificacion()
+    verificacion.fuera_del_rag = 23
+    entrada = _guardar(tmp_path, "nuevo.json", _reporte(verificacion=verificacion).model_dump_json())
+    script.main([str(entrada)], salida=tmp_path / "salida")
+    assert "Citas fuera del RAG (descartadas): 23" in capsys.readouterr().out
+
+    anterior = _guardar(tmp_path, "anterior.json", _reporte().model_dump_json())
+    script.main([str(anterior)], salida=tmp_path / "salida")
+    assert "Citas fuera del RAG (descartadas): no disponible" in capsys.readouterr().out

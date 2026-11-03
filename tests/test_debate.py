@@ -525,3 +525,161 @@ class TestDebateConTresAgentes:
         _, _, pharm, clinvar = self._correr(ClinicalCase(raw_text="texto", pico=_make_pico()))
         pharm.assert_not_called()
         clinvar.assert_not_called()
+
+
+# ── Tests: filtro estricto de citas al cerrar el debate (tarjeta #92) ─────────
+
+from backend.models.report import RetrievedArticleRef  # noqa: E402
+
+
+def _articulo(pmid: str, title: str = "Artículo ofrecido", year: str = "2020") -> RetrievedArticleRef:
+    return RetrievedArticleRef(pmid=pmid, title=title, year=year, excerpt="Resumen largo del artículo.")
+
+
+def _hyp_con_fuentes(text: str, sources: list[Source]) -> Hypothesis:
+    return Hypothesis(
+        text=text, priority=Priority.HIGH, evidence_level=EvidenceLevel.II,
+        rationale="r", sources=sources,
+    )
+
+
+class TestCitasAncladasAlRag:
+    """Caso base: neuropatía axonal sensitivomotora, varón de 42 años."""
+
+    def _correr(self, revisadas_01: list[Hypothesis], revisadas_03: list[Hypothesis],
+                articulos: list[RetrievedArticleRef]):
+        case = ClinicalCase(raw_text="texto", pico=_make_pico())
+        r1 = Report(
+            case_summary="Neuropatía axonal sensitivomotora, varón de 42 años.",
+            agent_outputs=[
+                _output("01", "Analista de Literatura", ["hipótesis literatura A"]),
+                _output("03", "Consultor Clínico", ["hipótesis clínica B"]),
+            ],
+            retrieved_articles=articulos,
+        )
+        with patch("backend.pipeline.debate.LiteratureAnalystAgent") as M01, \
+             patch("backend.pipeline.debate.GenomicsSpecialistAgent") as M02, \
+             patch("backend.pipeline.debate.ClinicalConsultantAgent") as M03:
+            a01, _, a03 = TestRunDebate()._mock_agents(M01, M02, M03)
+            a01.revise.return_value = AgentOutput(
+                agent_id="01", agent_name="A01", hypotheses=revisadas_01)
+            a03.revise.return_value = AgentOutput(
+                agent_id="03", agent_name="A03", hypotheses=revisadas_03)
+            report = asyncio.run(run_debate(case, r1))
+        return report, a01, a03
+
+    def test_cita_de_memoria_descartada_y_la_hipotesis_sigue(self):
+        ofrecidos = [_articulo(p) for p in ("11111111", "22222222", "33333333", "44444444", "55555555")]
+        h = _hyp_con_fuentes("Neuropatía por amiloidosis TTR",
+                             [Source(pmid="31234567", title="Cita de memoria")])
+        report, _, _ = self._correr([h], [_hyp_con_fuentes("Hipótesis clínica", [])], ofrecidos)
+
+        final = next(x for x in report.hypotheses if x.text == "Neuropatía por amiloidosis TTR")
+        assert final.sources == []
+        assert report.citas_fuera_del_rag == 1
+        assert all(s.pmid != "31234567" for x in report.hypotheses for s in x.sources)
+
+    def test_cita_ofrecida_se_conserva(self):
+        h = _hyp_con_fuentes("Neuropatía por amiloidosis TTR", [
+            Source(pmid="11111111", title="Artículo ofrecido"),
+            Source(pmid="31234567", title="Cita de memoria"),
+        ])
+        report, _, _ = self._correr([h], [], [_articulo("11111111")])
+
+        final = report.hypotheses[0]
+        assert [s.pmid for s in final.sources] == ["11111111"]
+        assert report.citas_fuera_del_rag == 1
+
+    def test_hipotesis_sin_fuentes_sigue_en_el_reporte(self):
+        h = _hyp_con_fuentes("Hipótesis sin respaldo", [Source(pmid="99999999", title="x")])
+        report, _, _ = self._correr([h], [_hyp_con_fuentes("Otra", [])], [_articulo("11111111")])
+        assert [x.text for x in report.hypotheses] == ["Hipótesis sin respaldo", "Otra"]
+
+    def test_fuente_sin_pmid_se_conserva(self):
+        guia = Source(title="Guía EFNS/PNS 2021")
+        h = _hyp_con_fuentes("Polineuropatía inflamatoria", [guia])
+        report, _, _ = self._correr([h], [], [_articulo("11111111")])
+        assert report.hypotheses[0].sources == [guia]
+        assert report.citas_fuera_del_rag == 0
+
+    def test_sin_literatura_recuperada_descarta_todas_las_citas_con_pmid(self):
+        pmids = [str(30000000 + i) for i in range(12)]
+        h01 = _hyp_con_fuentes("H1", [Source(pmid=p, title="t") for p in pmids[:6]])
+        h03 = _hyp_con_fuentes("H3", [Source(pmid=p, title="t") for p in pmids[6:]])
+        report, _, _ = self._correr([h01], [h03], [])
+        assert report.citas_fuera_del_rag == 12
+        assert all(not x.sources for x in report.hypotheses)
+
+    def test_sources_summary_se_calcula_despues_del_filtro(self):
+        h = _hyp_con_fuentes("H", [
+            Source(pmid="11111111", title="ofrecido"),
+            Source(pmid="31234567", title="memoria"),
+        ])
+        report, _, _ = self._correr([h], [], [_articulo("11111111")])
+        assert report.sources_summary == {"I": 0, "II": 1, "III": 0}
+
+    def test_con_un_solo_agente_tambien_se_filtra(self):
+        h = _hyp_con_fuentes("H única", [
+            Source(pmid="11111111", title="ofrecido"),
+            Source(pmid="31234567", title="memoria"),
+        ])
+        case = ClinicalCase(raw_text="texto", pico=_make_pico())
+        r1 = Report(
+            case_summary="s",
+            hypotheses=[h],
+            agent_outputs=[AgentOutput(agent_id="01", agent_name="A01", hypotheses=[h])],
+            retrieved_articles=[_articulo("11111111")],
+        )
+        with patch("backend.pipeline.debate.LiteratureAnalystAgent") as M01, \
+             patch("backend.pipeline.debate.GenomicsSpecialistAgent") as M02, \
+             patch("backend.pipeline.debate.ClinicalConsultantAgent") as M03:
+            TestRunDebate()._mock_agents(M01, M02, M03)
+            report = asyncio.run(run_debate(case, r1))
+        assert report.debate_rounds == []
+        assert [s.pmid for s in report.hypotheses[0].sources] == ["11111111"]
+        assert report.citas_fuera_del_rag == 1
+
+
+class TestLiteraturaEnLasRevisiones:
+    """Tarjeta #92: las Rondas 3 y 4 ven la literatura ofrecida; la Ronda 2 no."""
+
+    def _correr(self, articulos):
+        case = ClinicalCase(raw_text="texto", pico=_make_pico())
+        r1 = Report(
+            case_summary="s",
+            agent_outputs=[
+                _output("01", "Analista de Literatura", ["hipótesis literatura A"]),
+                _output("03", "Consultor Clínico", ["hipótesis clínica B"]),
+            ],
+            retrieved_articles=articulos,
+        )
+        with patch("backend.pipeline.debate.LiteratureAnalystAgent") as M01, \
+             patch("backend.pipeline.debate.GenomicsSpecialistAgent") as M02, \
+             patch("backend.pipeline.debate.ClinicalConsultantAgent") as M03:
+            a01, _, a03 = TestRunDebate()._mock_agents(M01, M02, M03)
+            asyncio.run(run_debate(case, r1))
+        return a01, a03
+
+    def test_revision_lista_los_articulos_sin_resumen(self):
+        articulos = [_articulo(str(40000000 + i), f"Título {i}", "2019") for i in range(8)]
+        a01, a03 = self._correr(articulos)
+
+        for agente in (a01, a03):
+            assert agente.revise.call_count == 2  # Rondas 3 y 4
+            for llamada in agente.revise.call_args_list:
+                contexto = llamada.args[0]
+                for i in range(8):
+                    assert f"[PMID: {40000000 + i}] Título {i} (2019)" in contexto
+                assert "Resumen largo del artículo." not in contexto
+
+    def test_revision_sin_articulos_dice_que_no_hay_literatura(self):
+        a01, _ = self._correr([])
+        contexto = a01.revise.call_args_list[0].args[0]
+        assert "No hay literatura disponible para citar" in contexto
+
+    def test_el_contexto_de_la_critica_no_cambia(self):
+        from backend.pipeline import pico as pico_mod
+
+        a01, _ = self._correr([_articulo("11111111")])
+        contexto = a01.critique.call_args.args[0]
+        assert contexto == pico_mod.format_for_agents(_make_pico())

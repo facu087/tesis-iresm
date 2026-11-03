@@ -126,6 +126,22 @@ Backend mergeado a `develop` (capa de recuperación de evidencia / RAG). Autor: 
 > figuraba en `architecture.md` ("toda hipótesis con referencia verificable"),
 > que con 15 de 15 citas discordantes no se cumplía nunca.
 >
+> **Citas ancladas al RAG** (Sprint 5, tarjeta #92, OpenSpec `citas-ancladas-rag`):
+> una cita con PMID solo vale si ese PMID lo ofreció el RAG. `run_debate()`
+> filtra las fuentes de las hipótesis finales con `recitation.filtrar_citas()`
+> antes de la verificación: lo descartado no se consulta en PubMed ni aparece en
+> el reporte, y el total queda en `verification.fuera_del_rag` (`None` en un
+> reporte anterior). Las fuentes sin PMID se conservan; sin literatura recuperada
+> se descartan todas las que tienen PMID. Ninguna hipótesis se descarta: la que
+> se queda sin fuentes es especulativa y entra en la Ronda 5. El Árbitro toma las
+> hipótesis de `report.hypotheses`, ya filtradas, nunca de las rondas del debate.
+> Los prompts de los Agentes 01, 02 y 03 llevan la regla (`base_agent.REGLA_CITAS`),
+> las revisiones de las Rondas 3 y 4 reciben la lista corta de artículos ofrecidos
+> (`recitation.lista_de_literatura()`, sin resúmenes) y el RAG ofrece hasta
+> `MAX_ARTICULOS_RAG = 10` artículos (`pipeline/orchestrator.py`). Con el filtro,
+> el anclaje en el RAG del Árbitro deja de medir algo: toda cita que le llega ya
+> es del RAG. El dato que lo reemplaza es "citas fuera del RAG".
+>
 > El Agente 05 es **híbrido**: el LLM solo traduce hipótesis a términos de
 > condición en inglés y etiqueta compatibilidad (`alta`/`media`/`baja`); la
 > búsqueda, los filtros duros por edad y sexo, la coincidencia exacta con
@@ -301,6 +317,12 @@ Scripts disponibles:
   después de la limpieza, que el comportamiento observable no cambia (una sesión viva sigue
   resolviéndose) y que una limpieza que falla devuelve `ok=False` sin levantar. Sin red ni
   cuota. Sale con código 1 si falla una comprobación
+- `demo_citas_ancladas.py` (Sprint 5, tarjeta #92) — sin red ni cuota: un debate del caso
+  base con agentes de respuesta fija, con literatura (5 artículos ofrecidos; citas de
+  memoria, ofrecidas, repetidas y una guía sin PMID) y sin literatura (12 PMIDs). Muestra
+  qué fuentes quedan, las descartadas por hipótesis, `fuera_del_rag` y el pedido de revisión
+  con la lista de literatura. Genera `resultado.txt` y `resumen.json` en
+  `output/demo_citas_ancladas/`. Sale con código 1 si falla una comprobación
 
 También se corrigió un bug del Sprint 2: falsos positivos en el extractor de
 biomarcadores (regex de anticuerpos y de marcadores de lab). Ver commit `e72e004`.
@@ -388,7 +410,8 @@ tesis-iresm/
 │   │   ├── evidence.py         ← clasificación EBM: tope de nivel, estado y orden (S4)
 │   │   ├── consensus.py        ← lógica determinista del Agente 04: partición,
 │   │   │                          representante, contradicciones, solapamiento RAG (S4)
-│   │   ├── recitation.py       ← Ronda 5: qué se recita y qué se acepta (S4)
+│   │   ├── recitation.py       ← Ronda 5: qué se recita y qué se acepta (S4);
+│   │   │                          filtro de citas fuera del RAG (S5, tarjeta #92)
 │   │   ├── trial_matching.py   ← lógica determinista del Agente 05: términos,
 │   │   │                          filtros edad/sexo, Orphanet, orden (S4)
 │   │   ├── calidad.py          ← criterios de calidad del reporte: evaluar() puro,
@@ -696,7 +719,9 @@ superadas: se midieron sin que las críticas del debate llegaran a los agentes.
 La corrida de validación del 2026-11-03 (tarjeta #58) midió 85.556 tokens en 30
 llamadas (8 reintentadas) y 517 s; el reporte no cumple los criterios de calidad
 (precisión de citas 0,08, ninguna cita sale del RAG). Ver la nota de la #58 en
-`.claude/backlog.md`.
+`.claude/backlog.md`. La tarjeta #92 agrega el filtro de citas fuera del RAG; en
+el modo mock (grabaciones del 2026-10-26) descarta 13 citas y la precisión pasa
+de 0,28 a 1,00 con la misma cobertura (0,33). Falta la corrida real que lo mida.
 El costo equivalente con Claude, GPT-4o o Gemini sigue estimado sobre la
 muestra sintética; con el `costos.jsonl` real se puede recalcular con
 `usage.recalculate()`.
