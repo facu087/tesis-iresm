@@ -385,7 +385,7 @@ tesis-iresm/
 │   ├── mock/                   ← modo mock del pipeline (S4)
 │   │   ├── mode.py             ← activación de `NEXUS_MOCK_LLM`
 │   │   ├── responses.py        ← respuestas por tarea, carga diferida de grabadas.json
-│   │   ├── grabadas.json       ← respuestas y RAG de la corrida real del 2026-10-26
+│   │   ├── grabadas.json       ← respuestas y RAG de la corrida real del 2026-11-03
 │   │   ├── recorder.py         ← grabador de respuestas crudas (solo lo abre un script)
 │   │   └── __init__.py
 │   ├── telemetry/              ← control de costos (S4)
@@ -719,9 +719,12 @@ superadas: se midieron sin que las críticas del debate llegaran a los agentes.
 La corrida de validación del 2026-11-03 (tarjeta #58) midió 85.556 tokens en 30
 llamadas (8 reintentadas) y 517 s; el reporte no cumple los criterios de calidad
 (precisión de citas 0,08, ninguna cita sale del RAG). Ver la nota de la #58 en
-`.claude/backlog.md`. La tarjeta #92 agrega el filtro de citas fuera del RAG; en
-el modo mock (grabaciones del 2026-10-26) descarta 13 citas y la precisión pasa
-de 0,28 a 1,00 con la misma cobertura (0,33). Falta la corrida real que lo mida.
+`.claude/backlog.md`. La corrida de verificación de la tarjeta #92 (citas
+ancladas al RAG, 2026-11-03, misma fecha) midió 84.666 tokens en 27 llamadas (6
+reintentadas) y 502 s, y el reporte **cumple** los tres criterios: cobertura 0,91
+(10/11), precisión 1,00 (8/8) y sobredeclaración 0,45 (5/11), con 0 citas fuera
+del RAG (los agentes citaron solo lo ofrecido). Ver la nota de la #92 en
+`.claude/backlog.md`.
 El costo equivalente con Claude, GPT-4o o Gemini sigue estimado sobre la
 muestra sintética; con el `costos.jsonl` real se puede recalcular con
 `usage.recalculate()`.
@@ -740,8 +743,8 @@ en el frontend con la misma visibilidad que la advertencia del consenso de
 IA.
 
 Las trece tareas de `TASK_BUDGETS` usan respuestas **textuales de la corrida
-real del 2026-10-26** (22 respuestas: una por llamada, con el agente que la
-pidió), guardadas en `backend/mock/grabadas.json` (versionado) y
+real del 2026-11-03** (21 respuestas: una por llamada, con el agente que la
+pidió; corrida de verificación de la tarjeta #92), guardadas en `backend/mock/grabadas.json` (versionado) y
 cargadas de forma diferida por `backend/mock/responses.py` en el primer uso en
 modo mock: el modo real nunca lee ese archivo, y si falta o está malformado se
 levanta `RespuestasGrabadasInvalidas`. Salieron de `backend/mock/recorder.py`,
@@ -752,8 +755,8 @@ script** (nunca una variable de entorno ni `POST /api/analyze`) y guarda
 `output/medicion_costos/grabacion.json` (gitignoreado);
 `scripts/regenerar_mock.py` la convierte en `grabadas.json`. Como cada agente
 recibe su propia grabación en el orden en que la pidió, el modo mock reproduce
-la corrida: 12 hipótesis de consenso sin repetidas, 10 ensayos y el
-`executive_summary` del Agente 06, igual en cada pasada. En la corrida del
+la corrida: 11 hipótesis de consenso sin repetidas (10 respaldadas), 8 ensayos
+y el `executive_summary` del Agente 06, igual en cada pasada. En la corrida del
 2026-10-20 los Agentes 01 y 02 respondieron la Ronda 5 con el esquema equivocado
 (`hypotheses` en vez de `recitations`) y su recitación falló (2 hipótesis
 mejoradas). Desde la tarjeta #90 el prompt de recitación prohíbe esa clave y
@@ -761,8 +764,9 @@ reescribir hipótesis, y `_parse_recitation()` acepta la forma `hypotheses` solo
 para la hipótesis cuyo texto coincide con la ofrecida (una reescrita no hereda
 citas) y avisa por stderr, con claves y conteos, cuando falta `recitations`. En
 la corrida del 2026-10-26, ya con ese prompt, los tres agentes usaron el esquema
-pedido: 12 hipótesis recitadas y 4 mejoradas (el 02 no recitó ninguna, que el
-prompt permite). Es una sola corrida: la variación entre corridas del modelo
+pedido: 12 hipótesis recitadas y 4 mejoradas. En la del 2026-11-03, con las citas
+ancladas al RAG, solo 3 hipótesis llegaron sin respaldo a la Ronda 5 (de los
+Agentes 02 y 03) y 2 mejoraron; el 03 no recitó ninguna, que el prompt permite. Es una sola corrida: la variación entre corridas del modelo
 no está medida. La grabación incluye además lo que el RAG
 ofreció en la Ronda 1 (bloque `rag` de `grabadas.json`): en modo mock la Ronda 1
 usa esos artículos y no consulta PubMed. Sin ese bloque se consultaba en vivo y,
