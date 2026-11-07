@@ -262,8 +262,9 @@ cerrar el análisis se agrega una línea a `output/costos.jsonl`. El
 identificador de análisis es aleatorio y la telemetría nunca contiene texto
 clínico, prompts ni respuestas. `backend/telemetry/pricing.py` contiene las
 tarifas por modelo y `usage.recalculate()` recalcula un registro con otra
-tabla. La medición del 2026-10-06 (`scripts/medir_costos.py`) arrojó 80.458
-tokens por caso en 28 llamadas.
+tabla. La última medición (`scripts/medir_costos.py`, 2026-11-03, tarjeta #92) arrojó
+84.666 tokens por caso en 27 llamadas; la serie completa está en
+`resultados-y-limitaciones.md`.
 
 ### 5.3 Modo mock
 

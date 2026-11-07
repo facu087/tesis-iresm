@@ -85,19 +85,23 @@ de entrada y salida, la latencia y si falló, sin texto clínico ni prompts
 
 ### 2.1 Costo y latencia por caso
 
-El proveedor actual (Groq, plan gratuito) impone una cuota de **200.000 tokens por día**.
-Con el consumo medido, entran **2 casos por día**.
+La cifra de referencia es la **última medición: 84.666 tokens por caso** (2026-11-03,
+tarjeta #92), tomada sobre el pipeline tal como se entrega, con las citas ancladas al RAG. Es
+mayor que las dos mediciones del 2026-10-06 (80.458 y 82.968 tokens) que se usaron antes como
+referencia; las regrabaciones del modo mock de octubre llegaron a 88.143. El
+proveedor actual (Groq, plan gratuito) impone una cuota de **200.000 tokens por día**: con ese
+consumo entran **2 casos por día**.
 
 | Fecha | Corrida | Tokens | Llamadas | Reintentadas (429) | Tiempo | Fuente |
 |-------|---------|--------|----------|--------------------|--------|--------|
 | 2026-10-04 | Medición de la tarjeta #84 (debate sin críticas) | 77.516 | 27 | — | — | `.claude/backlog.md:314-316` |
 | 2026-10-06 | Primera corrida del día (debate sin críticas) | 78.158 | — | — | — | `.claude/backlog.md:328-329` |
-| 2026-10-06 | Corrida con el arreglo de críticas (cifra de referencia) | 80.458 (43.240 entrada, 37.218 salida) | 28 | 7 | 505 s | `.claude/backlog.md:325-328`, `.claude/CLAUDE.md:93-96` |
+| 2026-10-06 | Corrida con el arreglo de críticas (antecedente) | 80.458 (43.240 entrada, 37.218 salida) | 28 | 7 | 505 s | `.claude/backlog.md:325-328`, `.claude/CLAUDE.md:93-96` |
 | 2026-10-07 | Regrabación del modo mock | 84.867 | 27 | 5 | 493 s | `.claude/traspaso.md:305-306` |
 | 2026-10-20 | Regrabación con RAG grabado | 87.320 | 30 | 8 | 495 s | `.claude/traspaso.md:320-321` |
 | 2026-10-26 | Regrabación con el prompt de Ronda 5 corregido | 88.143 | 28 | 6 | 526 s | `.claude/traspaso.md:325-326` |
 | 2026-11-03 | Validación end-to-end (tarjeta #58) | 85.556 | 30 | 8 | 517 s | `.claude/backlog.md:411`, `.claude/CLAUDE.md:731-732` |
-| 2026-11-03 | Verificación de citas ancladas al RAG (tarjeta #92) | 84.666 | 27 | 6 | 502 s | `.claude/backlog.md:413`, `.claude/CLAUDE.md:735-736` |
+| 2026-11-03 | Verificación de citas ancladas al RAG (tarjeta #92) — **cifra de referencia** | 84.666 | 27 | 6 | 502 s | `.claude/backlog.md:413`, `.claude/CLAUDE.md:735-736` |
 
 Las cifras del 2026-10-04 y de la primera corrida del 2026-10-06 están **superadas, no
 erróneas**: se midieron con el debate funcionando sin críticas (ver sección 3.1). En todas las
@@ -393,6 +397,6 @@ revisión médica que informar.
 
 | Tema | Fuente A | Fuente B | Interpretación |
 |------|----------|----------|----------------|
-| Corrida del 2026-10-06 | 80.458 tokens, 28 llamadas (7 reintentadas), 505 s (`.claude/backlog.md:325-328`, `.claude/CLAUDE.md:93-96`) | 82.968 tokens, 26 llamadas (4 reintentadas), 495 s (`.claude/backlog.md:567-569`, nota 21) | Probablemente corresponden a pasadas distintas del mismo día; las fuentes no lo aclaran. Este documento usa 80.458 como cifra de referencia, porque así la declaran `CLAUDE.md` y el backlog. |
+| Corrida del 2026-10-06 | 80.458 tokens, 28 llamadas (7 reintentadas), 505 s (`.claude/backlog.md:325-328`, `.claude/CLAUDE.md:93-96`) | 82.968 tokens, 26 llamadas (4 reintentadas), 495 s (`.claude/backlog.md:567-569`, nota 21) | Probablemente corresponden a pasadas distintas del mismo día; las fuentes no lo aclaran. Ninguna de las dos se usa como cifra de referencia: este documento toma la última medición, 84.666 tokens (2026-11-03), que es mayor que ambas. |
 | Proporción de citas discordantes | 15 de 15 (`.claude/backlog.md:147`, `.claude/CLAUDE.md`) | 14 de 14 en la corrida del 2026-09-22 (`.claude/backlog.md:163`); 9 de cada 10 en tres corridas (`.claude/backlog.md:186`) | Mediciones de corridas distintas; todas muestran discordancia casi total antes de la verificación por título. |
 | Anclaje en el RAG de la #58 | "de 0 a 6 de 6" (`.claude/backlog.md:413`) | "0/23 → 6/6" (`openspec/changes/archive/2026-11-03-citas-ancladas-rag/tasks.md:33`) | Mismo valor (cero); el denominador 23 son citas del arbitraje, distinto de las 25 citas contrastadas de la precisión. |
