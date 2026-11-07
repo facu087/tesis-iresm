@@ -322,14 +322,23 @@ Scripts disponibles:
 
 ### Anonimización (Sprint 5)
 
-`backend/ingestion/anonimizador.py` se aplica en `POST /api/analyze` entre
-`normalize()` y `ClinicalCase(...)`: es la última parada antes de que el texto vaya a
-Groq, PubMed, ClinicalTrials.gov, Orphanet y PharmGKB. Detecta con reglas
-deterministas documentos argentinos (DNI, LC, LE, CI, CUIL, CUIT), historia clínica y
-afiliado, teléfonos, correos, fechas de calendario, domicilios y nombres propios
-**precedidos por un marcador explícito** ("Paciente:", "Sr.", "Dra.", "derivado por",
-"Solicitante:", "Apellido y nombre:"), en "Nombre Apellido", "Apellido, Nombre" o en
-mayúsculas. Además **aprende del propio documento**: lo que ya detectó con marcador (cada
+`backend/ingestion/anonimizador.py` se aplica en `POST /api/analyze` y en
+`orchestrator.run()` entre `normalize()` y `ClinicalCase(...)`: es la última parada antes
+de que el texto vaya a Groq, PubMed, ClinicalTrials.gov, Orphanet y PharmGKB. Detecta con
+reglas deterministas documentos argentinos (DNI, LC, LE, CI, CUIL, CUIT), historia
+clínica, afiliado y credencial de obra social, matrícula profesional (MP/MN), teléfonos,
+correos, fechas de calendario, domicilios y nombres propios **precedidos por un marcador
+explícito** ("Paciente:", "Sr.", "Dra.", "derivado por", "Solicitante:", "Firma y sello:",
+"Apellido y nombre:"), en "Nombre Apellido", "Apellido, Nombre" o en mayúsculas.
+
+Criterios que evitan borrar texto clínico (revisión del PR #82): historia clínica,
+afiliado y matrícula exigen un número ("HC: hipertensión" queda); sin marcador, un
+teléfono no lleva espacios ni puntos, no va seguido de una unidad y no es un rango de
+años ("126 130 145 mg/dl", "12.500.000 /ul" y "2019-2023" quedan); un domicilio en prosa
+("reside en") es solo una calle con número, y el campo "Domicilio:" se tapa completo; un
+nombre sin dos puntos ("Paciente Juan Pérez") o de un familiar ("Esposa: María López",
+"Hijo de Juan Pérez") necesita dos o más palabras con el mismo formato y ningún término
+clínico ("Paciente Portador de HLA-B*15:02" y "Padre: Enfermedad Coronaria" quedan). Además **aprende del propio documento**: lo que ya detectó con marcador (cada
 palabra de un nombre, cada DNI) lo enmascara en todas sus apariciones, porque los informes
 repiten el nombre sin rótulo en títulos y pies. Solo busca nombres con inicial mayúscula
 (nunca "tono blanco") y no propaga apellidos que son términos médicos ("Wilson").

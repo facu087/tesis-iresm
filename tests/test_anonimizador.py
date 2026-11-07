@@ -319,16 +319,177 @@ class TestInforme:
         assert InformeAnonimizacion().total == 0
 
 
+# ── Casos de la revisión del PR #82 (2026-10-29) ─────────────────────────────
+
+class TestNoBorraInformacionClinica:
+    """Texto clínico que la versión anterior enmascaraba."""
+
+    @pytest.mark.parametrize("texto", [
+        "Paciente Portador de HLA-B*15:02",
+        "Paciente Tratado con Carbamazepina 200 mg/día",
+        "Paciente Diabético tipo 2",
+        "Vive en zona rural con exposición a pesticidas",
+        "Reside en Villa Carlos Paz, trabaja con organofosforados",
+        "Glucemias seriadas: 126 130 145 128 mg/dl",
+        "Recuento 12.500.000 /ul",
+        "Evolución 2019-2023",
+        "HC: hipertensión controlada",
+        "Afiliado PAMI",
+        "Padre: Enfermedad Coronaria",
+        "Madre: Fallecida por ACV",
+        "Hijo de madre diabética",
+    ])
+    def test_el_texto_clinico_queda_intacto(self, texto):
+        assert _mascaras(texto) == texto
+
+    def test_un_nombre_sin_dos_puntos_sigue_enmascarado(self):
+        assert _mascaras("Paciente Juan Pérez, 42 años") == "Paciente [NOMBRE], 42 años"
+
+    def test_un_domicilio_con_calle_y_numero_sigue_enmascarado(self):
+        salida = _mascaras("Reside en Av. San Martín 1234, trabaja con organofosforados")
+        assert "San Martín" not in salida and "1234" not in salida
+        assert "trabaja con organofosforados" in salida
+
+    def test_el_campo_domicilio_sigue_enmascarado(self):
+        salida = _mascaras("Domicilio: Belgrano 456 Dto. B")
+        assert salida == "Domicilio: [DOMICILIO]"
+
+    def test_un_telefono_con_guion_sigue_enmascarado(self):
+        assert _mascaras("Llamar al 351-4567890") == "Llamar al [TELEFONO]"
+
+    def test_un_telefono_con_espacios_y_marcador_sigue_enmascarado(self):
+        assert _mascaras("Cel: 351 456 7890") == "Cel: [TELEFONO]"
+
+    def test_historia_clinica_con_numero_sigue_enmascarada(self):
+        assert _mascaras("HC: 123456") == "[HISTORIA CLINICA]"
+
+
+class TestIdentificadoresQueSeEscapaban:
+    @pytest.mark.parametrize("texto, valor", [
+        ("Esposa: María López", "López"),
+        ("Hijo de Juan Pérez", "Pérez"),
+        ("Firma y sello: Ramírez Juan", "Ramírez"),
+        ("Credencial PAMI 150123456789/00", "150123456789"),
+        ("IOSFA nro 1234567", "1234567"),
+        ("M.P. 34567", "34567"),
+        ("MN 123456", "123456"),
+    ])
+    def test_se_enmascaran(self, texto, valor):
+        salida = _mascaras(texto)
+        assert valor not in salida
+        assert "[" in salida
+
+
+class TestVerificacionIndependiente:
+    """Casos del verificador independiente sobre las correcciones de la revisión."""
+
+    @pytest.mark.parametrize("texto", [
+        "Padre: Diabetes Mellitus",
+        "Madre: Artritis Reumatoidea",
+        "Hermana: Esclerosis Múltiple",
+        "Padre: Insuficiencia Renal Crónica",
+        "Hermano: Charcot Marie Tooth",
+        "Padre: Diabetes Mellitus\nPaciente con Diabetes Mellitus tipo 2",
+        "Vive en zona rural con exposición a pesticidas desde 2015",
+    ])
+    def test_los_antecedentes_familiares_quedan_intactos(self, texto):
+        assert _mascaras(texto) == texto
+
+    @pytest.mark.parametrize("texto, valor", [
+        ("Vive en Barrio Jardín, calle 9 de Julio 1200", "1200"),
+        ("Reside en calle 25 de Mayo 340", "340"),
+        ("Vive en Gral. Paz 1234", "Paz"),
+        ("vive en av. colón 1234", "colón"),
+        ("Reside en Barrio Alberdi, Av. Colón 1234", "Colón"),
+        ("Vive en: Av. Colón 1234", "Colón"),
+        ("Domicilio actual Av. Colón 1234", "Colón"),
+        ("reside en Pasaje Santa Ana s/n", "Santa Ana"),
+        ("reside en Bv. San Juan 500, 3° B", "3° B"),
+        ("vive en Bv. Illia 300 4to C", "4to C"),
+        ("reside en Manzana 4 Lote 12, Barrio Los Robles", "Lote 12"),
+    ])
+    def test_los_domicilios_en_prosa_se_enmascaran(self, texto, valor):
+        salida = _mascaras(texto)
+        assert valor not in salida
+        assert "[DOMICILIO]" in salida
+
+
 # ── Integración con el pipeline ───────────────────────────────────────────────
 
+_ENCABEZADO = (
+    "Paciente: Juan Pérez. DNI 23.456.789. Tel: 351-4567890.\n"
+    "Paciente masculino de 42 años con neuropatía axonal sensitivomotora.\n"
+)
+_IDENTIFICADORES = ("Pérez", "23.456.789", "4567890")
+
+
 class TestIntegracionConElRouter:
-    def test_el_router_anonimiza_antes_de_construir_el_caso(self):
+    def test_el_texto_que_llega_al_proveedor_esta_anonimizado(
+        self, client_medico_verificado, monkeypatch
+    ):
         """
-        Guarda contra regresión del orden: si alguien mueve la anonimización
-        después de `ClinicalCase(...)`, el texto identificable ya habría salido
-        hacia los agentes.
+        Llama al endpoint de verdad (modo mock, sin red) y revisa lo que reciben
+        `call_provider()` (PICO y biomarcadores) y la Ronda 1.
         """
-        fuente = (_RAIZ / "backend" / "api" / "router.py").read_text(encoding="utf-8")
-        pos_anonimizar = fuente.index("anonimizar, normalized")
-        pos_caso = fuente.index("ClinicalCase(raw_text=normalized)")
-        assert pos_anonimizar < pos_caso
+        from unittest.mock import AsyncMock, patch
+
+        import backend.agents.base_agent as base_agent
+        import backend.ingestion.biomarker_extractor as biomarcadores
+        import backend.pipeline.pico as pico
+        from tests.test_api import _make_navigation, _make_report
+
+        monkeypatch.setenv("NEXUS_MOCK_LLM", "1")
+        salientes: list[str] = []
+        original = base_agent.call_provider
+
+        def espia(**kwargs):
+            salientes.append(kwargs["user_message"])
+            return original(**kwargs)
+
+        monkeypatch.setattr(pico, "call_provider", espia)
+        monkeypatch.setattr(biomarcadores, "call_provider", espia)
+        ronda_1 = AsyncMock(return_value=_make_report())
+        with (
+            patch("backend.api.router.orchestrator.run_round_1", ronda_1),
+            patch("backend.api.router.debate.run_debate",
+                  new_callable=AsyncMock, return_value=_make_report()),
+            patch("backend.api.router.TrialNavigatorAgent.navigate",
+                  new_callable=AsyncMock, return_value=_make_navigation()),
+            patch("backend.api.router.verify_report_sources",
+                  new_callable=AsyncMock, return_value={}),
+            patch("backend.api.router.ArbiterAgent.arbitrate",
+                  new_callable=AsyncMock, side_effect=RuntimeError("mock")),
+        ):
+            respuesta = client_medico_verificado.post(
+                "/api/analyze", data={"text": _ENCABEZADO})
+
+        assert respuesta.status_code == 200, respuesta.text
+        assert salientes, "PICO y biomarcadores tienen que llamar al proveedor"
+        caso = ronda_1.call_args.args[0]
+        for texto in [*salientes, caso.raw_text]:
+            assert "[NOMBRE]" in texto
+            for identificador in _IDENTIFICADORES:
+                assert identificador not in texto
+
+
+class TestIntegracionConElOrquestador:
+    def test_run_anonimiza_antes_de_construir_el_caso(self, monkeypatch):
+        from unittest.mock import AsyncMock
+
+        from backend.pipeline import orchestrator
+
+        recibido: list[str] = []
+        monkeypatch.setattr(orchestrator.pico, "build", lambda caso: caso)
+        monkeypatch.setattr(
+            orchestrator, "extract_biomarkers",
+            lambda texto: recibido.append(texto) or None)
+        ronda_1 = AsyncMock(return_value="reporte")
+        monkeypatch.setattr(orchestrator, "run_round_1", ronda_1)
+
+        orchestrator.run(_ENCABEZADO)
+
+        recibido.append(ronda_1.call_args.args[0].raw_text)
+        for texto in recibido:
+            assert "[NOMBRE]" in texto
+            for identificador in _IDENTIFICADORES:
+                assert identificador not in texto

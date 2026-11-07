@@ -20,15 +20,23 @@ Qué detecta
 Identificadores directos, con reglas deterministas y auditables:
 
 - Documentos argentinos: DNI, LC, LE, CI, CUIL y CUIT.
-- Números de historia clínica, afiliado y obra social.
-- Teléfonos (fijos y móviles, con o sin característica).
+- Números de historia clínica, afiliado, credencial de obra social y
+  matrícula profesional (MP/MN). Siempre exigen un número: "HC: hipertensión"
+  o "Afiliado PAMI" no son identificadores.
+- Teléfonos (fijos y móviles, con o sin característica). Sin un marcador
+  ("Tel:", "Cel:") no se aceptan números con espacios o puntos, ni seguidos de
+  una unidad, ni rangos de años: son valores de laboratorio y fechas.
 - Correos electrónicos.
 - Fechas de calendario completas (numéricas y en palabras).
 - Nombres propios **precedidos por un marcador explícito**: "Paciente:",
   "Sr.", "Dra.", "a cargo de", "Solicitante:", "Apellido y nombre:", etc.
   Admite "Apellido, Nombre" y nombres en mayúsculas, como los imprimen los
-  laboratorios.
-- Domicilios introducidos por un marcador.
+  laboratorios. Sin dos puntos ("Paciente Juan Pérez") y para familiares
+  ("Esposa: María López", "Hijo de Juan Pérez") el criterio es más estricto:
+  dos o más palabras con el mismo formato, ninguna de ellas un término clínico.
+- Domicilios: el campo rotulado ("Domicilio:") completo; en prosa ("reside
+  en") solo una calle con número de puerta, para no llevarse "zona rural con
+  exposición a pesticidas".
 
 Qué aprende del propio documento
 --------------------------------
@@ -71,7 +79,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Pattern
+from typing import Callable, Pattern
 
 # Etiquetas con las que se reemplaza cada categoría. Se mantienen legibles para
 # que el médico que lea el reporte entienda que ahí había un dato, y para que
@@ -79,6 +87,7 @@ from typing import Pattern
 ETIQUETAS = {
     "documento": "[DOCUMENTO]",
     "historia_clinica": "[HISTORIA CLINICA]",
+    "matricula": "[MATRICULA]",
     "telefono": "[TELEFONO]",
     "email": "[EMAIL]",
     "fecha": "[FECHA]",
@@ -119,6 +128,24 @@ _NOMBRE_COMPUESTO = (
     rf"{_NOMBRE}(?:[ \t]*,[ \t]*{_PALABRA_CAP}(?:[ \t]+{_PALABRA_CAP}){{0,2}})?"
 )
 
+# Nombre sin un marcador fuerte ("Paciente Juan Pérez", "Esposa: María López"):
+# dos a cuatro palabras con mayúscula. Además pasa por _es_nombre_estricto(),
+# que exige el mismo formato en todas y que ninguna sea un término clínico. Sin
+# eso, "Paciente Portador de HLA-B*15:02" se llevaba el alelo que usa el Agente 02.
+_NOMBRE_ESTRICTO = (
+    rf"{_PALABRA_CAP}(?:[ \t]+{_PARTICULA}{_PALABRA_CAP}){{1,3}}"
+)
+# Obras sociales que los informes imprimen delante del número de afiliado.
+_OBRAS_SOCIALES = (
+    r"PAMI|IOSFA|IOMA|APROSS|OSDE|OSECAC|OSPRERA|OSPE|SANCOR|GALENO|MEDIF[EÉ]|"
+    r"OMINT|SWISS[ \t]+MEDICAL|ACCORD"
+)
+# Unidades que siguen a un valor de laboratorio: un número seguido de una de
+# estas no es un teléfono ("12500000 /ul", "126130145 mg/dl").
+_UNIDAD = (
+    r"[ \t]*(?:/|%|mg|mcg|[µu]g|ng|pg|g/|ml|dl|mm|cm|kg|mmol|meq|ui|u/|x[ \t]?10|c[ée]l)"
+)
+
 # Rótulos con los que un número de documento aparece en los informes.
 _MARCA_DOCUMENTO = (
     r"(?:DNI|D\.N\.I\.?|LC|L\.C\.?|LE|L\.E\.?|CI|C\.I\.?|documento|doc\.?|"
@@ -127,7 +154,10 @@ _MARCA_DOCUMENTO = (
 
 # Orden importante: lo más específico primero. Un CUIL contiene un DNI, y una
 # fecha numérica puede parecerse a un teléfono corto.
-_REGLAS: list[tuple[str, Pattern[str]]] = [
+# Cada regla es (categoría, patrón) o (categoría, patrón, validador). El
+# validador propio reemplaza al de la categoría (_VALIDADORES).
+_Validador = Callable[[str, bool], bool]
+_REGLAS: list[tuple[str, Pattern[str]] | tuple[str, Pattern[str], _Validador]] = [
     # ── Correo electrónico ────────────────────────────────────────────────
     ("email", re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b")),
 
@@ -146,13 +176,36 @@ _REGLAS: list[tuple[str, Pattern[str]]] = [
         re.I,
     )),
 
-    # ── Historia clínica, afiliado, obra social ───────────────────────────
+    # ── Historia clínica ──────────────────────────────────────────────────
+    # El valor tiene que llevar al menos un dígito: "HC: hipertensión
+    # controlada" es texto clínico, no un número de historia.
     ("historia_clinica", re.compile(
-        r"\b(?:historia\s+cl[íi]nica|h\.?\s?c\.?|n[º°o]\s*de\s*afiliado|"
-        r"afiliado|legajo|matr[íi]cula\s+del\s+paciente)\s*"
-        r"(?:n[º°o]\.?|nro\.?)?\s*:?\s*[\w./-]{4,20}\b",
+        r"\b(?:historia\s+cl[íi]nica|h\.?\s?c\.?|legajo|"
+        r"matr[íi]cula\s+del\s+paciente)\s*"
+        r"(?:n[º°o]\.?|nro\.?)?\s*:?\s*(?=[\w./-]*\d)[\w./-]{4,20}\b",
         re.I,
     )),
+
+    # ── Afiliado y credencial de obra social ──────────────────────────────
+    # "Credencial PAMI 150123456789/00", "IOSFA nro 1234567", "N° de afiliado:
+    # 12345678". Exige el número: "Afiliado PAMI" solo no dice nada.
+    # Comparte etiqueta con la historia clínica, como antes de este cambio.
+    ("historia_clinica", re.compile(
+        rf"\b(?:n[º°o][ \t]*de[ \t]*afiliado|afiliado|credencial|carnet|"
+        rf"obra[ \t]+social|{_OBRAS_SOCIALES})"
+        rf"(?:[ \t]+(?:{_OBRAS_SOCIALES}))?"
+        r"[ \t]*(?:n[º°o]\.?|nro\.?|n[úu]mero)?[ \t]*:?[ \t]*\d[\d./-]{3,24}\d",
+        re.I,
+    ), lambda c, _m: _minimo_digitos(c, 5)),
+
+    # ── Matrícula profesional ─────────────────────────────────────────────
+    # "M.P. 34567", "MN 123456", "Matrícula provincial 1234". Las siglas
+    # distinguen mayúsculas a propósito; el número lleva al menos 4 dígitos.
+    ("matricula", re.compile(
+        r"(?:\b(?i:matr[íi]cula)(?:[ \t]+(?i:provincial|nacional|profesional))?"
+        r"|\bM\.?[ \t]?[PN]\.?)(?![A-Za-z])"
+        r"[ \t]*(?i:n[º°o]\.?|nro\.?)?[ \t]*:?[ \t]*(\d[\d.]{2,9}\d)",
+    ), lambda c, _m: _minimo_digitos(c, 4)),
 
     # ── Teléfonos ─────────────────────────────────────────────────────────
     # Dos reglas: una anclada a un marcador ("Tel:"), que puede ser laxa porque
@@ -167,23 +220,41 @@ _REGLAS: list[tuple[str, Pattern[str]]] = [
         r"(\+?\d[\d \t().-]{5,20}\d)",
         re.I,
     )),
-    ("telefono", re.compile(r"(?<![\d/-])\+?\d[\d \t().-]{7,18}\d(?![\d/-])")),
+    # Sin marcador, solo números sin espacios ni puntos (o con "+" o una
+    # característica entre paréntesis), y nunca seguidos de una unidad: así
+    # quedan afuera "126 130 145 128 mg/dl" y "12.500.000 /ul".
+    ("telefono", re.compile(
+        r"(?<![\d/.,-])"
+        r"(?:\+\d[\d \t().-]{7,18}\d|\(\d{2,5}\)[ \t]?\d[\d-]{5,10}\d|\d[\d-]{6,16}\d)"
+        rf"(?![\d/.,-])(?!{_UNIDAD})"
+    )),
 
     # ── Fechas numéricas: 12/03/1984, 12-03-84 ────────────────────────────
     ("fecha", re.compile(r"\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b")),
     # ── Fechas en palabras: 12 de marzo de 1984 ───────────────────────────
     ("fecha", re.compile(rf"\b\d{{1,2}}\s+de\s+(?:{_MESES})\s+de\s+\d{{4}}\b", re.I)),
 
-    # ── Domicilio anunciado por marcador ──────────────────────────────────
-    # Se enmascara hasta el fin de la línea, a propósito. Cortar en el primer
-    # punto dejaría la calle a la vista, porque las direcciones están llenas de
-    # abreviaturas ("Av.", "Gral.", "Dto."). El costo es que, si alguien escribe
-    # texto clínico en la misma línea del domicilio, también se enmascara: se
-    # prefiere perder algo de contexto antes que publicar una dirección.
+    # ── Domicilio ─────────────────────────────────────────────────────────
+    # El campo rotulado ("Domicilio:") se enmascara hasta el fin de la línea:
+    # cortar en el primer punto dejaría la calle a la vista, porque las
+    # direcciones están llenas de abreviaturas ("Av.", "Gral.", "Dto.").
     ("domicilio", re.compile(
-        r"\b(?:domicilio|direcci[óo]n|vive\s+en|reside\s+en)\s*:?\s*([^\n;]{5,120})",
+        r"\b(?:domicilio|direcci[óo]n)[ \t]*:[ \t]*([^\n;]{5,120})",
         re.I,
     )),
+    # En prosa ("reside en", "vive en") se tapa hasta el último número de la
+    # línea (o "s/n"), con el piso y el departamento que lo siguen. Sin número no
+    # hay dirección: una ciudad o un barrio solos no identifican a nadie. La
+    # versión anterior tapaba hasta el fin de la línea y se llevaba "zona rural
+    # con exposición a pesticidas"; _es_domicilio_plausible() descarta los
+    # tramos con palabras de texto clínico ("con", "desde", "trabaja").
+    ("domicilio", re.compile(
+        r"\b(?:vive|reside|domiciliad[oa]|domicilio(?:[ \t]+actual)?|direcci[óo]n)"
+        r"(?:[ \t]+en)?[ \t]*:?[ \t]*"
+        r"([^\n;]{0,80}(?:\d(?:[°º]|to|vo|ro|do|er|mo|no)?(?:[ \t]*(?-i:[A-Z])\b)?"
+        r"|\bs/n\b))",
+        re.I,
+    ), lambda c, _m: _es_domicilio_plausible(c)),
 
     # ── Nombres con marcador explícito ────────────────────────────────────
     # El título va primero: "Dra. María Gutiérrez" tiene que resolverse antes
@@ -192,16 +263,44 @@ _REGLAS: list[tuple[str, Pattern[str]]] = [
     ("nombre", re.compile(
         rf"\b(?:dr|dra|doctor|doctora|lic|prof)\.?\s+({_NOMBRE_COMPUESTO})\b", re.I,
     )),
-    # "Paciente: Juan Pérez", "Sr. Juan Pérez", "Apellido y nombre: Pérez, Juan".
+    # "Sr. Juan Pérez", "Paciente: Juan Pérez", "Apellido y nombre: Pérez, Juan".
+    # Un tratamiento ("Sr.") alcanza como marcador; un rótulo ("Paciente")
+    # necesita los dos puntos para usar el criterio laxo.
     ("nombre", re.compile(
-        rf"\b(?:paciente|sr|sra|srta|don|do[ñn]a|nombre\s+y\s+apellido|"
-        rf"apellido\s+y\s+nombre|nombre|apellido)\.?\s*:?\s+({_NOMBRE_COMPUESTO})\b",
+        rf"\b(?:sr|sra|srta|don|do[ñn]a)\.?\s*:?\s+({_NOMBRE_COMPUESTO})\b",
         re.I,
     )),
+    ("nombre", re.compile(
+        rf"\b(?:paciente|nombre\s+y\s+apellido|apellido\s+y\s+nombre|nombre|apellido)"
+        rf"\.?[ \t]*:\s*({_NOMBRE_COMPUESTO})\b",
+        re.I,
+    )),
+    # Sin dos puntos ("Paciente Juan Pérez"): criterio estricto. Con el laxo,
+    # "Paciente Tratado con Carbamazepina" perdía "Tratado".
+    ("nombre", re.compile(
+        rf"\b(?:paciente|nombre\s+y\s+apellido|apellido\s+y\s+nombre|nombre|apellido)"
+        rf"[ \t]+({_NOMBRE_ESTRICTO})\b",
+        re.I,
+    ), lambda c, _m: _es_nombre_estricto(c)),
+    # Familiares, siempre con el criterio estricto. Detrás de "Padre:" o
+    # "Hermana:" va un antecedente ("Padre: Diabetes Mellitus"), y las
+    # enfermedades no caben en una lista: para padres, hijos y hermanos solo
+    # cuenta la filiación ("Hijo de Juan Pérez"). Cónyuge y tutor con dos puntos
+    # ("Esposa: María López") sí son una persona.
+    ("nombre", re.compile(
+        rf"\b(?:espos[oa]|c[óo]nyuge|pareja|tutor|tutora|acompañante)"
+        rf"(?:[ \t]+legal)?[ \t]*:[ \t]*({_NOMBRE_ESTRICTO})\b",
+        re.I,
+    ), lambda c, _m: _es_nombre_estricto(c)),
+    ("nombre", re.compile(
+        rf"\b(?:hij[oa]|herman[oa]|espos[oa]|c[óo]nyuge)[ \t]+de[ \t]+({_NOMBRE_ESTRICTO})\b",
+        re.I,
+    ), lambda c, _m: _es_nombre_estricto(c)),
     # Marcadores de derivación y de autoría, admitiendo artículo y título
     # intermedios. "Solicitante" y "autor" son los rótulos de los laboratorios.
     ("nombre", re.compile(
-        rf"\b(?:a\s+cargo\s+de|derivad[oa]\s+(?:a|por)|firma|atendid[oa]\s+por|"
+        rf"\b(?:a\s+cargo\s+de|derivad[oa]\s+(?:a|por)|firma(?:\s+y\s+sello)?|sello|"
+        rf"atendid[oa]\s+por|"
         rf"solicitante|autor|m[eé]dico\s+(?:solicitante|derivante|tratante))"
         rf"\s*:?\s+(?:(?:el|la|los|las)\s+)?"
         rf"(?:(?:dr|dra|doctor|doctora|lic|prof)\.?\s+)?({_NOMBRE_COMPUESTO})\b",
@@ -240,6 +339,10 @@ dr dra doctor doctora lic prof sr sra srta don dona doña
 diagnostico diagnóstico resultados resultado estudio informe motivo antecedentes
 laboratorio hemograma observaciones conclusion conclusión
 pre post quirurgico quirúrgico apellido nombre
+portador portadora tratado tratada diabetico diabético diabetica diabética
+hipertenso hipertensa obeso obesa tabaquista alcoholista asintomatico
+asintomático asintomatica asintomática sano sana vivo viva fallecido fallecida
+enfermedad sindrome síndrome cancer cáncer tumor neoplasia antecedente
 """.split())
 
 # Apellidos y nombres que además son términos médicos o topónimos. Se usan solo en
@@ -312,9 +415,53 @@ def _es_telefono_plausible(candidato: str, con_marcador: bool = False) -> bool:
     dosis. El techo de 15 evita tragarse una tira de mediciones separadas por
     espacios como si fuera un número solo.
     """
+    # "Evolución 2019-2023" es un rango de años, no un teléfono.
+    if re.fullmatch(r"(?:19|20)\d\d-(?:19|20)\d\d", candidato.strip()):
+        return False
     digitos = sum(c.isdigit() for c in candidato)
     minimo = 6 if con_marcador else 8
     return minimo <= digitos <= 15
+
+
+def _es_nombre_estricto(candidato: str) -> bool:
+    """
+    Nombre sin marcador fuerte: todas las palabras con el mismo formato
+    (capitalizadas o todas en mayúsculas) y ninguna un término clínico.
+
+    "Portador de HLA" mezcla formatos y "Enfermedad Coronaria" arranca con un
+    término clínico: ninguno de los dos es un nombre. "Juan Pérez" y
+    "PÉREZ JUAN" sí.
+    """
+    palabras = [
+        p for p in candidato.split() if p.lower() not in _PARTICULAS
+    ]
+    if len(palabras) < 2:
+        return False
+    if any(p.lower().strip(",.;:") in _NO_SON_NOMBRES | _PROTEGIDOS for p in palabras):
+        return False
+    todas_mayusculas = [p.isupper() for p in palabras]
+    return all(todas_mayusculas) or not any(todas_mayusculas)
+
+
+# Palabras que no aparecen en una dirección y sí en texto clínico.
+_NO_SON_DOMICILIO = frozenset("""
+con desde hace durante años año meses mes semanas días trabaja trabajó trabajando
+expuesto expuesta exposición por para que sin presenta refiere
+""".split())
+
+
+def _es_domicilio_plausible(candidato: str) -> bool:
+    """
+    Un tramo en prosa es una dirección si no tiene palabras de texto clínico:
+    "Av. Colón 1234" sí, "zona rural con exposición a pesticidas desde 2015" no.
+    """
+    palabras = re.findall(r"[a-záéíóúñ]+", candidato.lower())
+    return not any(p in _NO_SON_DOMICILIO for p in palabras)
+
+
+def _minimo_digitos(candidato: str, minimo: int) -> bool:
+    """Un número de afiliado o de matrícula tiene al menos `minimo` dígitos."""
+    return sum(c.isdigit() for c in candidato) >= minimo
 
 
 _VALIDADORES = {
@@ -397,8 +544,10 @@ def anonimizar(texto: str) -> tuple[str, InformeAnonimizacion]:
     # Lo que se detectó con marcador, para buscarlo después sin marcador.
     nombres_vistos: set[str] = set()
     documentos_vistos: set[str] = set()
-    for categoria, patron in _REGLAS:
+    for regla in _REGLAS:
+        categoria, patron = regla[0], regla[1]
         etiqueta = ETIQUETAS[categoria]
+        validador = regla[2] if len(regla) == 3 else _VALIDADORES.get(categoria)
 
         def _reemplazar(match: re.Match[str]) -> str:
             # Cuando la regla captura un grupo, se enmascara SOLO ese grupo y se
@@ -410,7 +559,6 @@ def anonimizar(texto: str) -> tuple[str, InformeAnonimizacion]:
             # Que la regla capture un grupo significa que venía anclada a un
             # marcador explícito; eso habilita criterios más laxos.
             con_marcador = bool(match.groups())
-            validador = _VALIDADORES.get(categoria)
             if validador and not validador(candidato, con_marcador):
                 return completo
 
