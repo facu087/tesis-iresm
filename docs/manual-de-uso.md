@@ -173,8 +173,10 @@ Hay dos modos de carga, elegibles con las pestañas "Subir PDF" e "Ingresar text
   clínico aquí...".
 
 Las imágenes sueltas (JPG, PNG) no se aceptan: un estudio en imagen debe incorporarse
-dentro de un PDF. El texto extraído se limita a unos 500 KB; lo que excede ese tamaño
-se descarta antes del análisis.
+dentro de un PDF. El archivo no puede superar el límite configurado en el servidor
+(50 MB por defecto); uno mayor se rechaza con el mensaje "El archivo supera el límite de
+50 MB.". El texto extraído se limita a unos 500 KB; lo que excede ese tamaño se descarta
+antes del análisis.
 
 Errores posibles al enviar: "Seleccioná un archivo PDF.", "Ingresá el texto del caso
 clínico.", "El archivo enviado está vacío." y "No se pudo extraer texto del

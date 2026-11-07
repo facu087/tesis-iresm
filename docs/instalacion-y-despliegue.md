@@ -132,7 +132,7 @@ funcionar sin ella.
 | `ORPHANET_API_KEY` | No | Valor por defecto del cliente | La API responde sin credencial. Un valor con espacios o `#` se descarta con aviso. |
 | `PROVINCIAL_LICENSE_SEARCH_URL` | No | (ninguno) | Enlace al buscador provincial de matrículas que se muestra al administrador. |
 | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY` | No | (ninguno) | Reservadas para la arquitectura de destino. El código actual no las lee. |
-| `MAX_FILE_SIZE_MB` | No | `50` (en `.env.example`) | Figura en la documentación, pero el backend no la lee (ver nota al final). |
+| `MAX_FILE_SIZE_MB` | No | `50` | Tamaño máximo del archivo subido a `POST /api/analyze`, en MB. Un archivo mayor recibe un 413. Un valor que no es un entero positivo avisa por stderr y usa 50 (ver nota al final). |
 | `NEXT_PUBLIC_API_URL` | No | `http://localhost:8000` | Base del backend para el frontend. |
 | `NEXT_PUBLIC_SITE_URL` | No | `http://localhost:3000` | Origen público del frontend. |
 
@@ -385,8 +385,11 @@ request y en cada push a `develop` y `master`, sin secretos:
 
 ### Nota sobre `MAX_FILE_SIZE_MB`
 
-`MAX_FILE_SIZE_MB=50` figura en `.env.example` y en la documentación del
-proyecto, pero ningún módulo del backend la lee a la fecha de esta guía: el
-tamaño de los archivos subidos no está limitado por esa variable. Si se requiere
-un límite en producción, puede aplicarse en el proxy inverso (por ejemplo,
-`client_max_body_size 50m;` en nginx).
+`POST /api/analyze` rechaza con un 413 ("El archivo supera el límite de N MB.") todo
+archivo mayor que `MAX_FILE_SIZE_MB` (50 por defecto), antes de extraer el texto. El
+backend lee como mucho el límite más un byte, así que un archivo grande no se carga en
+memoria. Sin embargo, el servidor (Starlette) recibe el cuerpo completo y lo guarda en un
+temporal antes de que el endpoint lo examine: el límite evita procesarlo, no recibirlo.
+En producción conviene cortar antes en el proxy inverso, con un valor algo mayor al de la
+variable para dejar lugar a los encabezados del formulario (por ejemplo,
+`client_max_body_size 51m;` en nginx o `request_body { max_size 51MB }` en Caddy).

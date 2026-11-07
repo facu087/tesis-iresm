@@ -914,7 +914,8 @@ NEXUS_MOCK_LLM=          # Apagada por defecto. 1/true la activa: el pipeline
 
 # Servidor
 ENVIRONMENT=development
-MAX_FILE_SIZE_MB=50
+MAX_FILE_SIZE_MB=50      # Tamaño máximo del archivo subido a POST /api/analyze; uno
+                         # mayor recibe 413. Inválido o <= 0: avisa y usa 50.
 SESSION_TTL_MINUTES=60  # TTL de la sesión de cuenta — en uso desde Sprint 4
 SESSION_CLEANUP_INTERVAL_MINUTES=15  # Cada cuántos minutos se borran las sesiones
                          # vencidas (backend/mantenimiento/limpieza.py, tarea de fondo
