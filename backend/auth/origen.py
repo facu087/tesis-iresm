@@ -11,18 +11,23 @@ rechaza igual que si no coincidiera.
 
 from __future__ import annotations
 
-import os
 from urllib.parse import urlsplit
 
 from fastapi import HTTPException, Request
 
-_ALLOWED_ORIGINS_ENV = "ALLOWED_ORIGINS"
-_DEFAULT_ALLOWED_ORIGINS = "http://localhost:3000"
+from ..seguridad import ConfiguracionInsegura, origenes_permitidos
 
 
 def _allowed_origins() -> list[str]:
-    valor = os.getenv(_ALLOWED_ORIGINS_ENV, _DEFAULT_ALLOWED_ORIGINS)
-    return [o.strip() for o in valor.split(",") if o.strip()]
+    """
+    La misma lista que usa CORS (`backend/seguridad.py`). Si la configuración es
+    inválida no se rechaza con un 500 sino que no se permite ningún origen:
+    *fail-closed*. El servidor ya no habría arrancado con esa configuración.
+    """
+    try:
+        return origenes_permitidos()
+    except ConfiguracionInsegura:
+        return []
 
 
 def _origen_efectivo(request: Request) -> str | None:
@@ -48,5 +53,6 @@ def validar_origen(request: Request) -> None:
     `Referer` como respaldo) no pertenece a `ALLOWED_ORIGINS`.
     """
     origen = _origen_efectivo(request)
-    if origen is None or origen not in _allowed_origins():
+    # Los navegadores mandan el origen en minúsculas; la lista ya está normalizada.
+    if origen is None or origen.lower() not in _allowed_origins():
         raise HTTPException(status_code=403, detail="Origen no permitido.")

@@ -16,9 +16,13 @@ from __future__ import annotations
 
 import sys
 import unicodedata
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from enum import Enum
+
+import httpx
 
 from ..external.pubmed import PubMedClient
 from ..models.hypothesis import Source
@@ -67,6 +71,110 @@ class SourceVerification:
     def is_valid(self) -> bool:
         """True solo si la referencia respalda realmente lo que el agente citó."""
         return self.status is SourceStatus.VERIFICADA
+
+
+# ── Estado global y causa de un fallo (tarjeta #91) ───────────────────────────
+
+class CausaFallo(str, Enum):
+    """Por qué falló una consulta a PubMed. Es lo único del fallo que llega al reporte."""
+
+    RED = "red"                              # Sin conexión o tiempo de espera agotado
+    LIMITE_VELOCIDAD = "limite_velocidad"    # HTTP 429
+    CONFIGURACION = "configuracion"          # HTTP 400/401/403: casi siempre la api_key
+    ERROR_API = "error_api"                  # HTTP 5xx u otra respuesta inutilizable
+    DESCONOCIDA = "desconocida"              # Cualquier otro fallo
+
+
+class EstadoVerificacion(str, Enum):
+    """Resultado global de las consultas a PubMed de un análisis."""
+
+    COMPLETA = "completa"
+    PARCIAL = "parcial"
+    NO_DISPONIBLE = "no_disponible"
+    SIN_CONSULTA = "sin_consulta"
+
+
+@dataclass(frozen=True)
+class ResultadoConsulta:
+    """Resultado de una consulta a PubMed: respondió, o falló por `causa`."""
+
+    ok: bool
+    causa: CausaFallo | None = None
+
+
+def clasificar_fallo(exc: BaseException) -> CausaFallo:
+    """
+    Traduce la excepción de una consulta a PubMed a una categoría fija.
+
+    Se decide por el tipo de excepción y el código HTTP, nunca por el texto:
+    el mensaje de httpx cambia entre versiones y contiene la URL con `api_key`.
+    """
+    if isinstance(exc, httpx.HTTPStatusError):
+        codigo = exc.response.status_code
+        if codigo == 429:
+            return CausaFallo.LIMITE_VELOCIDAD
+        if codigo in (400, 401, 403):
+            return CausaFallo.CONFIGURACION
+        return CausaFallo.ERROR_API
+    if isinstance(exc, httpx.TransportError):
+        return CausaFallo.RED
+    if isinstance(exc, ValueError):
+        # Incluye json.JSONDecodeError: PubMed respondió algo que no es JSON.
+        return CausaFallo.ERROR_API
+    return CausaFallo.DESCONOCIDA
+
+
+def estado_verificacion(
+    resultados: Sequence[ResultadoConsulta],
+) -> tuple[EstadoVerificacion, CausaFallo | None]:
+    """
+    Estado global a partir de los resultados de las consultas, en orden.
+
+    Con más de un fallo se informa la causa del primero: la verificación inicial
+    va antes que la Ronda 5 y es la que afecta a más fuentes.
+    """
+    if not resultados:
+        return EstadoVerificacion.SIN_CONSULTA, None
+    fallos = [r for r in resultados if not r.ok]
+    if not fallos:
+        return EstadoVerificacion.COMPLETA, None
+    estado = (
+        EstadoVerificacion.NO_DISPONIBLE
+        if len(fallos) == len(resultados)
+        else EstadoVerificacion.PARCIAL
+    )
+    return estado, fallos[0].causa
+
+
+_registro_activo: ContextVar[list[ResultadoConsulta] | None] = ContextVar(
+    "nexus_registro_consultas_pubmed", default=None
+)
+
+
+@contextmanager
+def registro_de_consultas() -> Iterator[list[ResultadoConsulta]]:
+    """
+    Abre el registro de consultas a PubMed de un análisis.
+
+    Mientras está abierto, cada consulta que hace `verify_sources()` —la
+    verificación inicial en el router y la re-verificación de la Ronda 5 dentro
+    del Árbitro— anota su resultado en la lista que devuelve. Se basa en
+    `contextvars`, así que dos análisis concurrentes no se mezclan. Fuera de un
+    registro (scripts, tests sueltos) no se anota nada.
+    """
+    resultados: list[ResultadoConsulta] = []
+    token = _registro_activo.set(resultados)
+    try:
+        yield resultados
+    finally:
+        _registro_activo.reset(token)
+
+
+def _anotar(resultado: ResultadoConsulta) -> None:
+    """Anota en el registro activo, si hay uno."""
+    registro = _registro_activo.get()
+    if registro is not None:
+        registro.append(resultado)
 
 
 def _normalize_tokens(title: str) -> set[str]:
@@ -181,11 +289,16 @@ async def verify_sources(sources: Sequence[Source]) -> dict[str, SourceVerificat
                 metadata = await client.fetch_metadata(pmids)
         except Exception as exc:
             fallo_consulta = True
+            causa = clasificar_fallo(exc)
+            _anotar(ResultadoConsulta(ok=False, causa=causa))
             print(
-                f"[NEXUS] Verificación bibliográfica no disponible ({type(exc).__name__}: {exc}). "
+                f"[NEXUS] Verificación bibliográfica no disponible "
+                f"(causa: {causa.value}; {type(exc).__name__}: {exc}). "
                 f"{len(pmids)} PMIDs quedan sin verificar.",
                 file=sys.stderr,
             )
+        else:
+            _anotar(ResultadoConsulta(ok=True))
 
     verificaciones: dict[str, SourceVerification] = {}
     for source in sources:

@@ -453,23 +453,22 @@ def build_arbitration_input(report: Report) -> ArbitrationInput:
     for output in finales:
         agent_names.setdefault(output.agent_id, output.agent_name)
 
+    # Las hipótesis salen siempre del reporte: es lo que se verificó y lo que
+    # se va a exportar. Las de la ronda traen las citas tal como las dijo cada
+    # agente, antes del filtro de citas fuera del RAG de `run_debate()`
+    # (tarjeta #92): tomarlas devolvería al consenso citas descartadas.
+    hypotheses = list(report.hypotheses)
+
     # `run_debate()` concatena las hipótesis de la última ronda en ese mismo
     # orden, así que recorrer los outputs reconstruye la autoría posición a
-    # posición. Si por lo que sea no coinciden, se completa con "" y el consenso
-    # simplemente no atribuye esa hipótesis, en vez de atribuirla mal.
-    hypotheses: list[Hypothesis] = []
-    hypothesis_agents: list[str] = []
-    for output in finales:
-        for hypothesis in output.hypotheses:
-            hypotheses.append(hypothesis)
-            hypothesis_agents.append(output.agent_id)
-
-    if [h.text for h in hypotheses] != [h.text for h in report.hypotheses]:
-        # El reporte manda: es lo que se verificó y lo que se va a exportar.
-        hypotheses = list(report.hypotheses)
-        por_texto = {
-            h.text: output.agent_id for output in finales for h in output.hypotheses
-        }
+    # posición. Si por lo que sea no coinciden, se atribuye por texto y, si
+    # tampoco, con "": el consenso no atribuye esa hipótesis en vez de
+    # atribuirla mal.
+    en_orden = [(h.text, output.agent_id) for output in finales for h in output.hypotheses]
+    if [texto for texto, _ in en_orden] == [h.text for h in hypotheses]:
+        hypothesis_agents = [agente for _, agente in en_orden]
+    else:
+        por_texto = dict(en_orden)
         hypothesis_agents = [por_texto.get(h.text, "") for h in hypotheses]
 
     critiques = [c for r in report.debate_rounds for c in r.critiques]

@@ -5,7 +5,7 @@ import {
   WarningCircleIcon,
   WarningIcon,
 } from "@phosphor-icons/react/ssr";
-import type { ArbitrationSummary, VerificationSummary } from "@/lib/types";
+import type { ArbitrationSummary, CausaFallo, VerificationSummary } from "@/lib/types";
 import { Notice } from "@/components/report/primitives";
 
 /**
@@ -117,21 +117,45 @@ export function ArbitrationBanner({ a }: { a: ArbitrationSummary }) {
  * Sin esto, un lector ve la referencia citada y asume que es buena: la
  * contradicción queda en el dato y no llega a la pantalla.
  */
+/**
+ * Plain-language phrase for each cause of a failed PubMed check (card #91).
+ * The report carries only the category; a test requires a phrase for each one.
+ */
+export const FRASES_CAUSA: Record<CausaFallo, string> = {
+  red: "PubMed no respondió (sin conexión o tiempo de espera agotado).",
+  limite_velocidad: "PubMed rechazó la consulta por exceso de pedidos.",
+  configuracion:
+    "PubMed rechazó la consulta: posible clave de PubMed mal configurada en el servidor.",
+  error_api: "PubMed devolvió un error.",
+  desconocida: "Ocurrió un error no identificado al consultar PubMed.",
+};
+
 export function VerificationBanner({ v }: { v: VerificationSummary }) {
   if (!v.total_fuentes) return null;
 
   const sospechosas = v.discordantes + v.inexistentes;
   const hayProblema = sospechosas > 0;
+  // A check that did not run fully is never presented as a success.
+  const incompleta = v.estado === "parcial" || v.estado === "no_disponible";
   const pendientes = v.hipotesis_pendientes ?? 0;
   const topeadas = v.hipotesis_topeadas ?? 0;
   const totalHipotesis = v.hipotesis_respaldadas + pendientes + v.hipotesis_especulativas;
 
   return (
     <Notice
-      tone={hayProblema ? "danger" : "positive"}
-      Icon={hayProblema ? WarningCircleIcon : SealCheckIcon}
+      tone={hayProblema ? "danger" : incompleta ? "warning" : "positive"}
+      Icon={hayProblema ? WarningCircleIcon : incompleta ? WarningIcon : SealCheckIcon}
       label="Verificación bibliográfica:"
     >
+      {incompleta && (
+        <>
+          {v.estado === "no_disponible" ? "no se pudo hacer" : "quedó incompleta"}:{" "}
+          {v.no_verificables === 1
+            ? "1 referencia no se pudo consultar."
+            : `${v.no_verificables} referencias no se pudieron consultar.`}{" "}
+          {FRASES_CAUSA[v.causa ?? "desconocida"]}{" "}
+        </>
+      )}
       {hayProblema ? (
         <>
           {sospechosas} de {v.total_fuentes} referencias citadas no se pudieron confirmar
@@ -143,8 +167,8 @@ export function VerificationBanner({ v }: { v: VerificationSummary }) {
           {v.verificadas} de {v.total_fuentes} referencias confirmadas contra PubMed.
         </>
       )}
-      {v.no_verificables > 0 && (
-        <> {v.no_verificables} no se pudieron consultar (fallo de red): no se invalidan.</>
+      {v.no_verificables > 0 && !incompleta && (
+        <> {v.no_verificables} no se pudieron consultar: no se invalidan.</>
       )}
       {pendientes > 0 && (
         <> {pendientes} de {totalHipotesis} hipótesis quedan pendientes de verificación.</>

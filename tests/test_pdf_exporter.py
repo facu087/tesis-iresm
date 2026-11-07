@@ -837,3 +837,152 @@ def test_el_marcado_propio_del_exportador_sigue_funcionando():
     assert "<b>" not in texto and "<font color" not in texto
     assert "Narrativa clínica:" in texto and "NO CORRESPONDE" in texto
     assert "Justificación:" in texto and "Veredicto del Árbitro:" in texto
+
+
+# ── Maquetación (tarjeta #78) ──────────────────────────────────────────────────
+#
+# Estos tests miran la geometría del PDF generado, no su texto: el texto salía
+# completo aun cuando el título pisaba al subtítulo y una celda se salía de la
+# hoja, así que ninguno de los tests de contenido lo habría detectado.
+
+_MARGEN_PT = 2 * 28.3465  # 2 cm, el margen de generate_pdf
+
+
+class TestMaquetacion:
+    def test_el_titulo_de_la_portada_no_pisa_al_subtitulo(self):
+        """
+        El estilo del título fijaba `fontSize=22` pero heredaba `leading=12`: la
+        línea medía menos que la letra y el subtítulo se dibujaba encima.
+        """
+        with pdfplumber.open(io.BytesIO(generate_pdf(_make_report()))) as pdf:
+            palabras = pdf.pages[0].extract_words()
+        titulo = next(w for w in palabras if w["text"] == "NEXUS")
+        subtitulo = [w for w in palabras if w["text"] in ("Sistema", "Soporte", "Investigativo")]
+        assert subtitulo, "no se encontró el subtítulo"
+        for palabra in subtitulo:
+            assert titulo["bottom"] <= palabra["top"] + 0.5, (
+                f"el título (hasta y={titulo['bottom']:.1f}) pisa a «{palabra['text']}» "
+                f"(desde y={palabra['top']:.1f})"
+            )
+
+    def test_el_leading_de_cada_estilo_alcanza_para_su_letra(self):
+        from backend.pipeline.pdf_exporter import _styles
+
+        for nombre, estilo in _styles().items():
+            assert estilo.leading >= estilo.fontSize, (
+                f"el estilo «{nombre}» tiene leading {estilo.leading} < fontSize {estilo.fontSize}"
+            )
+
+    def test_un_antecedente_largo_no_se_sale_de_la_hoja(self):
+        """
+        Las celdas de la tabla del resumen eran strings, que no se parten en
+        líneas: un antecedente largo se dibujaba fuera de la celda y del margen.
+        """
+        largo = (
+            "Diabetes tipo 2 de 10 años de evolución con control subóptimo (HbA1c 8.2%) "
+            "y antecedente familiar de problemas de equilibrio no estudiados en el padre"
+        )
+        reporte = _make_report()
+        reporte.case_summary.relevant_history = [largo]
+        reporte.case_summary.chief_complaint = largo
+        with pdfplumber.open(io.BytesIO(generate_pdf(reporte))) as pdf:
+            for n, pagina in enumerate(pdf.pages, 1):
+                derecha = pagina.width - _MARGEN_PT
+                for c in pagina.chars:
+                    assert c["x1"] <= derecha + 1, (
+                        f"pág. {n}: «{c['text']}» termina en x={c['x1']:.1f}, "
+                        f"pasado el margen derecho ({derecha:.1f})"
+                    )
+                    assert c["x0"] >= _MARGEN_PT - 1
+
+    def test_el_texto_largo_se_parte_en_varias_lineas_dentro_de_su_celda(self):
+        """Una celda con más texto crece hacia abajo; no se ensancha."""
+        largo = _make_report()
+        largo.case_summary.relevant_history = ["antecedente " * 30]
+        assert _alto_del_resumen(largo) > _alto_del_resumen(_make_report())
+
+    def test_las_tablas_miden_el_ancho_util_del_marco(self):
+        """Las de 17 cm exactos desbordaban los 12 pt de relleno del marco."""
+        from reportlab.platypus import Table
+
+        from backend.pipeline.pdf_exporter import (
+            _ANCHO_UTIL,
+            _case_summary,
+            _debate_summary,
+            _styles,
+        )
+
+        reporte = _make_report()
+        for seccion in (_case_summary, _debate_summary):
+            tablas = [f for f in seccion(reporte, _styles()) if isinstance(f, Table)]
+            assert tablas, seccion.__name__
+            for tabla in tablas:
+                assert sum(tabla._colWidths) <= _ANCHO_UTIL + 0.01
+
+    def test_el_encabezado_de_seccion_no_queda_huerfano(self):
+        """Encabezado, línea y contenido van juntos: no se corta entre dos páginas."""
+        from backend.pipeline.pdf_exporter import _section, _styles
+
+        spacer, titulo, linea = _section("ENSAYOS", _styles())
+        assert titulo.style.keepWithNext
+        assert linea.keepWithNext
+
+
+def _alto_del_resumen(reporte) -> float:
+    from reportlab.platypus import Table
+
+    from backend.pipeline.pdf_exporter import _ANCHO_UTIL, _case_summary, _styles
+
+    tabla = next(f for f in _case_summary(reporte, _styles()) if isinstance(f, Table))
+    return tabla.wrap(_ANCHO_UTIL, 10_000)[1]
+
+
+# ── Tests: estado de la verificación en la portada (tarjeta #91) ──────────────
+
+def _plano(pdf: bytes) -> str:
+    """Texto del PDF con los saltos de línea del maquetado unidos en espacios."""
+    return " ".join(_texto_del_pdf(pdf).split())
+
+
+class TestEstadoVerificacionEnPdf:
+    def _report_con_estado(self, estado, causa, no_verificables=1) -> StructuredReport:
+        report = _make_report()
+        report.verification = VerificationSummary(
+            total_fuentes=1, no_verificables=no_verificables,
+            hipotesis_pendientes=1, estado=estado, causa=causa,
+        )
+        return report
+
+    def test_no_disponible_por_red_dice_que_pubmed_no_respondio(self):
+        texto = _plano(generate_pdf(self._report_con_estado("no_disponible", "red")))
+        assert "Verificación bibliográfica no disponible" in texto
+        assert "PubMed no respondió (sin conexión o tiempo de espera agotado)" in texto
+
+    def test_parcial_dice_cuantas_quedaron_sin_consultar(self):
+        report = self._report_con_estado("parcial", "error_api", no_verificables=3)
+        texto = _plano(generate_pdf(report))
+        assert "Verificación bibliográfica incompleta" in texto
+        assert "3 referencias no se pudieron consultar" in texto
+        assert "PubMed devolvió un error" in texto
+
+    def test_configuracion_no_atribuye_el_fallo_a_la_red(self):
+        texto = _plano(generate_pdf(self._report_con_estado("no_disponible", "configuracion")))
+        assert "posible clave de PubMed mal configurada" in texto
+        assert "PubMed no respondió" not in texto
+
+    def test_completa_no_muestra_el_aviso(self):
+        texto = _plano(generate_pdf(self._report_con_estado("completa", None, 0)))
+        assert "Verificación bibliográfica no disponible" not in texto
+        assert "Verificación bibliográfica incompleta" not in texto
+
+    def test_sin_estado_no_muestra_el_aviso(self):
+        texto = _plano(generate_pdf(self._report_con_estado(None, None)))
+        assert "Verificación bibliográfica no disponible" not in texto
+        assert "Verificación bibliográfica incompleta" not in texto
+
+    def test_hay_una_frase_para_cada_causa(self):
+        from backend.pipeline.pdf_exporter import _FRASES_CAUSA
+        from backend.pipeline.verification import CausaFallo
+
+        assert set(_FRASES_CAUSA) == {c.value for c in CausaFallo}
+        assert all(_FRASES_CAUSA.values())

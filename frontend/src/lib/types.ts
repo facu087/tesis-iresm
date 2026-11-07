@@ -214,7 +214,18 @@ export interface VerificationSummary {
   hipotesis_pendientes?: number;
   /** Hipótesis cuyo nivel efectivo quedó por debajo del declarado. */
   hipotesis_topeadas?: number;
+  /**
+   * Whether the PubMed check ran (card #91). Absent on reports saved before
+   * the change, which must not claim any cause.
+   */
+  estado?: EstadoVerificacion | null;
+  /** Why the check failed, as a fixed category. Only with parcial/no_disponible. */
+  causa?: CausaFallo | null;
 }
+
+export type EstadoVerificacion = "completa" | "parcial" | "no_disponible" | "sin_consulta";
+
+export type CausaFallo = "red" | "limite_velocidad" | "configuracion" | "error_api" | "desconocida";
 
 export interface StructuredReport {
   metadata: ReportMetadata;

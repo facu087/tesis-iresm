@@ -143,6 +143,57 @@ def validate_recited(
     return aceptadas, descartadas
 
 
+def filtrar_citas(
+    sources: Sequence[Source],
+    allowed: set[str],
+) -> tuple[list[Source], int]:
+    """
+    Filtro estricto al cerrar el debate (tarjeta #92): conserva solo las
+    fuentes cuyo PMID ofreció el RAG.
+
+    A diferencia de `validate_recited()`, las fuentes **sin PMID** (una guía
+    citada por sociedad y año) se conservan en su lugar: no se pueden anclar a
+    un artículo, pero tampoco cuentan nunca como verificadas. Las que tienen
+    PMID pasan por la misma regla que la recitación de la Ronda 5.
+
+    Returns:
+        (fuentes resultantes en el orden original, cantidad descartada).
+    """
+    con_pmid = [s for s in sources if s.pmid]
+    aceptadas, descartadas = validate_recited(con_pmid, allowed)
+    pmids_aceptados = {s.pmid for s in aceptadas}
+
+    resultado: list[Source] = []
+    vistas: set[str] = set()
+    for source in sources:
+        if not source.pmid:
+            resultado.append(source)
+        elif source.pmid in pmids_aceptados and source.pmid not in vistas:
+            vistas.add(source.pmid)
+            resultado.append(source)
+    return resultado, descartadas
+
+
+def lista_de_literatura(articles: Sequence[RetrievedArticleRef]) -> str:
+    """
+    Lista corta de la literatura ofrecida para los pedidos de revisión del
+    debate: una línea `[PMID: …] título (año)` por artículo, sin resumen,
+    porque se repite en cada revisión.
+    """
+    lineas = ["LITERATURA CIENTÍFICA DISPONIBLE (la única que podés citar):"]
+    con_pmid = [a for a in articles if a.pmid]
+    if not con_pmid:
+        lineas.append(
+            "No hay literatura disponible para citar en este análisis: "
+            "dejá `sources` vacío y usá evidence_level \"III\"."
+        )
+        return "\n".join(lineas)
+    for article in con_pmid:
+        anio = f" ({article.year})" if article.year else ""
+        lineas.append(f"[PMID: {article.pmid}] {article.title}{anio}")
+    return "\n".join(lineas)
+
+
 def improved(
     hypothesis: Hypothesis,
     verifications: Mapping[str, SourceVerification],

@@ -3,6 +3,7 @@ Esquemas de request/response para la API de NEXUS.
 """
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -148,6 +149,18 @@ class VerificationSummary(BaseModel):
     hipotesis_especulativas: int = 0
     hipotesis_pendientes: int = 0
     hipotesis_topeadas: int = 0
+    # Tarjeta #91 — si la verificación corrió y, si falló, por qué. Opcionales:
+    # un reporte anterior no los tiene y no afirma ninguna causa. La causa es
+    # una categoría fija, nunca el texto de la excepción.
+    estado: Literal["completa", "parcial", "no_disponible", "sin_consulta"] | None = None
+    causa: Literal[
+        "red", "limite_velocidad", "configuracion", "error_api", "desconocida"
+    ] | None = None
+    # Tarjeta #92 — fuentes con PMID descartadas al cerrar el debate por no
+    # venir de la literatura que ofreció el RAG; nunca se consultan en PubMed.
+    # None = reporte anterior al filtro (no informado); 0 = se filtró y no
+    # descartó nada.
+    fuera_del_rag: int | None = None
 
 
 class StructuredReport(BaseModel):

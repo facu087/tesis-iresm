@@ -31,6 +31,16 @@ from . import model_tasks
 # agentes ya las importan desde `base_agent`.
 from .model_tasks import GROQ_FAST, GROQ_MAIN
 
+# Regla de citas de la tarjeta #92: una cita con PMID solo vale si ese PMID lo
+# ofreció el RAG. El debate la aplica al cerrar (`pipeline/debate.py`); acá se
+# la repite al modelo en la revisión. Los SYSTEM_PROMPT de los Agentes 01, 02 y
+# 03 la llevan escrita con el mismo texto (lo comprueba tests/test_agents_prompts.py).
+REGLA_CITAS = (
+    "Solo podés citar PMIDs que figuren en el bloque LITERATURA CIENTÍFICA del contexto. "
+    "Si ningún artículo de ese bloque respalda la hipótesis, dejá `sources` vacío y usá "
+    '`evidence_level: "III"`.'
+)
+
 
 def _grabar_respuesta(
     *,
@@ -540,6 +550,7 @@ class BaseAgent(ABC):
             "Respondé a cada crítica recibida: ajustá tu hipótesis si la crítica es válida,\n"
             "o defendela con argumentación adicional. Podés agregar hipótesis nuevas si\n"
             "el debate reveló perspectivas no consideradas.\n\n"
+            f"CITAS: {REGLA_CITAS}\n\n"
             "Respondé ÚNICAMENTE con JSON en el formato estándar de hipótesis:\n"
             '{\n  "hypotheses": [...]\n}'
         )

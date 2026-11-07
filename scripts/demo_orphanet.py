@@ -11,8 +11,9 @@ simulados, y eso tapaba dos cosas:
    afirmaba ORPHA:85163 para la amiloidosis ATTR hereditaria; el código real
    es **ORPHA:271861**.
 
-Los genes no se consultan acá: la ORPHAcodes API no expone ese dato (32 rutas,
-ninguna de genes). Ver el docstring de `backend/external/orphanet.py`.
+Los genes no están en esta API (32 rutas, ninguna de genes): `get_genes()`
+delega en el cliente de Orphadata, otro host. Acá se muestra apenas el símbolo;
+el detalle (tipo de asociación, estado, PMID) está en `demo_orphadata.py`.
 
 Correrlo necesita conexión. No necesita GROQ_API_KEY.
 
@@ -34,10 +35,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
-from backend.external.orphanet import (
-    OrphanetClient,
-    OrphanetGenesNoDisponibles,
-)
+from backend.external.orphanet import OrphanetClient
 from backend.external.rate_limiter import ExternalApiError
 
 _SEP = "═" * 78
@@ -107,16 +105,18 @@ async def main() -> None:
         print(f"  Término inexistente → {vacio}  (404 'Query not found', sin excepción)")
         print(f"  Código inexistente  → {await client.get_by_code('99999999')}")
 
-        print(f"\n{'─' * 78}\n4. Genes: esta API no los tiene\n{'─' * 78}")
-        try:
-            await client.get_genes("271861")
-        except OrphanetGenesNoDisponibles as exc:
-            print(f"  OrphanetGenesNoDisponibles:")
-            for linea in str(exc).split(". "):
-                print(f"      {linea.strip()}")
-            lineas.append(f"GENES: {exc}")
-        print("\n  Antes devolvía [] en silencio, que se lee como 'esta enfermedad")
-        print("  no tiene genes asociados' — y es falso: el dato está en otra API.")
+        print(f"\n{'─' * 78}\n4. Genes: esta API no los tiene, los trae Orphadata\n{'─' * 78}")
+        print("  get_genes() delega en backend/external/orphadata.py (tarjeta #74).")
+        print("  Ojo: Orphadata cuelga la asociación génica del subtipo, no del grupo.\n")
+        for codigo, etiqueta in (("85447", "ATTRV30M amyloidosis (subtipo)"),
+                                 ("271861", "Hereditary ATTR amyloidosis")):
+            genes = await client.get_genes(codigo)
+            estado = ", ".join(genes) if genes else "sin asociación génica cargada"
+            print(f"  ORPHA:{codigo:<8} {etiqueta:<36} → {estado}")
+            lineas.append(f"GENES ORPHA:{codigo} ({etiqueta}): {estado}")
+        print("\n  La versión anterior devolvía [] en silencio contra un endpoint que no")
+        print("  existe, y eso se lee como 'esta enfermedad no tiene genes asociados'.")
+        print("  El detalle completo (tipo de asociación, PMID) está en demo_orphadata.py.")
 
     _OUT_DIR.mkdir(parents=True, exist_ok=True)
     txt = _OUT_DIR / "enfermedades.txt"

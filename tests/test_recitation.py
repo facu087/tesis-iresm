@@ -568,3 +568,61 @@ class TestLaRecitacionLlegaAlReporte:
         _correr(entrada, verifs, {"01": agente}, monkeypatch)
 
         assert verifs == antes
+
+
+# ── Tarjeta #92: filtro estricto de citas al cerrar el debate ────────────────
+
+class TestFiltrarCitas:
+    OFRECIDOS = {"11111111", "22222222"}
+
+    def test_pmid_no_ofrecido_se_descarta(self):
+        fuentes, descartadas = recitation.filtrar_citas(
+            [Source(pmid="31234567", title="De memoria")], self.OFRECIDOS
+        )
+        assert fuentes == []
+        assert descartadas == 1
+
+    def test_pmid_ofrecido_se_conserva(self):
+        fuente = Source(pmid="11111111", title="Ofrecido")
+        assert recitation.filtrar_citas([fuente], self.OFRECIDOS) == ([fuente], 0)
+
+    def test_fuente_sin_pmid_se_conserva_en_su_lugar(self):
+        guia = Source(pmid=None, title="Guía AAN 2021")
+        ofrecida = Source(pmid="22222222", title="Ofrecido")
+        fuentes, descartadas = recitation.filtrar_citas(
+            [Source(pmid="99999999", title="Inventado"), guia, ofrecida], self.OFRECIDOS
+        )
+        assert fuentes == [guia, ofrecida]
+        assert descartadas == 1
+
+    def test_pmid_repetido_queda_una_vez(self):
+        fuente = Source(pmid="11111111", title="Ofrecido")
+        fuentes, descartadas = recitation.filtrar_citas([fuente, fuente], self.OFRECIDOS)
+        assert fuentes == [fuente]
+        assert descartadas == 0
+
+    def test_sin_literatura_se_descartan_todas_las_fuentes_con_pmid(self):
+        guia = Source(pmid=None, title="Guía")
+        fuentes, descartadas = recitation.filtrar_citas(
+            [Source(pmid="11111111", title="A"), Source(pmid="22222222", title="B"), guia], set()
+        )
+        assert fuentes == [guia]
+        assert descartadas == 2
+
+
+class TestListaDeLiteratura:
+    def test_una_linea_por_articulo_sin_resumen(self):
+        articulos = [
+            RetrievedArticleRef(pmid="11111111", title="Amyloid neuropathy", year="2024",
+                                excerpt="Resumen largo que no debe aparecer"),
+            RetrievedArticleRef(pmid="22222222", title="IgM paraproteinaemic neuropathies", year="2004"),
+        ]
+        texto = recitation.lista_de_literatura(articulos)
+        assert "[PMID: 11111111] Amyloid neuropathy (2024)" in texto
+        assert "[PMID: 22222222] IgM paraproteinaemic neuropathies (2004)" in texto
+        assert "Resumen largo" not in texto
+
+    def test_sin_articulos_avisa_que_no_hay_literatura(self):
+        texto = recitation.lista_de_literatura([])
+        assert "No hay literatura disponible" in texto
+        assert "[PMID:" not in texto

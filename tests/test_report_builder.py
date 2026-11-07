@@ -541,3 +541,72 @@ class TestNavegacionDeEnsayos:
         segundo = _make_trial().model_copy(update={"nct_id": "NCT_B"})
         result = _build(trials=[primero, segundo])
         assert [t.nct_id for t in result.clinical_trials] == ["NCT_A", "NCT_B"]
+
+
+# ── Estado y causa de la verificación (tarjeta #91) ────────────────────────────
+
+class TestEstadoDeLaVerificacion:
+    def test_sin_estado_los_campos_quedan_nulos(self):
+        reporte = build_export(_make_case(), _make_report(), trials=[], processing_time=1.0)
+        assert reporte.verification.estado is None
+        assert reporte.verification.causa is None
+
+    def test_con_estado_el_json_lo_contiene(self):
+        from backend.pipeline.verification import CausaFallo, EstadoVerificacion
+
+        reporte = build_export(
+            _make_case(), _make_report(), trials=[], processing_time=1.0,
+            estado_verificacion=(EstadoVerificacion.NO_DISPONIBLE, CausaFallo.RED),
+        )
+        datos = reporte.model_dump(mode="json")["verification"]
+        assert datos["estado"] == "no_disponible"
+        assert datos["causa"] == "red"
+
+    def test_completa_no_lleva_causa(self):
+        from backend.pipeline.verification import EstadoVerificacion
+
+        reporte = build_export(
+            _make_case(), _make_report(), trials=[], processing_time=1.0,
+            estado_verificacion=(EstadoVerificacion.COMPLETA, None),
+        )
+        assert reporte.verification.estado == "completa"
+        assert reporte.verification.causa is None
+
+
+class TestCitasFueraDelRag:
+    """Tarjeta #92: conteo de citas descartadas por no venir del RAG."""
+
+    def test_el_json_exportado_trae_el_conteo(self):
+        report = _make_report()
+        report.citas_fuera_del_rag = 23
+        datos = _build(report=report).model_dump(mode="json")
+        assert datos["verification"]["fuera_del_rag"] == 23
+
+    def test_cero_descartadas_se_informa_como_cero(self):
+        datos = _build().model_dump(mode="json")
+        assert datos["verification"]["fuera_del_rag"] == 0
+
+    def test_reporte_guardado_sin_el_campo_valida_con_none(self):
+        datos = _build().model_dump(mode="json")
+        del datos["verification"]["fuera_del_rag"]
+        leido = StructuredReport.model_validate(datos)
+        assert leido.verification.fuera_del_rag is None
+
+    def test_ninguna_cita_descartada_aparece_en_hipotesis_ni_bibliografia(self):
+        from backend.models.report import RetrievedArticleRef
+        from backend.pipeline.debate import _anclar_citas
+
+        h = _hypothesis()
+        h.sources = [_source("11111111", "Ofrecido"), _source("31234567", "De memoria")]
+        filtradas, descartadas = _anclar_citas(
+            [h], [RetrievedArticleRef(pmid="11111111", title="Ofrecido")]
+        )
+        report = _make_report(hypotheses=filtradas)
+        report.citas_fuera_del_rag = descartadas
+
+        datos = _build(report=report).model_dump(mode="json")
+        citados = {s["pmid"] for x in datos["hypotheses"] for s in x["sources"]}
+        biblio = {s["pmid"] for s in datos["bibliography"]}
+        assert "31234567" not in citados | biblio
+        assert citados == biblio == {"11111111"}
+        assert datos["verification"]["fuera_del_rag"] == 1

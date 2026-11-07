@@ -251,3 +251,54 @@ class TestRonda1ConTresAgentes:
         case, _, perfil, M02 = self._correr()
         assert case.genomic_context is perfil
         assert M02.call_args.kwargs["genomic_context"] is perfil
+
+
+# ── Tests: tope de literatura que ofrece el RAG (tarjeta #92) ──────────────────
+
+class TestTopeDeArticulosRag:
+    """El RAG pide hasta 10 artículos; si el umbral deja menos, se ofrecen esos."""
+
+    def _instalar(self, monkeypatch, devueltos: int) -> dict:
+        from backend.rag.retriever import RetrievedArticle
+
+        pedido: dict = {}
+
+        async def fake_index(genes, conditions, drugs):
+            return {}
+
+        class FakeRetriever:
+            def get_context_with_articles(self, query, max_results=5):
+                pedido["max_results"] = max_results
+                articulos = [
+                    RetrievedArticle(
+                        pmid=str(50000000 + i), title=f"Artículo {i}", journal="J",
+                        year="2021", authors="A", url="", excerpt="e",
+                        relevance_score=0.8,
+                    )
+                    for i in range(min(devueltos, max_results))
+                ]
+                return "LITERATURA CIENTÍFICA RELEVANTE", articulos
+
+        monkeypatch.setattr("backend.pipeline.orchestrator.index_from_clinical_context", fake_index)
+        monkeypatch.setattr("backend.pipeline.orchestrator.PubMedRetriever", lambda: FakeRetriever())
+        return pedido
+
+    def _caso(self) -> ClinicalCase:
+        case = ClinicalCase(raw_text="Neuropatía axonal sensitivomotora, varón de 42 años.")
+        return case
+
+    def test_se_piden_10_articulos(self, monkeypatch):
+        from backend.pipeline.orchestrator import MAX_ARTICULOS_RAG, _enrich_context_with_rag
+
+        pedido = self._instalar(monkeypatch, devueltos=14)
+        _, articulos = asyncio.run(_enrich_context_with_rag(self._caso(), "BASE"))
+        assert MAX_ARTICULOS_RAG == 10
+        assert pedido["max_results"] == 10
+        assert len(articulos) == 10
+
+    def test_si_el_retriever_devuelve_4_se_ofrecen_4(self, monkeypatch):
+        from backend.pipeline.orchestrator import _enrich_context_with_rag
+
+        self._instalar(monkeypatch, devueltos=4)
+        _, articulos = asyncio.run(_enrich_context_with_rag(self._caso(), "BASE"))
+        assert [a.pmid for a in articulos] == [str(50000000 + i) for i in range(4)]

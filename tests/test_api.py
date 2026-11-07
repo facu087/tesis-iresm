@@ -432,3 +432,92 @@ class TestExportPdfEndpoint:
         assert reporte.trial_search is None
         assert reporte.rare_diseases == []
         assert reporte.clinical_trials[0].compatibility == "sin_evaluar"
+
+    def test_reporte_previo_no_tiene_estado_ni_causa_de_verificacion(self):
+        """Tarjeta #91: los campos nuevos son opcionales y un reporte viejo no afirma causa."""
+        from backend.api.schemas import StructuredReport
+
+        reporte = StructuredReport(**_reporte_previo())
+        assert reporte.verification.estado is None
+        assert reporte.verification.causa is None
+
+
+# ── Tests: estado de la verificación bibliográfica (tarjeta #91) ───────────────
+
+import httpx
+
+from backend.pipeline import verification as _verification
+
+
+class _PubMedSecuencial:
+    """Doble de PubMedClient: cada consulta toma el próximo resultado de la lista."""
+
+    resultados: list[object] = []
+
+    async def __aenter__(self) -> "_PubMedSecuencial":
+        return self
+
+    async def __aexit__(self, *_: object) -> None:
+        return None
+
+    async def fetch_metadata(self, pmids: list[str]) -> dict[str, dict]:
+        resultado = _PubMedSecuencial.resultados.pop(0)
+        if isinstance(resultado, BaseException):
+            raise resultado
+        return resultado  # type: ignore[return-value]
+
+
+class TestEstadoVerificacionEnElEndpoint:
+    """
+    Corre el router con PubMed simulado (sin parchear la verificación) para
+    probar que el estado llega al JSON. Caso base: neuropatía axonal
+    sensitivomotora, varón de 42 años, con una hipótesis que cita un PMID.
+    """
+
+    def _run(self, client, monkeypatch, resultados, arbitrate_side_effect=None):
+        _PubMedSecuencial.resultados = list(resultados)
+        monkeypatch.setattr(_verification, "PubMedClient", _PubMedSecuencial)
+        patches = _pipeline_patches()
+        arbitrate = patch(
+            "backend.api.router.ArbiterAgent.arbitrate",
+            new_callable=AsyncMock,
+            side_effect=arbitrate_side_effect or RuntimeError("mock: sin Groq"),
+        )
+        with (
+            patches["normalize"], patches["pico_build"], patches["extract_biomarkers"],
+            patches["run_round_1"], patches["run_debate"], patches["navigate"], arbitrate,
+        ):
+            response = client.post("/api/analyze", data={"text": "caso clínico de prueba"})
+        assert response.status_code == 200
+        return response.json()["verification"]
+
+    def test_pubmed_sin_conexion_queda_no_disponible_por_red(self, client_medico_verificado, monkeypatch):
+        v = self._run(client_medico_verificado, monkeypatch, [httpx.ConnectError("refused")])
+        assert v["estado"] == "no_disponible"
+        assert v["causa"] == "red"
+        assert v["no_verificables"] == 1
+
+    def test_pubmed_responde_queda_completa_sin_causa(self, client_medico_verificado, monkeypatch):
+        metadata = {"12345678": {"title": "Estudio B12 y neuropatía"}}
+        v = self._run(client_medico_verificado, monkeypatch, [metadata])
+        assert v["estado"] == "completa"
+        assert v["causa"] is None
+
+    def test_falla_solo_la_ronda_5_queda_parcial(self, client_medico_verificado, monkeypatch):
+        """El Árbitro re-verifica lo recitado: si esa consulta falla, el estado es parcial."""
+        metadata = {"12345678": {"title": "Estudio B12 y neuropatía"}}
+        error_503 = httpx.HTTPStatusError(
+            "Server error", request=httpx.Request("GET", "https://eutils.example"),
+            response=httpx.Response(503, request=httpx.Request("GET", "https://eutils.example")),
+        )
+
+        async def arbitro_que_recita(*_args, **_kwargs):
+            await _verification.verify_sources([Source(title="Recitada", pmid="87654321")])
+            raise RuntimeError("mock: el resto del arbitraje no importa acá")
+
+        v = self._run(
+            client_medico_verificado, monkeypatch, [metadata, error_503],
+            arbitrate_side_effect=arbitro_que_recita,
+        )
+        assert v["estado"] == "parcial"
+        assert v["causa"] == "error_api"

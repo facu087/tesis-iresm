@@ -292,3 +292,136 @@ class TestReporteEtiquetado:
         assert export.hypotheses[0].status == "respaldada"
         assert export.hypotheses[0].evidence_level == "III"
         assert export.verification.hipotesis_topeadas == 1
+
+
+# ── Causa y estado global de la verificación (tarjeta #91) ─────────────────────
+
+import asyncio
+import json
+
+import httpx
+
+from backend.pipeline.verification import (
+    CausaFallo,
+    EstadoVerificacion,
+    ResultadoConsulta,
+    clasificar_fallo,
+    estado_verificacion,
+    registro_de_consultas,
+    verify_sources,
+)
+
+_URL_CON_CLAVE = (
+    "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
+    "?db=pubmed&id=11111111&api_key=CLAVE-SECRETA-123"
+)
+
+
+def _error_http(codigo: int) -> httpx.HTTPStatusError:
+    """HTTPStatusError como lo levanta `response.raise_for_status()`."""
+    request = httpx.Request("GET", _URL_CON_CLAVE)
+    response = httpx.Response(codigo, request=request)
+    return httpx.HTTPStatusError(
+        f"Client error '{codigo}' for url '{_URL_CON_CLAVE}'", request=request, response=response
+    )
+
+
+class TestClasificarFallo:
+    @pytest.mark.parametrize(
+        ("exc", "causa"),
+        [
+            (_error_http(429), CausaFallo.LIMITE_VELOCIDAD),
+            (_error_http(400), CausaFallo.CONFIGURACION),
+            (_error_http(401), CausaFallo.CONFIGURACION),
+            (_error_http(403), CausaFallo.CONFIGURACION),
+            (_error_http(503), CausaFallo.ERROR_API),
+            (_error_http(418), CausaFallo.ERROR_API),
+            (httpx.ConnectTimeout("timed out"), CausaFallo.RED),
+            (httpx.ConnectError("connection refused"), CausaFallo.RED),
+            (httpx.ReadTimeout("read timed out"), CausaFallo.RED),
+            (json.JSONDecodeError("Expecting value", "<html>", 0), CausaFallo.ERROR_API),
+            (RuntimeError("algo inesperado"), CausaFallo.DESCONOCIDA),
+        ],
+    )
+    def test_cada_excepcion_tiene_su_categoria(self, exc, causa):
+        assert clasificar_fallo(exc) is causa
+
+
+class TestEstadoVerificacion:
+    def test_sin_consultas_es_sin_consulta(self):
+        assert estado_verificacion([]) == (EstadoVerificacion.SIN_CONSULTA, None)
+
+    def test_todas_responden_es_completa_sin_causa(self):
+        ok = ResultadoConsulta(ok=True)
+        assert estado_verificacion([ok, ok]) == (EstadoVerificacion.COMPLETA, None)
+
+    def test_todas_fallan_es_no_disponible(self):
+        fallo = ResultadoConsulta(ok=False, causa=CausaFallo.RED)
+        assert estado_verificacion([fallo]) == (EstadoVerificacion.NO_DISPONIBLE, CausaFallo.RED)
+
+    def test_falla_solo_la_ronda_5_es_parcial(self):
+        resultados = [
+            ResultadoConsulta(ok=True),
+            ResultadoConsulta(ok=False, causa=CausaFallo.ERROR_API),
+        ]
+        assert estado_verificacion(resultados) == (EstadoVerificacion.PARCIAL, CausaFallo.ERROR_API)
+
+    def test_dos_fallos_gana_la_primera_causa(self):
+        resultados = [
+            ResultadoConsulta(ok=False, causa=CausaFallo.RED),
+            ResultadoConsulta(ok=False, causa=CausaFallo.LIMITE_VELOCIDAD),
+        ]
+        assert estado_verificacion(resultados) == (EstadoVerificacion.NO_DISPONIBLE, CausaFallo.RED)
+
+
+class TestRegistroDeConsultas:
+    @pytest.mark.asyncio
+    async def test_anota_una_consulta_que_responde(self, _fake_pubmed):
+        _fake_pubmed.metadata = {"11111111": {"title": "Estudio A"}}
+        with registro_de_consultas() as resultados:
+            await verify_sources([_source("11111111", "Estudio A")])
+        assert resultados == [ResultadoConsulta(ok=True)]
+
+    @pytest.mark.asyncio
+    async def test_anota_un_fallo_con_su_causa(self, _fake_pubmed):
+        _fake_pubmed.error = _error_http(429)
+        with registro_de_consultas() as resultados:
+            await verify_sources([_source("11111111", "Estudio A")])
+        assert resultados == [ResultadoConsulta(ok=False, causa=CausaFallo.LIMITE_VELOCIDAD)]
+
+    @pytest.mark.asyncio
+    async def test_fuera_de_un_registro_no_falla(self, _fake_pubmed):
+        _fake_pubmed.error = _error_http(503)
+        v = await verify_sources([_source("11111111", "Estudio A")])
+        assert v["11111111"].status is SourceStatus.NO_VERIFICABLE
+
+    @pytest.mark.asyncio
+    async def test_sin_pmids_no_anota(self, _fake_pubmed):
+        with registro_de_consultas() as resultados:
+            await verify_sources([_source(None, "Fuente sin PMID")])
+        assert resultados == []
+
+    @pytest.mark.asyncio
+    async def test_registros_concurrentes_no_se_mezclan(self, _fake_pubmed):
+        _fake_pubmed.metadata = {"11111111": {"title": "Estudio A"}}
+
+        async def analisis(pmid: str) -> list[ResultadoConsulta]:
+            with registro_de_consultas() as resultados:
+                await asyncio.sleep(0)
+                await verify_sources([_source(pmid, "Estudio A")])
+                await asyncio.sleep(0)
+            return resultados
+
+        uno, otro = await asyncio.gather(analisis("11111111"), analisis("11111111"))
+        assert uno == [ResultadoConsulta(ok=True)]
+        assert otro == [ResultadoConsulta(ok=True)]
+
+    @pytest.mark.asyncio
+    async def test_lo_anotado_no_lleva_el_texto_de_la_excepcion(self, _fake_pubmed):
+        _fake_pubmed.error = _error_http(400)
+        with registro_de_consultas() as resultados:
+            await verify_sources([_source("11111111", "Estudio A")])
+        anotado = repr(resultados)
+        assert "CLAVE-SECRETA-123" not in anotado
+        assert "eutils" not in anotado
+        assert resultados == [ResultadoConsulta(ok=False, causa=CausaFallo.CONFIGURACION)]

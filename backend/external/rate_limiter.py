@@ -70,6 +70,11 @@ class RateLimiter:
     PUBMED_NO_KEY = 3      # req/s sin API key
     PUBMED_WITH_KEY = 10   # req/s con API key
     ORPHANET = 5           # req/s (estimado, no documentado)
+    # Orphadata vive en otro host que la ORPHAcodes API (api.orphadata.com vs
+    # api.orphacode.org), así que tiene cupo propio. No documenta límite ni
+    # devuelve headers de rate limit. Medido el 2026-10-06: 10 consultas en
+    # paralelo responden 200 en 0,9 s. Se deja en 5, igual que Orphanet.
+    ORPHADATA = 5          # req/s (medido, ver arriba)
     # PharmGKB/ClinPGx no documenta su límite y está detrás de Cloudflare.
     # Medido el 2026-09-15: 3 req/s con burst devuelve HTTP 429; 1 y 2 req/s
     # secuenciales pasan sin problema. Se deja en 2 y sin burst.
@@ -247,11 +252,13 @@ _pubmed_rps = pubmed_rps()
 
 pubmed_limiter = RateLimiter(requests_per_second=_pubmed_rps)
 orphanet_limiter = RateLimiter(requests_per_second=RateLimiter.ORPHANET)
+orphadata_limiter = RateLimiter(requests_per_second=RateLimiter.ORPHADATA)
 pharmgkb_limiter = RateLimiter(requests_per_second=RateLimiter.PHARMGKB)
 clinical_trials_limiter = RateLimiter(requests_per_second=RateLimiter.CLINICAL_TRIALS)
 
 pubmed_breaker = ApiCircuitBreaker("PubMed", failure_threshold=5)
 orphanet_breaker = ApiCircuitBreaker("Orphanet", failure_threshold=3)
+orphadata_breaker = ApiCircuitBreaker("Orphadata", failure_threshold=3)
 pharmgkb_breaker = ApiCircuitBreaker("PharmGKB", failure_threshold=3)
 clinical_trials_breaker = ApiCircuitBreaker("ClinicalTrials", failure_threshold=5)
 

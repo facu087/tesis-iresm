@@ -70,6 +70,10 @@ Backend mergeado a `develop` (capa de recuperación de evidencia / RAG). Autor: 
 - [x] Fix: el RAG consultaba PubMed en español — ahora usa `condition_en`
 - [x] **Integrar** RAG + verificador de PMIDs en el flujo del pipeline (router/orchestrator)
 - [x] Verificación bibliográfica de PMIDs: título real vs. citado (backend/pipeline/verification.py)
+- [x] Reporte: estado global de la verificación (`completa`/`parcial`/`no_disponible`/
+      `sin_consulta`) y causa del fallo en categorías, en `/report` y en el PDF
+      (tarjeta #91, OpenSpec `reporte-motivo-verificacion`). `registro_de_consultas()`
+      anota cada consulta a PubMed, incluida la de la Ronda 5; nunca el texto del error
 - [x] Vista de reporte: estado de verificación de hipótesis y fuentes (frontend/src/app/report/page.tsx)
 - [x] PDF: estado de verificación en el reporte exportado (backend/pipeline/pdf_exporter.py)
 - [x] Agente 02 (Especialista Genómica): prompt + llamada LLM + parseo JSON
@@ -121,6 +125,22 @@ Backend mergeado a `develop` (capa de recuperación de evidencia / RAG). Autor: 
 > respaldo queda especulativo. Esto **reemplaza** el criterio de parada que
 > figuraba en `architecture.md` ("toda hipótesis con referencia verificable"),
 > que con 15 de 15 citas discordantes no se cumplía nunca.
+>
+> **Citas ancladas al RAG** (Sprint 5, tarjeta #92, OpenSpec `citas-ancladas-rag`):
+> una cita con PMID solo vale si ese PMID lo ofreció el RAG. `run_debate()`
+> filtra las fuentes de las hipótesis finales con `recitation.filtrar_citas()`
+> antes de la verificación: lo descartado no se consulta en PubMed ni aparece en
+> el reporte, y el total queda en `verification.fuera_del_rag` (`None` en un
+> reporte anterior). Las fuentes sin PMID se conservan; sin literatura recuperada
+> se descartan todas las que tienen PMID. Ninguna hipótesis se descarta: la que
+> se queda sin fuentes es especulativa y entra en la Ronda 5. El Árbitro toma las
+> hipótesis de `report.hypotheses`, ya filtradas, nunca de las rondas del debate.
+> Los prompts de los Agentes 01, 02 y 03 llevan la regla (`base_agent.REGLA_CITAS`),
+> las revisiones de las Rondas 3 y 4 reciben la lista corta de artículos ofrecidos
+> (`recitation.lista_de_literatura()`, sin resúmenes) y el RAG ofrece hasta
+> `MAX_ARTICULOS_RAG = 10` artículos (`pipeline/orchestrator.py`). Con el filtro,
+> el anclaje en el RAG del Árbitro deja de medir algo: toda cita que le llega ya
+> es del RAG. El dato que lo reemplaza es "citas fuera del RAG".
 >
 > El Agente 05 es **híbrido**: el LLM solo traduce hipótesis a términos de
 > condición en inglés y etiqueta compatibilidad (`alta`/`media`/`baja`); la
@@ -208,6 +228,10 @@ que es local e ignorada por git. Lo que queda es el adjunto en Trello.
 Scripts disponibles:
 - `demo_pubmed.py` — cliente PubMed E-utilities (búsqueda + verificación PMIDs)
 - `demo_orphanet.py` — cliente Orphanet (enfermedades raras)
+- `demo_orphadata.py` — cliente Orphadata contra la API real: genes de ATTRV30M (ORPHA:85447,
+  devuelve `TTR`), y los códigos del caso base (ORPHA:271861 y ORPHA:64746), que **no tienen
+  asociación génica cargada** porque cuelga de los subtipos: un 404 `Query not found` que NO
+  significa "no se conoce gen". Distingue ese 404 del 404 de ruteo (URL mal armada)
 - `demo_pharmgkb.py` — cliente PharmGKB (fármaco-genómica)
 - `demo_clinvar.py` — cliente ClinVar: TTR `c.148G>A` (encontrada), `p.Val50Met`, `Val30Met`
   (ambigua) y una inexistente, más el bloque del Agente 02; `--sin-red` simula la caída de NCBI
@@ -222,6 +246,11 @@ Scripts disponibles:
   sobre el caso de prueba (rankings, overlap y dispersión de scores)
 - `demo_verificacion.py` — verificación bibliográfica: contrasta contra PubMed los PMIDs
   citados por los agentes y muestra el título real al lado del citado (Agente 04)
+- `demo_estado_verificacion.py` (tarjeta #91) — sin red ni cuota: simula PubMed respondiendo,
+  sin conexión, 429, 400 (clave), 503 y una falla solo en la Ronda 5, y muestra estado, causa
+  y el aviso del PDF; comprueba que ni la URL ni la clave llegan al reporte. Genera
+  `resultado.txt`, `resumen.json`, `reporte_no_disponible.pdf` y `.json` en
+  `output/demo_estado_verificacion/`. Sale con código 1 si algo falla
 - `demo_priorizacion_evidencia.py` — priorización EBM: nivel declarado vs. efectivo, estado
   y orden del reporte; genera `priorizacion.txt`, `reporte.json` y `reporte.pdf`
   (`--pubmed` verifica PMIDs reales)
@@ -253,7 +282,28 @@ Scripts disponibles:
   `output/medicion_costos/`. `--mock` lo recorre sin cuota. `--grabar` abre el
   grabador de `backend/mock/recorder.py` durante la pasada base y escribe
   `grabacion.json` (no graba en modo mock). Cada ejecución real gasta unos
-  20.000 tokens extra en la comparación
+  20.000 tokens extra en la comparación. También guarda `reporte.json` con el
+  reporte de la pasada base (con el estado de la verificación), para evaluarlo
+  con `evaluar_reporte.py`
+- `evaluar_reporte.py <reporte.json>` (Sprint 5, tarjeta #59; no es un demo) — evalúa un
+  reporte guardado contra los criterios de calidad de `backend/pipeline/calidad.py`:
+  veredicto (`cumple`/`no_cumple`/`no_evaluable`), motivos, tres métricas contra umbral
+  (cobertura de respaldo, precisión de citas, sobredeclaración) e indicadores. Sin red ni
+  cuota. Guarda `evaluacion.json` y `evaluacion.txt` en `output/evaluacion_calidad/<nombre>/`.
+  Sale con 0/1/2 según el veredicto y 3 si el archivo no es un reporte válido. La evaluación
+  no copia texto clínico. Los umbrales son **provisionales** (versión `2026-11-provisional`)
+  y se recalibran con la corrida real de la tarjeta #58
+- `demo_criterios_calidad.py` (Sprint 5, tarjeta #59) — sin red ni cuota: siete reportes
+  sintéticos del caso base (cumple, cada métrica fallando, nivel II sin respaldo, modo mock,
+  verificación caída) con su veredicto. Genera `resultado.txt`, `resumen.json` y
+  `criterios.txt` en `output/demo_criterios_calidad/`. Sale con código 1 si algún veredicto
+  no es el esperado
+- `demo_seguridad_http.py` (Sprint 5, tarjeta #57) — sin red ni cuota: qué valores de
+  `ALLOWED_ORIGINS` acepta el servidor y cuáles impiden que arranque; un preflight por caso
+  contra la configuración anterior (reconstruida) y la real; el riesgo del `*` medido en la
+  configuración anterior; encabezados de seguridad antes y ahora; y producción (HSTS,
+  `/docs` en 404, http rechazado) en un proceso aparte. Sale con código 1 si algo falla.
+  Genera `resultado.txt` y `resumen.json` en `output/demo_seguridad_http/`
 - `demo_registro_medicos.py` — registro de médicos, revisión admin y pipeline
   protegido: dos altas → intento de análisis rechazado (pendiente, 403) → alta
   del primer admin por CLI → aprobación con auditoría → análisis permitido
@@ -299,6 +349,26 @@ falta un NER biomédico en español, evaluado con métricas propias (trabajo fut
 va a los logs. El caso base de `scripts/poc_test.py` ya viene anonimizado a mano y debe
 salir intacto (hay un test).
 
+- `demo_limpieza_temporales.py` (Sprint 5, tarjeta #56) — verifica la premisa de la tarjeta
+  (el backend no escribe archivos temporales: el PDF se procesa en memoria) y muestra lo que
+  sí se acumulaba, las filas de la tabla `sesion`: seis sesiones de distintas edades antes y
+  después de la limpieza, que el comportamiento observable no cambia (una sesión viva sigue
+  resolviéndose) y que una limpieza que falla devuelve `ok=False` sin levantar. Sin red ni
+  cuota. Sale con código 1 si falla una comprobación
+- `demo_citas_ancladas.py` (Sprint 5, tarjeta #92) — sin red ni cuota: un debate del caso
+  base con agentes de respuesta fija, con literatura (5 artículos ofrecidos; citas de
+  memoria, ofrecidas, repetidas y una guía sin PMID) y sin literatura (12 PMIDs). Muestra
+  qué fuentes quedan, las descartadas por hipótesis, `fuera_del_rag` y el pedido de revisión
+  con la lista de literatura. Genera `resultado.txt` y `resumen.json` en
+  `output/demo_citas_ancladas/`. Sale con código 1 si falla una comprobación
+- `revision_medica.py` (Sprint 5, tarjeta #60; no es un demo) — material de la revisión del
+  reporte con un médico o el tutor. `preparar <reporte.json>` genera el PDF del reporte, la
+  planilla imprimible y los CSV para cargar las respuestas (rechaza reportes de modo mock y
+  no pisa una planilla existente); `tabular <carpeta>` valida las respuestas contra sus
+  opciones y resume pertinencia, citas que respaldan, nivel razonable y las hipótesis con
+  respaldo verificado sin respaldo clínico. El resumen no copia texto clínico. El protocolo
+  de la sesión está en `docs/revision-medica.md`
+
 También se corrigió un bug del Sprint 2: falsos positivos en el extractor de
 biomarcadores (regex de anticuerpos y de marcadores de lab). Ver commit `e72e004`.
 
@@ -319,6 +389,8 @@ tesis-iresm/
 │   ├── config.yaml             ← contexto del proyecto + reglas para los artefactos
 │   ├── specs/                  ← specs vigentes del sistema (por capacidad)
 │   └── changes/                ← cambios en curso; archive/ guarda los cerrados
+├── docs/
+│   └── revision-medica.md      ← protocolo de la revisión del reporte con un médico (S5, #60)
 ├── .vscode/
 │   ├── extensions.json         ← extensiones recomendadas del equipo
 │   └── settings.json           ← configuración compartida
@@ -362,7 +434,7 @@ tesis-iresm/
 │   ├── mock/                   ← modo mock del pipeline (S4)
 │   │   ├── mode.py             ← activación de `NEXUS_MOCK_LLM`
 │   │   ├── responses.py        ← respuestas por tarea, carga diferida de grabadas.json
-│   │   ├── grabadas.json       ← respuestas y RAG de la corrida real del 2026-10-26
+│   │   ├── grabadas.json       ← respuestas y RAG de la corrida real del 2026-11-03
 │   │   ├── recorder.py         ← grabador de respuestas crudas (solo lo abre un script)
 │   │   └── __init__.py
 │   ├── telemetry/              ← control de costos (S4)
@@ -370,27 +442,42 @@ tesis-iresm/
 │   │   ├── pricing.py          ← tabla de tarifas por modelo
 │   │   ├── medicion.py         ← lógica de la medición de costos
 │   │   └── __init__.py
+│   ├── seguridad.py            ← ALLOWED_ORIGINS validada, es_produccion(), encabezados
+│   │                              de seguridad y CORS mínimo (S5, tarjeta #57)
 │   ├── db.py                   ← engine SQLite + create_db_and_tables() (S4)
+│   ├── mantenimiento/
+│   │   └── limpieza.py         ← borra las sesiones vencidas en segundo plano; no hay
+│   │                              archivos temporales que limpiar (S5, tarjeta #56)
 │   ├── cli.py                  ← `python -m backend.cli crear-admin` (S4)
 │   ├── pipeline/
 │   │   ├── pico.py             ← build() síntesis PICO + format_for_agents()
 │   │   ├── genomic_context.py  ← build() determinista + enrich() PharmGKB/ClinVar (S4)
 │   │   ├── orchestrator.py     ← distribución paralela asyncio (Ronda 1)
 │   │   ├── debate.py           ← motor de debate adversarial (Rondas 2–4)
-│   │   ├── verification.py     ← verificación de PMIDs citados contra PubMed (S4)
+│   │   ├── verification.py     ← verificación de PMIDs citados contra PubMed (S4);
+│   │   │                          estado global y causa del fallo (registro_de_consultas)
 │   │   ├── evidence.py         ← clasificación EBM: tope de nivel, estado y orden (S4)
 │   │   ├── consensus.py        ← lógica determinista del Agente 04: partición,
 │   │   │                          representante, contradicciones, solapamiento RAG (S4)
-│   │   ├── recitation.py       ← Ronda 5: qué se recita y qué se acepta (S4)
+│   │   ├── recitation.py       ← Ronda 5: qué se recita y qué se acepta (S4);
+│   │   │                          filtro de citas fuera del RAG (S5, tarjeta #92)
 │   │   ├── trial_matching.py   ← lógica determinista del Agente 05: términos,
 │   │   │                          filtros edad/sexo, Orphanet, orden (S4)
+│   │   ├── calidad.py          ← criterios de calidad del reporte: evaluar() puro,
+│   │   │                          umbrales versionados (S5, tarjeta #59). No lo
+│   │   │                          llama el pipeline: lo usa scripts/evaluar_reporte.py
+│   │   ├── revision_medica.py  ← planilla de la revisión médica y tabulación de las
+│   │   │                          respuestas (S5, tarjeta #60); la usa
+│   │   │                          scripts/revision_medica.py
 │   │   ├── report_builder.py   ← generación de JSON estructurado del reporte
 │   │   ├── pdf_exporter.py     ← exportación a PDF con ReportLab
 │   │   └── __init__.py
 │   ├── external/
 │   │   ├── clinical_trials.py  ← cliente ClinicalTrials.gov API v2
 │   │   ├── pubmed.py           ← cliente PubMed E-utilities + verificación PMIDs (S4)
-│   │   ├── orphanet.py         ← cliente Orphanet: enfermedades raras (S4)
+│   │   ├── orphanet.py         ← cliente Orphanet: enfermedades raras (S4); delega los
+│   │   │                          genes en orphadata.py
+│   │   ├── orphadata.py        ← cliente Orphadata: genes asociados a enfermedades raras (S4)
 │   │   ├── pharmgkb.py         ← cliente PharmGKB: fármaco-genómica (S4)
 │   │   ├── clinvar.py          ← cliente ClinVar: significancia de variantes (S4)
 │   │   └── rate_limiter.py     ← rate limits y fallbacks para APIs externas (S4)
@@ -681,6 +768,15 @@ muestra sintética. Los números de una corrida real **ya están medidos**
 tokens. Cada ejecución del script gasta además unos 20.000 tokens en la
 comparación de modelos. Las cifras anteriores (77.516 y 78.158) quedan
 superadas: se midieron sin que las críticas del debate llegaran a los agentes.
+La corrida de validación del 2026-11-03 (tarjeta #58) midió 85.556 tokens en 30
+llamadas (8 reintentadas) y 517 s; el reporte no cumple los criterios de calidad
+(precisión de citas 0,08, ninguna cita sale del RAG). Ver la nota de la #58 en
+`.claude/backlog.md`. La corrida de verificación de la tarjeta #92 (citas
+ancladas al RAG, 2026-11-03, misma fecha) midió 84.666 tokens en 27 llamadas (6
+reintentadas) y 502 s, y el reporte **cumple** los tres criterios: cobertura 0,91
+(10/11), precisión 1,00 (8/8) y sobredeclaración 0,45 (5/11), con 0 citas fuera
+del RAG (los agentes citaron solo lo ofrecido). Ver la nota de la #92 en
+`.claude/backlog.md`.
 El costo equivalente con Claude, GPT-4o o Gemini sigue estimado sobre la
 muestra sintética; con el `costos.jsonl` real se puede recalcular con
 `usage.recalculate()`.
@@ -699,8 +795,8 @@ en el frontend con la misma visibilidad que la advertencia del consenso de
 IA.
 
 Las trece tareas de `TASK_BUDGETS` usan respuestas **textuales de la corrida
-real del 2026-10-26** (22 respuestas: una por llamada, con el agente que la
-pidió), guardadas en `backend/mock/grabadas.json` (versionado) y
+real del 2026-11-03** (21 respuestas: una por llamada, con el agente que la
+pidió; corrida de verificación de la tarjeta #92), guardadas en `backend/mock/grabadas.json` (versionado) y
 cargadas de forma diferida por `backend/mock/responses.py` en el primer uso en
 modo mock: el modo real nunca lee ese archivo, y si falta o está malformado se
 levanta `RespuestasGrabadasInvalidas`. Salieron de `backend/mock/recorder.py`,
@@ -711,8 +807,8 @@ script** (nunca una variable de entorno ni `POST /api/analyze`) y guarda
 `output/medicion_costos/grabacion.json` (gitignoreado);
 `scripts/regenerar_mock.py` la convierte en `grabadas.json`. Como cada agente
 recibe su propia grabación en el orden en que la pidió, el modo mock reproduce
-la corrida: 12 hipótesis de consenso sin repetidas, 10 ensayos y el
-`executive_summary` del Agente 06, igual en cada pasada. En la corrida del
+la corrida: 11 hipótesis de consenso sin repetidas (10 respaldadas), 8 ensayos
+y el `executive_summary` del Agente 06, igual en cada pasada. En la corrida del
 2026-10-20 los Agentes 01 y 02 respondieron la Ronda 5 con el esquema equivocado
 (`hypotheses` en vez de `recitations`) y su recitación falló (2 hipótesis
 mejoradas). Desde la tarjeta #90 el prompt de recitación prohíbe esa clave y
@@ -720,8 +816,9 @@ reescribir hipótesis, y `_parse_recitation()` acepta la forma `hypotheses` solo
 para la hipótesis cuyo texto coincide con la ofrecida (una reescrita no hereda
 citas) y avisa por stderr, con claves y conteos, cuando falta `recitations`. En
 la corrida del 2026-10-26, ya con ese prompt, los tres agentes usaron el esquema
-pedido: 12 hipótesis recitadas y 4 mejoradas (el 02 no recitó ninguna, que el
-prompt permite). Es una sola corrida: la variación entre corridas del modelo
+pedido: 12 hipótesis recitadas y 4 mejoradas. En la del 2026-11-03, con las citas
+ancladas al RAG, solo 3 hipótesis llegaron sin respaldo a la Ronda 5 (de los
+Agentes 02 y 03) y 2 mejoraron; el 03 no recitó ninguna, que el prompt permite. Es una sola corrida: la variación entre corridas del modelo
 no está medida. La grabación incluye además lo que el RAG
 ofreció en la Ronda 1 (bloque `rag` de `grabadas.json`): en modo mock la Ronda 1
 usa esos artículos y no consulta PubMed. Sin ese bloque se consultaba en vivo y,
@@ -758,6 +855,40 @@ ensayos consultan PubMed y ClinicalTrials.gov en vivo.
 - Anonimizar antes de enviar a APIs externas
 - No persistir datos clínicos más allá de la sesión
 - API keys SIEMPRE desde `.env`, nunca hardcodeadas
+
+### Seguridad HTTP y despliegue (Sprint 5, tarjeta #57)
+
+`backend/seguridad.py` concentra tres decisiones que antes estaban repartidas:
+
+- **Orígenes**: `origenes_permitidos()` es la única lectura de `ALLOWED_ORIGINS`; la usan
+  `main.py` (CORS) y `auth/origen.py` (validación CSRF). Antes cada una la parseaba a su
+  manera y nada impedía `*`, que con `allow_credentials=True` deja a cualquier sitio leer
+  respuestas autenticadas. Una configuración insegura **impide arrancar**.
+- **Producción**: `es_produccion()` (`ENVIRONMENT=production`, sin distinguir mayúsculas) es
+  la única decisión; la usan el HSTS, la cookie `Secure` y el apagado de `/docs`. Antes la
+  cookie comparaba el texto exacto, y con `Production` el HSTS se habría activado sin que
+  la cookie fuera `Secure`.
+- **Encabezados**: `EncabezadosDeSeguridad` (middleware ASGI) agrega `nosniff`,
+  `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`, COOP, una CSP de API
+  (`default-src 'none'`) y `Cache-Control: no-store` en `/api/*`. `Strict-Transport-Security`
+  solo en producción. El frontend suma los suyos en `next.config.ts` (sin CSP: ver abajo).
+
+CORS acepta solo los métodos (`GET`, `POST`, `PUT`) y el header (`Content-Type`) que usa
+`frontend/src/lib/api.ts`. Si el frontend empieza a usar otro método o header, hay que
+agregarlo en `METODOS_CORS`/`ENCABEZADOS_CORS`.
+
+**Despliegue.** El backend **no termina TLS**: va detrás de un proxy inverso (nginx, Caddy,
+un balanceador) que sí lo hace. Requisitos: `ENVIRONMENT=production`; `ALLOWED_ORIGINS` con
+los orígenes `https` del frontend; `ALLOWED_HOSTS` con los dominios del backend; y uvicorn
+con `--proxy-headers --forwarded-allow-ips=<ip del proxy>` para que vea el esquema real.
+El proxy tiene que redirigir http a https. Sin eso, la cookie `Secure` no viaja y el login
+no funciona: es lo esperado.
+
+**Pendiente, dicho a propósito**: el frontend no tiene `Content-Security-Policy`. Next
+inyecta scripts en línea para hidratar y una CSP estricta exige nonces por pedido
+(`node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md`); activarla sin
+probarla dejaría la aplicación en blanco. Una respuesta 500 sin manejar tampoco lleva estos
+encabezados: la arma el middleware más externo de Starlette.
 
 ### Testing
 - Cada módulo nuevo requiere su test en `tests/`
@@ -825,6 +956,9 @@ NEXUS_MOCK_LLM=          # Apagada por defecto. 1/true la activa: el pipeline
 ENVIRONMENT=development
 MAX_FILE_SIZE_MB=50
 SESSION_TTL_MINUTES=60  # TTL de la sesión de cuenta — en uso desde Sprint 4
+SESSION_CLEANUP_INTERVAL_MINUTES=15  # Cada cuántos minutos se borran las sesiones
+                         # vencidas (backend/mantenimiento/limpieza.py, tarea de fondo
+                         # del lifespan). 0 la apaga. Sprint 5, tarjeta #56.
 
 # Seguridad (Sprint 4 — registro de médicos)
 SECRET_KEY=              # Firma la cookie de sesión (HMAC). Obligatoria: sin
@@ -832,7 +966,13 @@ SECRET_KEY=              # Firma la cookie de sesión (HMAC). Obligatoria: sin
                          # SecretKeyNoConfigurada en el primer login.
 ALLOWED_ORIGINS=http://localhost:3000  # Lista blanca para CORS y para la
                          # validación de Origin/Referer (mitigación CSRF) en
-                         # todo endpoint que cambia estado.
+                         # todo endpoint que cambia estado. Una sola lectura
+                         # (backend/seguridad.py), validada al arrancar: el
+                         # servidor NO levanta con "*", sin esquema, con ruta,
+                         # ni con http fuera de localhost en producción.
+ALLOWED_HOSTS=           # Opcional. Hosts aceptados en el encabezado Host, por
+                         # coma. Sin definir no se restringe (en producción
+                         # avisa por stderr). No acepta "*".
 
 # Persistencia de cuentas (Sprint 4)
 NEXUS_DB_PATH=./data/nexus.db  # Cuentas, sesiones y auditoría (SQLite).
