@@ -1,9 +1,8 @@
 import type { NextConfig } from "next";
 
 // Encabezados de seguridad de toda respuesta del frontend (tarjeta #57).
-// No hay Content-Security-Policy a propósito: Next inyecta scripts en línea para
-// hidratar y una CSP estricta exige nonces por pedido; ponerla sin probarla
-// dejaría la aplicación en blanco. Queda como trabajo pendiente documentado.
+// La Content-Security-Policy no va acá: necesita un nonce distinto en cada
+// pedido, así que la agrega `src/proxy.ts` (política en `src/lib/csp.ts`).
 const encabezadosDeSeguridad = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },

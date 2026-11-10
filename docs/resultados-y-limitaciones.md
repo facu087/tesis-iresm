@@ -337,9 +337,12 @@ revisión médica que informar.
 
 ### 5.4 Seguridad web
 
-- **El frontend no tiene `Content-Security-Policy`.** Next.js inyecta scripts en línea para la
-  hidratación y una CSP estricta exige nonces por pedido; activarla sin probarla dejaría la
-  aplicación en blanco (`.claude/CLAUDE.md:847-850`).
+- **La CSP del frontend permite el atributo `style`** (`style-src-attr 'unsafe-inline'`),
+  porque varios componentes posicionan y animan con él. Un atributo de estilo no ejecuta
+  código, pero sí permite alterar la apariencia de la página si se lograra inyectar HTML.
+  Los scripts, en cambio, solo corren con el nonce del pedido (`frontend/src/lib/csp.ts`).
+- **La CSP obliga a renderizar cada página en cada pedido**: el nonce no puede estar en una
+  página generada de antemano, así que no hay caché de páginas.
 - Una respuesta 500 sin manejar del backend no lleva los encabezados de seguridad, porque la
   arma el middleware más externo de Starlette (`.claude/CLAUDE.md:850-851`).
 
@@ -374,20 +377,18 @@ revisión médica que informar.
 
 ## 6. Trabajo futuro
 
-1. **Arquitectura multi-proveedor de destino.** Claude Opus para los Agentes 01, 04 y 06,
-   GPT-4o para el Agente 02 y Gemini Pro para el Agente 03 (`.claude/CLAUDE.md:657-660`). El
-   cambio se concentra en `call_provider()` (`backend/agents/base_agent.py`), el único punto
-   del sistema que instancia el cliente del proveedor; la telemetría permite recalcular el
-   costo de corridas ya registradas con otra tabla de tarifas mediante `usage.recalculate()`.
+1. **Corrida real de la arquitectura multi-proveedor.** Claude Opus para los Agentes 01, 04 y
+   06, GPT-4o para el Agente 02 y Gemini Pro para el Agente 03 ya están implementados detrás
+   de `NEXUS_PROVEEDORES=destino` (`backend/agents/model_tasks.py`), con respaldo en Groq por
+   llamada, pero solo se probaron con dobles de los SDK. Falta una corrida con las tres claves
+   (`scripts/medir_costos.py --grabar`) para medir costo y calidad frente a Groq.
 2. **Reconocimiento de entidades biomédicas en español para la anonimización.** Complementar la
    red de seguridad determinista con un modelo de NER clínico en español que detecte
    identificadores no cubiertos por reglas.
 3. **Recalibración de umbrales con más casos.** Reemplazar la versión `2026-11-provisional` por
    umbrales derivados de varios casos y de varias corridas por caso, que permitan además medir
    la variación del modelo.
-4. **CSP del frontend con nonces.** Implementar una `Content-Security-Policy` con nonces por
-   pedido, siguiendo la guía de Next.js, y probarla antes de activarla.
-5. **Validación multi-caso con médicos.** Realizar la sesión de la tarjeta #60 y extenderla a
+4. **Validación multi-caso con médicos.** Realizar la sesión de la tarjeta #60 y extenderla a
    varios casos y varios revisores, para estimar con qué frecuencia una hipótesis con respaldo
    verificado carece de respaldo clínico.
 

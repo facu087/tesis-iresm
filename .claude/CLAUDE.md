@@ -370,6 +370,12 @@ salir intacto (hay un test).
   qué fuentes quedan, las descartadas por hipótesis, `fuera_del_rag` y el pedido de revisión
   con la lista de literatura. Genera `resultado.txt` y `resumen.json` en
   `output/demo_citas_ancladas/`. Sale con código 1 si falla una comprobación
+- `demo_csp_frontend.py` (Sprint 5, CSP del frontend) — sin red externa ni cuota: levanta el
+  build de producción del frontend (`next start`, pide antes `npm run build` o `--build`) y
+  comprueba en cada ruta que llega la política, que todo `<script>` ejecutable lleva el nonce
+  del encabezado (también el del tema), que el nonce cambia en cada pedido y que `connect-src`
+  tiene un solo backend. Genera `resultado.txt` y `resumen.json` en
+  `output/demo_csp_frontend/`. Sale con 1 si algo falla y con 2 si no hay build
 - `demo_multi_proveedor.py` (Sprint 5, multi-proveedor) — sin red ni cuota: con los SDK de
   Anthropic, OpenAI, Google y Groq reemplazados por dobles, una llamada por agente más el
   Agente 05 y PICO en cuatro casos (todo en `groq`; `destino` con las tres claves; sin la
@@ -591,6 +597,7 @@ tesis-iresm/
 │   │       ├── siteUrl.ts          ← origen público validado (`NEXT_PUBLIC_SITE_URL`, S4)
 │   │       └── pipelineSteps.ts    ← pasos del pipeline (S4, fuente única de la landing,
 │   │                                  /analizar y /analyzing)
+│   ├── src/proxy.ts            ← CSP con nonce por pedido (S5); la política, en lib/csp.ts
 │   ├── next.config.ts
 │   ├── vitest.config.mts       ← corredor de tests del frontend (Vitest + jsdom, S4)
 │   └── package.json
@@ -914,7 +921,8 @@ ensayos consultan PubMed y ClinicalTrials.gov en vivo.
 - **Encabezados**: `EncabezadosDeSeguridad` (middleware ASGI) agrega `nosniff`,
   `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`, COOP, una CSP de API
   (`default-src 'none'`) y `Cache-Control: no-store` en `/api/*`. `Strict-Transport-Security`
-  solo en producción. El frontend suma los suyos en `next.config.ts` (sin CSP: ver abajo).
+  solo en producción. El frontend suma los suyos en `next.config.ts` y la CSP en `src/proxy.ts`
+  (ver abajo).
 
 CORS acepta solo los métodos (`GET`, `POST`, `PUT`) y el header (`Content-Type`) que usa
 `frontend/src/lib/api.ts`. Si el frontend empieza a usar otro método o header, hay que
@@ -927,11 +935,21 @@ con `--proxy-headers --forwarded-allow-ips=<ip del proxy>` para que vea el esque
 El proxy tiene que redirigir http a https. Sin eso, la cookie `Secure` no viaja y el login
 no funciona: es lo esperado.
 
-**Pendiente, dicho a propósito**: el frontend no tiene `Content-Security-Policy`. Next
-inyecta scripts en línea para hidratar y una CSP estricta exige nonces por pedido
-(`node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md`); activarla sin
-probarla dejaría la aplicación en blanco. Una respuesta 500 sin manejar tampoco lleva estos
-encabezados: la arma el middleware más externo de Starlette.
+**CSP del frontend** (Sprint 5, pendiente de la #57): `frontend/src/proxy.ts` genera un nonce
+por pedido y manda la política, que arma `frontend/src/lib/csp.ts`. Next lee el nonce del
+encabezado del pedido y lo pone en sus propios scripts
+(`node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md`); `app/layout.tsx`
+lo lee de `x-nonce` para el script del tema. Scripts solo con nonce (`'strict-dynamic'`), sin
+`'unsafe-inline'` ni `'unsafe-eval'` en producción; `<style>` con nonce y el atributo `style`
+permitido aparte (`style-src-attr`); `connect-src` con el propio origen y el backend de
+`NEXT_PUBLIC_API_URL`; `frame-ancestors 'none'`. `upgrade-insecure-requests` solo en
+producción con backend `https`. Consecuencias: **todas las páginas se renderizan por pedido**
+(el nonce lo exige) y `NEXT_PUBLIC_API_URL` se fija al construir: si cambia el backend, hay
+que reconstruir o la política bloquea las llamadas. En `next dev` se suman `'unsafe-eval'` y
+estilos en línea, que el servidor de desarrollo necesita. Verificado en un navegador sin
+interfaz, en producción y en desarrollo: las nueve rutas hidratan sin violaciones y un
+`<img onerror>` inyectado se bloquea. Una respuesta 500 sin manejar del backend sigue sin
+llevar los encabezados: la arma el middleware más externo de Starlette.
 
 ### Testing
 - Cada módulo nuevo requiere su test en `tests/`
