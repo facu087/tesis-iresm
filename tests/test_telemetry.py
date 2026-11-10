@@ -301,3 +301,70 @@ class TestRecalcular:
         assert recalculado["totals"]["cost_usd"] == pytest.approx(15.0 + 37.5)
         # El original no se muta.
         assert resumen["totals"]["cost_usd"] == 0.0
+
+
+# ── Multi-proveedor (Sprint 5): proveedor, respaldo y tarifas de destino ─────────
+
+class TestMultiProveedor:
+    def test_llamada_de_respaldo_queda_registrada(self, tmp_path):
+        """Scenario: Llamada de respaldo — intento fallido y respaldo en Groq."""
+        token = usage.open_registry()
+        usage.record_call(task="arbitro_veredictos", model="claude-opus-5-5", ok=False,
+                          latency_seconds=1.0, agent_id="04", provider="anthropic")
+        usage.record_call(task="arbitro_veredictos", model="openai/gpt-oss-120b", ok=True,
+                          latency_seconds=2.0, agent_id="04", prompt_tokens=10,
+                          completion_tokens=5, fallback=True, fallback_reason="falla")
+        resumen = usage.close_registry(token, output_path=tmp_path / "costos.jsonl")
+        grupos = {(g["provider"], g["model"]): g for g in resumen["by_agent"]}
+        assert grupos[("anthropic", "claude-opus-5-5")]["failed_calls"] == 1
+        assert grupos[("groq", "openai/gpt-oss-120b")]["fallback_calls"] == 1
+        assert resumen["totals"]["fallback_calls"] == 1
+
+    def test_providers_by_agent_resume_quien_respondio(self):
+        token = usage.open_registry()
+        registro = usage.current()
+        usage.record_call(task="agente01_hipotesis", model="claude-opus-5-5", ok=True,
+                          latency_seconds=1.0, agent_id="01", agent_name="Literatura",
+                          provider="anthropic")
+        usage.record_call(task="debate_critica", model="claude-opus-5-5", ok=True,
+                          latency_seconds=1.0, agent_id="01", agent_name="Literatura",
+                          provider="anthropic")
+        usage.record_call(task="agente03_hipotesis", model="openai/gpt-oss-120b", ok=True,
+                          latency_seconds=1.0, agent_id="03", agent_name="Clínico",
+                          fallback=True, fallback_reason="clave_faltante")
+        usage.record_call(task="arbitro_veredictos", model="claude-opus-5-5", ok=False,
+                          latency_seconds=1.0, agent_id="04", provider="anthropic")
+        usage.record_call(task="pico_sintesis", model="openai/gpt-oss-120b", ok=True,
+                          latency_seconds=1.0)
+        resumen = usage.providers_by_agent(registro)
+        usage._current.reset(token)
+        assert resumen == [
+            {"agent_id": "01", "agent_name": "Literatura", "provider": "anthropic",
+             "model": "claude-opus-5-5", "fallback_reason": None},
+            {"agent_id": "03", "agent_name": "Clínico", "provider": "groq",
+             "model": "openai/gpt-oss-120b", "fallback_reason": "clave_faltante"},
+        ]
+
+    def test_un_costos_jsonl_anterior_se_sigue_recalculando(self):
+        """Una línea de `costos.jsonl` previa al cambio no tiene `provider`."""
+        anterior = {
+            "analysis_id": "abc", "timestamp": "2026-10-06T00:00:00+00:00",
+            "totals": {"calls": 1, "cost_usd": 0.0, "unpriced_models": []},
+            "by_agent": [{"agent_id": "01", "agent_name": "x", "model": "openai/gpt-oss-120b",
+                          "calls": 1, "prompt_tokens": 1_000_000,
+                          "completion_tokens": 1_000_000, "cost_usd": 0.0, "priced": True}],
+        }
+        tabla = {"openai/gpt-oss-120b": pricing.ModelPrice(4.0, 20.0)}
+        assert usage.recalculate(anterior, tabla)["totals"]["cost_usd"] == pytest.approx(24.0)
+
+    def test_costo_real_de_la_arquitectura_de_destino(self, tmp_path):
+        """Scenario: Costo real de la arquitectura de destino."""
+        token = usage.open_registry()
+        for modelo, proveedor in (("claude-opus-5-5", "anthropic"), ("gpt-4o", "openai"),
+                                  ("gemini-3.1-pro-preview", "google")):
+            usage.record_call(task="debate_critica", model=modelo, ok=True,
+                              latency_seconds=1.0, prompt_tokens=1_000_000,
+                              completion_tokens=1_000_000, provider=proveedor)
+        resumen = usage.close_registry(token, output_path=tmp_path / "costos.jsonl")
+        assert resumen["totals"]["unpriced_models"] == []
+        assert resumen["totals"]["cost_usd"] == pytest.approx((4 + 20) + (2.5 + 10) + (2 + 12))

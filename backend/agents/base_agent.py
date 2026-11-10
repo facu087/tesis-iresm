@@ -22,7 +22,7 @@ from collections.abc import Collection
 
 from ..mock import recorder as response_recorder
 from ..mock.mode import ENV_VAR, is_mock_active
-from ..mock.responses import get_mock_response
+from ..mock.responses import get_mock_entry
 from ..models.hypothesis import EvidenceLevel, Hypothesis, Priority, Source
 from ..models.report import AgentOutput, Critique
 from ..telemetry import usage as usage_telemetry
@@ -65,7 +65,7 @@ def _grabar_respuesta(
     try:
         response_recorder.record_response(
             task=task, model=model, agent_id=agent_id, agent_name=agent_name,
-            truncated=truncated, response=response,
+            truncated=truncated, response=response, provider=provider,
         )
     except Exception as exc:
         print(
@@ -319,13 +319,17 @@ def call_provider(
         inicio = time.perf_counter()
         # El agente que llama elige entre las grabaciones de la tarea: cada
         # uno recibe la suya, en el orden en que las produjo la corrida real.
-        contenido = get_mock_response(task, agent_id=agent_id)
+        # La telemetría anota el proveedor y el modelo que produjeron la
+        # grabación (D8): una corrida de destino reproducida muestra Claude.
+        grabada = get_mock_entry(task, agent_id=agent_id)
         usage_telemetry.record_call(
-            task=task, model=model, agent_id=agent_id, agent_name=agent_name,
-            ok=True, latency_seconds=time.perf_counter() - inicio,
+            task=task, model=grabada.model or model, agent_id=agent_id,
+            agent_name=agent_name, ok=True,
+            latency_seconds=time.perf_counter() - inicio,
             prompt_tokens=0, completion_tokens=0, mock=True,
+            provider=grabada.provider,
         )
-        return contenido
+        return grabada.response
 
     destino = model_tasks.resolve_agent_provider(agent_id, task)
     motivo_respaldo: str | None = None

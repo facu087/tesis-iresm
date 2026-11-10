@@ -2,11 +2,13 @@
 Tarifas por modelo, para estimar el costo de un análisis a partir de sus
 tokens (control de costos, Sprint 4 — D5).
 
-Los valores de Groq son cero: es el tier gratuito que usa el sistema hoy. Los
-de la arquitectura de destino (Claude Opus, GPT-4o, Gemini Pro — ver
-`.claude/CLAUDE.md`, sección "Modelo de IA") quedan comentados como
-referencia: activarlos es cargar la tarifa real cuando se haga el swap de
-proveedor.
+Los valores de Groq son cero: es el tier gratuito que usa el sistema por
+defecto. Los de la arquitectura de destino (Claude Opus, GPT-4o, Gemini Pro —
+`NEXUS_PROVEEDORES=destino`, Sprint 5) son los de lista pública al 2026-11-09:
+con esa arquitectura activa, el resumen de un análisis ya informa su costo
+real. Si el modelo de un proveedor se cambia por variable de entorno
+(`NEXUS_MODELO_*`) y no figura acá, el análisis sigue y el modelo queda
+señalado como sin tarifa.
 
 El valor real de la tabla no es contar lo que Groq no cobra: es poder
 responder "¿cuánto costaría este mismo caso con Claude Opus?" recalculando
@@ -32,12 +34,14 @@ class ModelPrice:
 DEFAULT_PRICES: dict[str, ModelPrice] = {
     "openai/gpt-oss-120b": ModelPrice(input_per_million=0.0, output_per_million=0.0),
     "openai/gpt-oss-20b": ModelPrice(input_per_million=0.0, output_per_million=0.0),
-    # Arquitectura de destino — comentados a propósito. Los valores son de
-    # lista pública al momento de escribir esto y hay que revisarlos antes de
-    # usarlos para el capítulo de viabilidad de la tesis.
-    # "claude-opus-4-...": ModelPrice(input_per_million=15.0, output_per_million=75.0),
-    # "gpt-4o": ModelPrice(input_per_million=2.5, output_per_million=10.0),
-    # "gemini-1.5-pro": ModelPrice(input_per_million=1.25, output_per_million=5.0),
+    # Arquitectura de destino. Precios de lista revisados el 2026-11-09: tabla
+    # de modelos de Anthropic al 2026-11-03 (Claude Opus 5.5),
+    # developers.openai.com/api/docs/pricing
+    # (GPT-4o) y ai.google.dev/gemini-api/docs/pricing (Gemini 3.1 Pro Preview,
+    # tramo de prompts de hasta 200k tokens: un caso clínico no lo supera).
+    "claude-opus-5-5": ModelPrice(input_per_million=4.0, output_per_million=20.0),
+    "gpt-4o": ModelPrice(input_per_million=2.5, output_per_million=10.0),
+    "gemini-3.1-pro-preview": ModelPrice(input_per_million=2.0, output_per_million=12.0),
 }
 
 

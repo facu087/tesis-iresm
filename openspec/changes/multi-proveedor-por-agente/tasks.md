@@ -17,12 +17,12 @@
 
 ## 4. Telemetría y tarifas
 
-- [ ] 4.1 En `backend/telemetry/usage.py`, agregar `proveedor`, `respaldo` y `motivo_respaldo` a cada llamada registrada, y el resumen por agente que usará el reporte (D7). Una entrada vieja sin esos campos se lee como Groq. Verificar en `tests/test_telemetria.py` (o el test vigente de telemetría) el escenario "Llamada de respaldo" y que un `costos.jsonl` anterior se sigue recalculando.
-- [ ] 4.2 En `backend/telemetry/pricing.py`, agregar las tarifas de `claude-opus-5-5`, `gpt-4o` y el modelo de Gemini elegido, con la fecha en que se tomaron (D9), revisadas contra las páginas de precios. Verificar el escenario "Costo real de la arquitectura de destino" con un registro sintético.
+- [x] 4.1 En `backend/telemetry/usage.py`, agregar `proveedor`, `respaldo` y `motivo_respaldo` a cada llamada registrada, y el resumen por agente que usará el reporte (D7). Una entrada vieja sin esos campos se lee como Groq. Verificar en `tests/test_telemetria.py` (o el test vigente de telemetría) el escenario "Llamada de respaldo" y que un `costos.jsonl` anterior se sigue recalculando.
+- [x] 4.2 En `backend/telemetry/pricing.py`, agregar las tarifas de `claude-opus-5-5`, `gpt-4o` y el modelo de Gemini elegido, con la fecha en que se tomaron (D9), revisadas contra las páginas de precios. Verificar el escenario "Costo real de la arquitectura de destino" con un registro sintético.
 
 ## 5. Grabación y modo mock
 
-- [ ] 5.1 En `backend/mock/recorder.py` y `backend/mock/responses.py`, guardar y reproducir el proveedor y el modelo de cada respuesta (D8); una grabación sin esos campos se reproduce como Groq. Verificar con un test que una grabación con `proveedor: "anthropic"` produce en la telemetría del modo mock ese proveedor, y que `grabadas.json` actual sigue cargando sin cambios.
+- [x] 5.1 En `backend/mock/recorder.py` y `backend/mock/responses.py`, guardar y reproducir el proveedor y el modelo de cada respuesta (D8); una grabación sin esos campos se reproduce como Groq. Verificar con un test que una grabación con `proveedor: "anthropic"` produce en la telemetría del modo mock ese proveedor, y que `grabadas.json` actual sigue cargando sin cambios.
 
 ## 6. Reporte, vista y PDF
 

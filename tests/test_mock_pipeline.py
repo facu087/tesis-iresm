@@ -280,7 +280,7 @@ class TestAnalisisCompletoEnModoMock:
         vistas: list[object] = []
         cerradas: list[object] = []
         abrir, cerrar = mock_responses.open_replay_session, mock_responses.close_replay_session
-        elegir = mock_responses.get_mock_response
+        elegir = mock_responses.get_mock_entry
 
         def abrir_espiado():
             token = abrir()
@@ -297,7 +297,7 @@ class TestAnalisisCompletoEnModoMock:
 
         monkeypatch.setattr(mock_responses, "open_replay_session", abrir_espiado)
         monkeypatch.setattr(mock_responses, "close_replay_session", cerrar_espiado)
-        monkeypatch.setattr("backend.agents.base_agent.get_mock_response", elegir_espiado)
+        monkeypatch.setattr("backend.agents.base_agent.get_mock_entry", elegir_espiado)
 
         for _ in range(2):
             assert self._correr(

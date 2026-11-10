@@ -550,3 +550,52 @@ class TestModoMock:
         assert dobles.anthropic.constructor == []
         assert isinstance(resultado, str) and resultado
         assert resultado == esperada
+
+
+# ── 5.1 Grabación y modo mock con proveedor ──────────────────────────────
+
+
+class TestGrabacionConProveedor:
+    def test_el_grabador_guarda_proveedor_y_modelo(self, dobles, destino_con_claves) -> None:
+        from backend.mock import recorder
+
+        token = recorder.open_recorder()
+        try:
+            _llamar("agente01_hipotesis", "01")
+            entrada = recorder.current().entries[-1]
+        finally:
+            recorder._current.reset(token)
+        assert (entrada["provider"], entrada["model"]) == ("anthropic", "claude-opus-5-5")
+        assert "user_message" not in entrada and "system_prompt" not in entrada
+
+    def test_el_modo_mock_reproduce_el_proveedor_grabado(
+        self, monkeypatch, tmp_path, registro,
+    ) -> None:
+        import json
+
+        from backend.mock import responses
+
+        archivo = tmp_path / "grabadas.json"
+        archivo.write_text(json.dumps({"tasks": {"agente01_hipotesis": [{
+            "seq": 1, "agent_id": "01", "provider": "anthropic",
+            "model": "claude-opus-5-5", "response": "{\"hypotheses\": []}",
+        }]}}), encoding="utf-8")
+        monkeypatch.setattr(responses, "_ARCHIVO_GRABADAS", archivo)
+        monkeypatch.setattr(responses, "_CACHE", None)
+        monkeypatch.setenv("NEXUS_MOCK_LLM", "1")
+        assert _llamar("agente01_hipotesis", "01") == "{\"hypotheses\": []}"
+        llamada = registro.calls[-1]
+        assert (llamada.provider, llamada.model, llamada.mock) == (
+            "anthropic", "claude-opus-5-5", True,
+        )
+
+    def test_grabadas_json_actual_carga_y_se_reproduce_como_groq(
+        self, monkeypatch, registro,
+    ) -> None:
+        from backend.mock import responses
+
+        monkeypatch.setattr(responses, "_CACHE", None)
+        monkeypatch.setenv("NEXUS_MOCK_LLM", "1")
+        _llamar("agente01_hipotesis", "01")
+        llamada = registro.calls[-1]
+        assert (llamada.provider, llamada.model) == ("groq", GROQ_MAIN)

@@ -82,9 +82,14 @@ def record_response(
     agent_name: str | None,
     truncated: bool,
     response: str,
+    provider: str = "groq",
 ) -> None:
     """
     Registra la respuesta cruda de una llamada exitosa al proveedor.
+
+    Guarda también qué proveedor y qué modelo la produjeron (multi-proveedor,
+    Sprint 5 — D8): al reproducirla en modo mock, la telemetría y el reporte
+    muestran el modelo que respondió en la corrida real.
 
     No hace nada si no hay un grabador abierto: un test, un script de demo o un
     análisis servido por la API llaman a `call_provider()` sin pasar por acá.
@@ -97,6 +102,7 @@ def record_response(
         "task": task,
         "agent_id": agent_id,
         "agent_name": agent_name,
+        "provider": provider,
         "model": model,
         "truncated": truncated,
         "response": response,
