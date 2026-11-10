@@ -344,13 +344,27 @@ Un análisis tarda varios minutos (unos 500 s medidos en corridas reales), por l
 que conviene ampliar el tiempo de espera del proxy para `POST /api/analyze`
 (en nginx, `proxy_read_timeout`).
 
-### 7.4 Pendiente conocido
+### 7.4 Content-Security-Policy del frontend
 
-El frontend **no tiene `Content-Security-Policy`**. Next.js inyecta scripts en
-línea para la hidratación, y una CSP estricta requiere nonces generados por
-pedido; activarla sin probarla dejaría la aplicación en blanco. Además, una
-respuesta 500 no manejada del backend no lleva los encabezados de seguridad,
-porque la genera el middleware más externo de Starlette.
+El frontend manda una `Content-Security-Policy` con un nonce distinto en cada
+pedido (`frontend/src/proxy.ts`, política en `frontend/src/lib/csp.ts`). Para el
+despliegue importan tres cosas:
+
+- **`NEXT_PUBLIC_API_URL` se fija al construir** (`npm run build`). La política
+  solo deja llamar a ese backend (`connect-src`): si el backend cambia de
+  dirección, hay que reconstruir el frontend o el navegador bloquea las llamadas.
+- **Todas las páginas se renderizan en cada pedido**, porque el nonce no puede
+  estar en una página generada de antemano. No hay caché de páginas en un CDN.
+- `upgrade-insecure-requests` solo se agrega con un backend `https`: un build de
+  producción servido por http en una red local (una demostración) sigue
+  funcionando contra un backend http.
+
+`python scripts/demo_csp_frontend.py` comprueba la política sobre el build real.
+
+### 7.5 Pendiente conocido
+
+Una respuesta 500 no manejada del backend no lleva los encabezados de
+seguridad, porque la genera el middleware más externo de Starlette.
 
 ---
 

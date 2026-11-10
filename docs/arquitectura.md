@@ -334,6 +334,10 @@ con `create_db_and_tables()` en el `lifespan` de `backend/main.py`.
 - `EncabezadosDeSeguridad` (middleware ASGI) agrega `nosniff`,
   `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`, COOP, una
   CSP de API y `Cache-Control: no-store` en `/api/*`; HSTS solo en producción.
+- El frontend manda su propia CSP con un nonce por pedido (`frontend/src/proxy.ts`,
+  `frontend/src/lib/csp.ts`): scripts solo con ese nonce, `connect-src` limitado
+  al backend y `frame-ancestors 'none'`. Por eso todas sus páginas se renderizan
+  en cada pedido.
 
 El backend no termina TLS: se despliega detrás de un proxy inverso.
 
