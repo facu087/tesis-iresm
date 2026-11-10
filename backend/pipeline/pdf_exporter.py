@@ -800,6 +800,54 @@ def _bibliography(report: StructuredReport, s: dict) -> list:
 
 # ── Punto de entrada ───────────────────────────────────────────────────────────
 
+_NOMBRE_PROVEEDOR = {
+    "groq": "Groq",
+    "anthropic": "Anthropic",
+    "openai": "OpenAI",
+    "google": "Google",
+}
+
+_MOTIVO_RESPALDO = {
+    "clave_faltante": "Respaldo en Groq: faltaba la clave del proveedor asignado",
+    "falla": "Respaldo en Groq: el proveedor asignado falló",
+}
+
+
+def _providers(report: StructuredReport, s: dict) -> list:
+    """
+    Qué proveedor y qué modelo respondieron por cada agente (multi-proveedor,
+    Sprint 5). Un reporte anterior a ese cambio no trae el dato: se omite.
+    """
+    proveedores = report.metadata.proveedores
+    if not proveedores:
+        return []
+    elems = _section("MODELOS QUE RESPONDIERON", s)
+    rows = [[
+        _par("Agente", s["celda_b"]), _par("Proveedor y modelo", s["celda_b"]),
+        _par("Observación", s["celda_b"]),
+    ]]
+    for p in proveedores:
+        agente = f"{p.agent_id} — {p.agent_name}" if p.agent_name else p.agent_id
+        modelo = f"{_NOMBRE_PROVEEDOR.get(p.provider, p.provider)} · {p.model}"
+        nota = _MOTIVO_RESPALDO.get(p.fallback_reason or "", "")
+        if nota:
+            nota = f"<font color='{_hex(_RED)}'>{nota}</font>"
+        rows.append([_par(_t(agente), s["celda"]), _par(_t(modelo), s["celda"]),
+                     _par(nota, s["celda"])])
+    t = Table(rows, colWidths=_anchos(5, 6, 6), repeatRows=1)
+    t.setStyle(TableStyle([
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("BACKGROUND", (0, 0), (-1, 0), _NEXUS_LIGHT),
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+    ]))
+    elems.append(t)
+    return elems
+
+
 def generate_pdf(report: StructuredReport) -> bytes:
     """
     Genera el reporte estructurado en formato PDF.
@@ -829,6 +877,7 @@ def generate_pdf(report: StructuredReport) -> bytes:
     elements.extend(_executive_summary(report, s))
     elements.extend(_hypotheses(report, s))
     elements.extend(_debate_summary(report, s))
+    elements.extend(_providers(report, s))
     elements.extend(_clinical_trials(report, s))
     elements.extend(_bibliography(report, s))
 

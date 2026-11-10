@@ -268,6 +268,18 @@ class TestAnalisisCompletoEnModoMock:
         assert response.status_code == 200
         assert response.json()["metadata"]["mock"] is True
 
+    def test_el_reporte_informa_quien_respondio_por_cada_agente(
+        self, monkeypatch, client_medico_verificado_sin_relanzar
+    ):
+        """Multi-proveedor (Sprint 5): el bloque sale de la telemetría del análisis."""
+        response = self._correr(monkeypatch, client_medico_verificado_sin_relanzar)
+        proveedores = response.json()["metadata"]["proveedores"]
+        assert proveedores, "el análisis no informó ningún proveedor"
+        # Lo grabado es una corrida de Groq: así se reproduce.
+        assert {p["provider"] for p in proveedores} == {"groq"}
+        assert all(p["fallback_reason"] is None for p in proveedores)
+        assert "06" in {p["agent_id"] for p in proveedores}
+
     def test_cada_analisis_abre_y_cierra_su_sesion_de_reproduccion(
         self, monkeypatch, client_medico_verificado_sin_relanzar
     ):

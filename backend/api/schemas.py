@@ -18,6 +18,22 @@ _DISCLAIMER = (
 )
 
 
+class AgentProviderInfo(BaseModel):
+    """
+    Qué proveedor y qué modelo respondieron por un agente (multi-proveedor,
+    Sprint 5 — D7). Solo identificadores: nunca el prompt, la respuesta ni el
+    mensaje de un error del proveedor.
+    """
+
+    agent_id: str
+    agent_name: str | None = None
+    provider: str
+    model: str
+    # None: respondió el proveedor asignado. "clave_faltante" o "falla": la
+    # llamada se hizo en Groq porque ese proveedor no estaba disponible.
+    fallback_reason: Literal["clave_faltante", "falla"] | None = None
+
+
 class ReportMetadata(BaseModel):
     generated_at: datetime
     nexus_version: str
@@ -29,6 +45,9 @@ class ReportMetadata(BaseModel):
     # `modo-mock-pipeline`); el frontend y el PDF lo muestran con la misma
     # visibilidad que la advertencia del consenso de IA.
     mock: bool = False
+    # Quién respondió por cada agente (multi-proveedor, Sprint 5). `None` en un
+    # reporte anterior a ese cambio: la vista y el PDF omiten la sección.
+    proveedores: list[AgentProviderInfo] | None = None
 
 
 class CaseSummarySection(BaseModel):

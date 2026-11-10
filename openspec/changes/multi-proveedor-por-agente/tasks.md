@@ -26,7 +26,7 @@
 
 ## 6. Reporte, vista y PDF
 
-- [ ] 6.1 Agregar `metadata.proveedores` (opcional) al schema del reporte en `backend/api/schemas.py`, llenarlo en `api/router.py` desde el resumen de la telemetría al cerrar el análisis, y mostrarlo en `pipeline/pdf_exporter.py`. Verificar en tests los escenarios "Corrida completa en la arquitectura de destino", "Corrida con respaldo" y "Reporte anterior a este cambio" (el PDF se genera sin la sección), y que el bloque solo contiene agente, proveedor, modelo y motivo.
+- [x] 6.1 Agregar `metadata.proveedores` (opcional) al schema del reporte en `backend/api/schemas.py`, llenarlo en `api/router.py` desde el resumen de la telemetría al cerrar el análisis, y mostrarlo en `pipeline/pdf_exporter.py`. Verificar en tests los escenarios "Corrida completa en la arquitectura de destino", "Corrida con respaldo" y "Reporte anterior a este cambio" (el PDF se genera sin la sección), y que el bloque solo contiene agente, proveedor, modelo y motivo.
 - [ ] 6.2 Mostrar los proveedores en la vista `/report` (`frontend/src/lib/types.ts` y `frontend/src/components/report/`), con el sistema visual de `.landing` y los dos temas, omitiendo la sección si el campo falta. Verificar con un test de Vitest para los dos casos y con `npm run lint` y `tsc --noEmit`.
 
 ## 7. Evidencia y documentación

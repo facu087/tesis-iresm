@@ -986,3 +986,87 @@ class TestEstadoVerificacionEnPdf:
 
         assert set(_FRASES_CAUSA) == {c.value for c in CausaFallo}
         assert all(_FRASES_CAUSA.values())
+
+
+# ── Multi-proveedor (Sprint 5): quién respondió por cada agente ──────────────────
+
+from backend.api.schemas import AgentProviderInfo  # noqa: E402
+
+
+def _proveedores_destino() -> list[AgentProviderInfo]:
+    return [
+        AgentProviderInfo(agent_id="01", agent_name="Analista de Literatura",
+                          provider="anthropic", model="claude-opus-5-5"),
+        AgentProviderInfo(agent_id="02", agent_name="Especialista Genómica",
+                          provider="openai", model="gpt-4o"),
+        AgentProviderInfo(agent_id="03", agent_name="Consultor Clínico",
+                          provider="google", model="gemini-3.1-pro-preview"),
+        AgentProviderInfo(agent_id="04", agent_name="Árbitro Verificador",
+                          provider="anthropic", model="claude-opus-5-5"),
+        AgentProviderInfo(agent_id="06", agent_name="Sintetizador",
+                          provider="anthropic", model="claude-opus-5-5"),
+    ]
+
+
+class TestProveedoresEnElPdf:
+    def test_corrida_completa_en_la_arquitectura_de_destino(self):
+        """Scenario: Corrida completa en la arquitectura de destino."""
+        report = _make_report()
+        report.metadata.proveedores = _proveedores_destino()
+        texto = _texto_del_pdf(generate_pdf(report))
+        assert "MODELOS QUE RESPONDIERON" in texto
+        assert texto.count("claude-opus-5-5") == 3
+        assert "gpt-4o" in texto and "gemini-3.1-pro-preview" in texto
+        assert "Respaldo en Groq" not in texto
+
+    def test_corrida_con_respaldo(self):
+        """Scenario: Corrida con respaldo — el Agente 03 respondió con Groq."""
+        report = _make_report()
+        report.metadata.proveedores = [AgentProviderInfo(
+            agent_id="03", agent_name="Consultor Clínico", provider="groq",
+            model="openai/gpt-oss-120b", fallback_reason="clave_faltante",
+        )]
+        texto = _texto_del_pdf(generate_pdf(report))
+        assert "Groq" in texto and "openai/gpt-oss-120b" in texto
+        assert "faltaba la clave" in texto
+
+    def test_reporte_anterior_a_este_cambio_omite_la_seccion(self):
+        """Scenario: Reporte anterior a este cambio."""
+        report = _make_report()
+        assert report.metadata.proveedores is None
+        texto = _texto_del_pdf(generate_pdf(report))
+        assert "MODELOS QUE RESPONDIERON" not in texto
+
+
+class TestProveedoresEnElSchema:
+    def test_el_bloque_solo_tiene_agente_proveedor_modelo_y_motivo(self):
+        assert set(AgentProviderInfo.model_fields) == {
+            "agent_id", "agent_name", "provider", "model", "fallback_reason",
+        }
+
+    def test_un_reporte_json_anterior_se_lee_sin_el_campo(self):
+        datos = _make_report().model_dump(mode="json")
+        datos["metadata"].pop("proveedores")
+        from backend.api.schemas import StructuredReport
+
+        assert StructuredReport.model_validate(datos).metadata.proveedores is None
+
+    def test_el_router_arma_el_bloque_desde_la_telemetria(self):
+        from backend.api.router import _proveedores_del_analisis
+        from backend.telemetry import usage
+
+        assert _proveedores_del_analisis() is None  # sin registro abierto
+        token = usage.open_registry()
+        try:
+            usage.record_call(task="agente02_hipotesis", model="gpt-4o", ok=True,
+                              latency_seconds=1.0, agent_id="02",
+                              agent_name="Especialista Genómica", provider="openai")
+            usage.record_call(task="agente03_hipotesis", model="openai/gpt-oss-120b",
+                              ok=True, latency_seconds=1.0, agent_id="03",
+                              fallback=True, fallback_reason="falla")
+            bloque = _proveedores_del_analisis()
+        finally:
+            usage._current.reset(token)
+        assert [(b.agent_id, b.provider, b.fallback_reason) for b in bloque] == [
+            ("02", "openai", None), ("03", "groq", "falla"),
+        ]

@@ -42,7 +42,7 @@ from ..pipeline.verification import (
 from ..mock import responses as mock_responses
 from ..mock.mode import is_mock_active
 from ..telemetry import usage as usage_telemetry
-from .schemas import StructuredReport
+from .schemas import AgentProviderInfo, StructuredReport
 
 router = APIRouter(prefix="/api", tags=["análisis"])
 
@@ -318,12 +318,32 @@ async def analyze(
         # ── 9. Resumen ejecutivo (Agente 06) ────────────────────────────────
         # Va al final porque narra el reporte ya construido; no cambia datos.
         structured.executive_summary = await _synthesize_safe(structured)
+
+        # ── 10. Quién respondió por cada agente (multi-proveedor, D7) ────────
+        # Sale de la telemetría, que ya registró cada llamada; va después del
+        # Agente 06, que es la última llamada al modelo.
+        structured.metadata.proveedores = _proveedores_del_analisis()
         processing_time = time.perf_counter() - start
         structured.metadata.processing_time_seconds = round(processing_time, 2)
         return structured
     finally:
         mock_responses.close_replay_session(replay_token)
         usage_telemetry.close_registry(telemetry_token, mock=is_mock_active())
+
+
+def _proveedores_del_analisis() -> list[AgentProviderInfo] | None:
+    """
+    Quién respondió por cada agente en el análisis en curso, según el registro
+    de telemetría abierto. `None` si no hay registro (no debería pasar dentro de
+    `analyze()`, que lo abre al empezar).
+    """
+    registro = usage_telemetry.current()
+    if registro is None:
+        return None
+    return [
+        AgentProviderInfo(**entrada)
+        for entrada in usage_telemetry.providers_by_agent(registro)
+    ]
 
 
 @router.post(
