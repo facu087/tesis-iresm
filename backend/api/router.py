@@ -3,6 +3,7 @@ Router FastAPI — endpoints del pipeline NEXUS.
 """
 
 import asyncio
+import os
 import sys
 import time
 
@@ -46,6 +47,36 @@ from .schemas import StructuredReport
 router = APIRouter(prefix="/api", tags=["análisis"])
 
 _MAX_TEXT_BYTES = 500_000  # ~500 KB
+
+# Tamaño máximo del archivo subido, en MB, si MAX_FILE_SIZE_MB no está definida
+# o no es un entero positivo.
+_MAX_FILE_SIZE_MB_DEFAULT = 50
+
+
+def _limite_subida_mb() -> int:
+    """
+    Límite de tamaño del archivo subido, leído de `MAX_FILE_SIZE_MB`.
+
+    Se lee en cada pedido para que un cambio de configuración no exija
+    reimportar el módulo. Un valor que no es un entero positivo avisa por
+    stderr y cae al valor por defecto: un error de tipeo en el `.env` no debe
+    dejar el endpoint sin límite ni impedir analizar.
+    """
+    crudo = os.getenv("MAX_FILE_SIZE_MB", "").strip()
+    if not crudo:
+        return _MAX_FILE_SIZE_MB_DEFAULT
+    try:
+        valor = int(crudo)
+    except ValueError:
+        valor = 0
+    if valor <= 0:
+        print(
+            f"[NEXUS] MAX_FILE_SIZE_MB={crudo!r} no es un entero positivo; "
+            f"se usa {_MAX_FILE_SIZE_MB_DEFAULT} MB.",
+            file=sys.stderr,
+        )
+        return _MAX_FILE_SIZE_MB_DEFAULT
+    return valor
 
 
 async def _navigate_trials_safe(
@@ -191,7 +222,18 @@ async def analyze(
     try:
         # ── 1. Extracción de texto ─────────────────────────────────────────
         if file is not None:
-            content = await file.read()
+            # Se lee como mucho un byte más que el límite: alcanza para saber
+            # si lo supera sin cargar en memoria un archivo arbitrariamente
+            # grande. El proxy de producción puede cortar antes (ver
+            # docs/instalacion-y-despliegue.md).
+            limite_mb = _limite_subida_mb()
+            limite_bytes = limite_mb * 1024 * 1024
+            content = await file.read(limite_bytes + 1)
+            if len(content) > limite_bytes:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"El archivo supera el límite de {limite_mb} MB.",
+                )
             if not content:
                 raise HTTPException(status_code=422, detail="El archivo enviado está vacío.")
             try:
