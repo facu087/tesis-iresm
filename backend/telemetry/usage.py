@@ -61,6 +61,13 @@ class CallRecord:
     completion_tokens: int | None = None
     truncated: bool = False  # la respuesta se cortó al alcanzar el techo de tokens
     mock: bool = False       # la respuesta vino del modo mock, no del proveedor real
+    # Proveedor que atendió la llamada (multi-proveedor, Sprint 5). Una entrada
+    # anterior a ese cambio no lo tiene: era Groq.
+    provider: str = "groq"
+    # La llamada se hizo en Groq porque el proveedor asignado al agente no
+    # estaba disponible: "clave_faltante" o "falla" (design D6).
+    fallback: bool = False
+    fallback_reason: str | None = None
 
 
 class AnalysisUsage:
@@ -76,11 +83,20 @@ class AnalysisUsage:
     def __init__(self) -> None:
         self.analysis_id = secrets.token_hex(8)
         self.calls: list[CallRecord] = []
+        self.warned: set[tuple[str, ...]] = set()
         self._lock = threading.Lock()
 
     def record(self, call: CallRecord) -> None:
         with self._lock:
             self.calls.append(call)
+
+    def first_warning(self, key: tuple[str, ...]) -> bool:
+        """`True` la primera vez que se pide esta clave en el análisis."""
+        with self._lock:
+            if key in self.warned:
+                return False
+            self.warned.add(key)
+            return True
 
 
 _current: contextvars.ContextVar[AnalysisUsage | None] = contextvars.ContextVar(
@@ -103,6 +119,30 @@ def current() -> AnalysisUsage | None:
     return _current.get()
 
 
+# Avisos ya emitidos fuera de un análisis (un script, un test): sin registro
+# abierto no hay "análisis" que acote el aviso, así que vale por proceso.
+_warned_without_registry: set[tuple[str, ...]] = set()
+_warned_lock = threading.Lock()
+
+
+def first_warning(key: tuple[str, ...]) -> bool:
+    """
+    `True` si el aviso identificado por `key` todavía no se emitió en este
+    análisis.
+
+    Lo usa `call_provider()` para avisar del respaldo en Groq una vez por
+    análisis, proveedor y motivo (design D6), y no en cada llamada.
+    """
+    registry = _current.get()
+    if registry is not None:
+        return registry.first_warning(key)
+    with _warned_lock:
+        if key in _warned_without_registry:
+            return False
+        _warned_without_registry.add(key)
+        return True
+
+
 def record_call(
     *,
     task: str,
@@ -115,6 +155,9 @@ def record_call(
     completion_tokens: int | None = None,
     truncated: bool = False,
     mock: bool = False,
+    provider: str = "groq",
+    fallback: bool = False,
+    fallback_reason: str | None = None,
 ) -> None:
     """
     Registra un intento de llamada en el registro activo del contexto actual.
@@ -137,6 +180,9 @@ def record_call(
         completion_tokens=completion_tokens,
         truncated=truncated,
         mock=mock,
+        provider=provider,
+        fallback=fallback,
+        fallback_reason=fallback_reason,
     ))
 
 
