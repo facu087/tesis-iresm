@@ -2,7 +2,7 @@
 
 ## 1. Dependencias
 
-- [ ] 1.1 En `backend/requirements.txt`, actualizar `anthropic` y `openai` a las versiones vigentes y reemplazar `google-generativeai` por `google-genai` (design D3), con versiones fijadas contra la documentación de cada SDK. Verificar con `pip install -r backend/requirements.txt` en el `.venv` y con `pytest tests/` sin regresiones antes de tocar código.
+- [x] 1.1 En `backend/requirements.txt`, actualizar `anthropic` y `openai` a las versiones vigentes y reemplazar `google-generativeai` por `google-genai` (design D3), con versiones fijadas contra la documentación de cada SDK. Verificar con `pip install -r backend/requirements.txt` en el `.venv` y con `pytest tests/` sin regresiones antes de tocar código.
 
 ## 2. Mapa por agente y activación
 
