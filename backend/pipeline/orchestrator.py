@@ -24,6 +24,7 @@ from ..agents.agent_01_literature import LiteratureAnalystAgent
 from ..agents.agent_02_genomics import GenomicsSpecialistAgent
 from ..agents.agent_03_clinical import ClinicalConsultantAgent
 from ..agents.base_agent import BaseAgent
+from ..ingestion.anonimizador import anonimizar
 from ..ingestion.biomarker_extractor import extract as extract_biomarkers
 from ..ingestion.normalizer import normalize
 from ..mock import recorder
@@ -210,12 +211,15 @@ async def run_round_1(case: ClinicalCase) -> Report:
 def run(clinical_text: str) -> Report:
     """
     Ejecuta el pipeline completo de forma sincrónica:
-      normalización → PICO → biomarcadores → Ronda 1 (paralelo).
+      normalización → anonimización → PICO → biomarcadores → Ronda 1 (paralelo).
 
     Uso desde scripts y tests de integración.
     En FastAPI usar run_round_1() directamente desde un endpoint async.
     """
     normalized = normalize(clinical_text)
+    # Mismo orden que POST /api/analyze: nada sale hacia Groq sin anonimizar.
+    normalized, informe = anonimizar(normalized)
+    print(f"[NEXUS] {informe.resumen()}", file=sys.stderr)
 
     case = ClinicalCase(raw_text=normalized)
     case = pico.build(case)
