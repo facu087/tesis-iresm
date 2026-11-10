@@ -1,5 +1,5 @@
 import { CheckCircleIcon, WarningIcon } from "@phosphor-icons/react/ssr";
-import type { CaseSummarySection, DebateSummary } from "@/lib/types";
+import type { AgentProviderInfo, CaseSummarySection, DebateSummary } from "@/lib/types";
 import { CARD } from "@/components/landing/styles";
 import { BulletList, Notice, SECTION_LABEL } from "@/components/report/primitives";
 
@@ -60,7 +60,13 @@ function ListCard({ label, items }: { label: string; items: string[] }) {
 
 /* ── Debate tab ─────────────────────────────────────────────────────────── */
 
-export function DebateTab({ debate }: { debate: DebateSummary }) {
+interface DebateTabProps {
+  debate: DebateSummary;
+  /** Who answered for each agent; absent in reports older than the field. */
+  providers?: AgentProviderInfo[] | null;
+}
+
+export function DebateTab({ debate, providers }: DebateTabProps) {
   return (
     <div className="flex flex-col gap-4">
       {/* Stats */}
@@ -108,6 +114,60 @@ export function DebateTab({ debate }: { debate: DebateSummary }) {
           </ul>
         </div>
       )}
+
+      {providers && providers.length > 0 && <ProvidersCard providers={providers} />}
+    </div>
+  );
+}
+
+/* ── Models that answered ───────────────────────────────────────────────── */
+
+const PROVIDER_NAME: Record<string, string> = {
+  groq: "Groq",
+  anthropic: "Anthropic",
+  openai: "OpenAI",
+  google: "Google",
+};
+
+const FALLBACK_NOTE: Record<string, string> = {
+  clave_faltante: "Respaldo en Groq: faltaba la clave del proveedor asignado",
+  falla: "Respaldo en Groq: el proveedor asignado falló",
+};
+
+/**
+ * Provider and model that answered for each agent. A fallback is told in
+ * words and with an icon, never by colour alone.
+ */
+export function ProvidersCard({ providers }: { providers: AgentProviderInfo[] }) {
+  return (
+    <div className={CARD}>
+      <p className={`mb-3 ${SECTION_LABEL}`}>Modelos que respondieron</p>
+      <ul className="flex flex-col gap-3">
+        {providers.map((p) => {
+          const note = p.fallback_reason ? FALLBACK_NOTE[p.fallback_reason] : null;
+          return (
+            <li
+              key={`${p.agent_id}-${p.provider}-${p.model}-${p.fallback_reason ?? ""}`}
+              className="flex flex-col gap-1 text-sm text-fg sm:flex-row sm:items-baseline sm:gap-3"
+            >
+              <span className="min-w-0 font-semibold wrap-anywhere sm:w-56 sm:shrink-0">
+                {p.agent_id}
+                {p.agent_name ? ` — ${p.agent_name}` : ""}
+              </span>
+              <span className="min-w-0 wrap-anywhere">
+                {PROVIDER_NAME[p.provider] ?? p.provider}{" "}
+                <span className="font-mono text-fg-muted">{p.model}</span>
+              </span>
+              {note && (
+                <span className="flex min-w-0 items-start gap-1.5 text-ochre">
+                  <WarningIcon aria-hidden="true" weight="bold" className="mt-0.5 size-4 shrink-0" />
+                  <span className="wrap-anywhere">{note}</span>
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

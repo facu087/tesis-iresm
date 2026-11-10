@@ -253,7 +253,7 @@ export default function ReportPage() {
           )}
           {tab === "hipotesis"    && <HipotesisTab    hypotheses={report.hypotheses} />}
           {tab === "caso"         && <CasoTab         summary={report.case_summary} />}
-          {tab === "debate"       && <DebateTab        debate={report.debate_summary} />}
+          {tab === "debate"       && <DebateTab        debate={report.debate_summary} providers={report.metadata.proveedores} />}
           {tab === "ensayos"      && <EnsayosTab       report={report} />}
           {tab === "bibliografia" && <BibliografiaTab  sources={report.bibliography} />}
         </div>
