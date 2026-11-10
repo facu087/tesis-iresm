@@ -131,7 +131,9 @@ funcionar sin ella.
 | `PUBMED_API_KEY` | No | (ninguno) | Aumenta el límite de consultas a NCBI E-utilities. |
 | `ORPHANET_API_KEY` | No | Valor por defecto del cliente | La API responde sin credencial. Un valor con espacios o `#` se descarta con aviso. |
 | `PROVINCIAL_LICENSE_SEARCH_URL` | No | (ninguno) | Enlace al buscador provincial de matrículas que se muestra al administrador. |
-| `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY` | No | (ninguno) | Reservadas para la arquitectura de destino. El código actual no las lee. |
+| `NEXUS_PROVEEDORES` | No | `groq` | `destino` activa la arquitectura de destino (sección 6b): Claude Opus para los Agentes 01, 04 y 06, GPT-4o para el 02 y Gemini Pro para el 03. Cualquier otro valor avisa por stderr y queda en `groq`. |
+| `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY` | No | (ninguno) | Claves de los proveedores de destino. Solo se leen con `NEXUS_PROVEEDORES=destino`: una clave cargada sola no activa nada. |
+| `NEXUS_MODELO_ANTHROPIC`, `NEXUS_MODELO_OPENAI`, `NEXUS_MODELO_GOOGLE` | No | `claude-opus-5-5`, `gpt-4o`, `gemini-3.1-pro-preview` | Cambian el modelo de cada proveedor de destino sin tocar el código. Un modelo sin tarifa en `backend/telemetry/pricing.py` se reporta con costo cero y señalado. |
 | `MAX_FILE_SIZE_MB` | No | `50` | Tamaño máximo del archivo subido a `POST /api/analyze`, en MB. Un archivo mayor recibe un 413. Un valor que no es un entero positivo avisa por stderr y usa 50 (ver nota al final). |
 | `NEXT_PUBLIC_API_URL` | No | `http://localhost:8000` | Base del backend para el frontend. |
 | `NEXT_PUBLIC_SITE_URL` | No | `http://localhost:3000` | Origen público del frontend. |
@@ -199,6 +201,52 @@ NEXUS_MOCK_LLM=1 uvicorn backend.main:app --reload
 ClinicalTrials.gov siguen consultando esos servicios en vivo. Una demostración
 en modo mock necesita conexión a internet y sus resultados en esas dos etapas
 pueden variar con el tiempo.
+
+## 6b. Arquitectura de destino (multi-proveedor)
+
+Por defecto todo el pipeline corre en Groq. Con `NEXUS_PROVEEDORES=destino`
+cada agente usa el proveedor que le asigna la arquitectura de la tesis:
+
+| Agente | Proveedor | Modelo por defecto |
+|--------|-----------|--------------------|
+| 01 Analista de Literatura, 04 Árbitro, 06 Sintetizador | Anthropic | `claude-opus-5-5` |
+| 02 Especialista Genómica | OpenAI | `gpt-4o` |
+| 03 Consultor Clínico | Google | `gemini-3.1-pro-preview` |
+
+La síntesis PICO, la extracción de biomarcadores y el Agente 05 siguen en Groq
+siempre, así que `GROQ_API_KEY` sigue siendo obligatoria.
+
+```bash
+NEXUS_PROVEEDORES=destino
+ANTHROPIC_API_KEY=<clave>
+OPENAI_API_KEY=<clave>
+GOOGLE_API_KEY=<clave>
+```
+
+**Respaldo.** Si falta la clave de un proveedor, o su llamada falla después de
+los reintentos del SDK (timeout de 120 s por intento), esa llamada se repite en
+Groq y el análisis sigue. Se avisa por stderr una vez por análisis y proveedor,
+con el tipo del error y nunca su mensaje, y el reporte lo muestra en la sección
+"Modelos que respondieron" de la vista y del PDF.
+
+**Costo.** Con la arquitectura de destino cada análisis tiene costo real; el
+resumen de consumo de stderr y `output/costos.jsonl` lo estiman con las tarifas
+de `backend/telemetry/pricing.py`. Sin la variable, sigue en cero.
+
+**Privacidad.** Los proveedores de destino reciben los mismos datos que hoy
+recibe Groq: el texto ya pasó por la anonimización
+(`backend/ingestion/anonimizador.py`), que corre antes de cualquier llamada a
+un modelo. Son tres empresas más que procesan el caso anonimizado; conviene
+revisar sus políticas de retención antes de usarlos con datos reales.
+
+**Modo mock.** Con `NEXUS_MOCK_LLM=1` no se llama a ningún proveedor, con o sin
+la arquitectura de destino. Una corrida real de destino grabada con
+`scripts/medir_costos.py --grabar` se reproduce mostrando el modelo que
+respondió.
+
+`scripts/demo_multi_proveedor.py` muestra los cuatro casos (todo en Groq,
+destino con las claves, sin la clave de Google y Anthropic fallando) sin red ni
+cuota.
 
 ---
 

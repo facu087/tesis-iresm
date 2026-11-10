@@ -370,6 +370,12 @@ salir intacto (hay un test).
   qué fuentes quedan, las descartadas por hipótesis, `fuera_del_rag` y el pedido de revisión
   con la lista de literatura. Genera `resultado.txt` y `resumen.json` en
   `output/demo_citas_ancladas/`. Sale con código 1 si falla una comprobación
+- `demo_multi_proveedor.py` (Sprint 5, multi-proveedor) — sin red ni cuota: con los SDK de
+  Anthropic, OpenAI, Google y Groq reemplazados por dobles, una llamada por agente más el
+  Agente 05 y PICO en cuatro casos (todo en `groq`; `destino` con las tres claves; sin la
+  clave de Google; Anthropic fallando). Muestra quién recibió cada llamada, los avisos de
+  respaldo y el bloque `metadata.proveedores`. Genera `resultado.txt` y `resumen.json` en
+  `output/demo_multi_proveedor/`. Sale con código 1 si algún caso no da lo esperado
 - `revision_medica.py` (Sprint 5, tarjeta #60; no es un demo) — material de la revisión del
   reporte con un médico o el tutor. `preparar <reporte.json>` genera el PDF del reporte, la
   planilla imprimible y los CSV para cargar las respuestas (rechaza reportes de modo mock y
@@ -705,8 +711,11 @@ backfillean los Sprints 1–3. Requiere el CLI: `npm install -g @fission-ai/open
 
 > **Groq — `openai/gpt-oss-120b`** — reemplaza temporalmente a Claude/Gemini/GPT-4o
 > mientras se gestionan créditos en las APIs de pago.
-> La arquitectura final usará Claude Opus (agentes 01, 04, 06),
-> GPT-4o (agente 02) y Gemini Pro (agente 03).
+> La arquitectura final usa Claude Opus (agentes 01, 04, 06),
+> GPT-4o (agente 02) y Gemini Pro (agente 03), y **ya está implementada**
+> detrás de `NEXUS_PROVEEDORES=destino` (Sprint 5, OpenSpec
+> `multi-proveedor-por-agente`; ver "Proveedor por agente" más abajo). Sin esa
+> variable, todo corre en Groq como siempre.
 
 Constantes disponibles en `backend/agents/model_tasks.py` (re-exportadas desde
 `base_agent.py` por compatibilidad):
@@ -720,10 +729,12 @@ Constantes disponibles en `backend/agents/model_tasks.py` (re-exportadas desde
 
 ### Punto único de llamada al proveedor (Sprint 4 — control de costos)
 
-**Ningún módulo instancia el cliente de Groq por su cuenta.** El único lugar
-del sistema que lo hace es `call_provider()` en `backend/agents/base_agent.py`
-(`grep -rn "Groq(api_key" backend/` tiene que devolver una sola línea, la de
-adentro de esa función). Todo lo demás pasa por ahí:
+**Ningún módulo instancia el cliente de un proveedor por su cuenta.** El único
+lugar del sistema que lo hace es `base_agent.py`: `call_provider()` para Groq y
+sus tres adaptadores (`_call_anthropic`, `_call_openai`, `_call_google`).
+`tests/test_proveedor_por_agente.py::TestPuntoUnico` lo comprueba: busca los
+constructores de los cuatro SDK en `backend/` y falla si aparece uno fuera de
+`base_agent.py`. Todo lo demás pasa por ahí:
 
 - `BaseAgent._call_llm(self, user_message, *, task)` — usado por los agentes
   y por `critique()`/`revise()`/`recite()` del debate.
@@ -749,6 +760,29 @@ de proveedor (Claude/GPT-4o/Gemini) se agrega en ese único método.
 Vale tenerlo en cuenta al escribir el Agente 06: si asume la firma de Groq en
 lugar de delegar en `_call_llm()`/`call_provider()`, rompe la regla y deja su
 consumo fuera de la telemetría.
+
+### Proveedor por agente (Sprint 5 — multi-proveedor)
+
+Con `NEXUS_PROVEEDORES=destino`, `call_provider()` consulta `AGENT_PROVIDERS`
+en `backend/agents/model_tasks.py` (al lado de `TASK_BUDGETS`): 01/04/06 →
+Anthropic `claude-opus-5-5`, 02 → OpenAI `gpt-4o`, 03 → Google
+`gemini-3.1-pro-preview`. Claude y Gemini razonan siempre y usan un techo de
+16.000 tokens; GPT-4o conserva el de la tarea. PICO, biomarcadores y el Agente 05
+siguen en Groq siempre. A Claude no se le manda `temperature` (Opus 5.5 la
+rechaza) y va con `effort: "medium"` y streaming; un `stop_reason: "refusal"` es
+una falla. Timeout de 120 s por intento; los reintentos son los del SDK.
+
+**Respaldo por llamada**: sin la clave o si el proveedor falla, la misma llamada
+se repite en Groq con el modelo y techo de la tarea, queda en la telemetría
+(`provider`, `fallback`, `fallback_reason`) y se avisa por stderr una vez por
+análisis y proveedor, con el tipo de la excepción y nunca su mensaje. El reporte
+lleva `metadata.proveedores` (agente, proveedor, modelo y motivo; `None` en un
+reporte anterior), que `/report` muestra en la pestaña del debate y el PDF en
+"Modelos que respondieron". La grabación guarda el proveedor y el modo mock lo
+reproduce; `grabadas.json` actual se reproduce como Groq. Tarifas de destino en
+`backend/telemetry/pricing.py` (al 2026-11-09). GPT-4o figura como *deprecated*
+en la documentación de OpenAI: se mantiene porque lo pide la arquitectura, y se
+cambia con `NEXUS_MODELO_OPENAI`. Falta la corrida real con claves.
 
 ### Telemetría de costos
 
@@ -924,10 +958,15 @@ encabezados: la arma el middleware más externo de Starlette.
 # Modelo de IA activo
 GROQ_API_KEY=           # Groq (gpt-oss) — obligatorio hoy
 
-# Modelos futuros (cuando se tengan créditos)
-ANTHROPIC_API_KEY=      # Claude — Agentes 01, 04, 06
+# Arquitectura de destino (Sprint 5, multi-proveedor). Las claves solo se
+# leen con NEXUS_PROVEEDORES=destino: una clave cargada sola no activa nada.
+NEXUS_PROVEEDORES=      # groq (default) | destino. Otro valor avisa y queda en groq.
+ANTHROPIC_API_KEY=      # Claude Opus — Agentes 01, 04, 06
 OPENAI_API_KEY=         # GPT-4o — Agente 02
 GOOGLE_API_KEY=         # Gemini Pro — Agente 03
+NEXUS_MODELO_ANTHROPIC= # Opcional. Default claude-opus-5-5
+NEXUS_MODELO_OPENAI=    # Opcional. Default gpt-4o
+NEXUS_MODELO_GOOGLE=    # Opcional. Default gemini-3.1-pro-preview
 
 # APIs científicas
 PUBMED_API_KEY=         # Opcional, aumenta rate limit

@@ -31,13 +31,13 @@
 
 ## 7. Evidencia y documentación
 
-- [ ] 7.1 Crear `scripts/demo_multi_proveedor.py`, sin red ni cuota: con los SDK reemplazados por dobles, muestra entrada → salida para cuatro casos (todo en `groq`; `destino` con las tres claves; `destino` sin la clave de Google; Anthropic fallando), con qué proveedor respondió cada agente, los avisos de stderr y el bloque `proveedores` del reporte. Guarda `resultado.txt` y `resumen.json` en `output/demo_multi_proveedor/` y sale con código 1 si algún caso no da lo esperado. Verificar corriéndolo.
+- [x] 7.1 Crear `scripts/demo_multi_proveedor.py`, sin red ni cuota: con los SDK reemplazados por dobles, muestra entrada → salida para cuatro casos (todo en `groq`; `destino` con las tres claves; `destino` sin la clave de Google; Anthropic fallando), con qué proveedor respondió cada agente, los avisos de stderr y el bloque `proveedores` del reporte. Guarda `resultado.txt` y `resumen.json` en `output/demo_multi_proveedor/` y sale con código 1 si algún caso no da lo esperado. Verificar corriéndolo.
 - [ ] 7.2 Documentar `NEXUS_PROVEEDORES`, las claves y las variables de modelo en `docs/instalacion-y-despliegue.md` y `.env.example`, la arquitectura en `docs/arquitectura.md`, y que los datos anonimizados también van a esos proveedores. Verificar releyendo las secciones tocadas.
 
 ## 8. Cierre
 
-- [ ] 8.1 Correr la suite completa (`pytest tests/`) y en el frontend `npm run lint`, `tsc --noEmit` y `npm test`. Verificar que pasan, salvo los tests de Tesseract si el binario no está en la máquina local.
-- [ ] 8.2 Actualizar `.claude/CLAUDE.md` (sección "Modelo de IA actual", estructura de carpetas, lista de demos, estado del Sprint 5) y `.claude/backlog.md`. Verificar releyendo las secciones tocadas.
+- [x] 8.1 Correr la suite completa (`pytest tests/`) y en el frontend `npm run lint`, `tsc --noEmit` y `npm test`. Verificar que pasan, salvo los tests de Tesseract si el binario no está en la máquina local.
+- [x] 8.2 Actualizar `.claude/CLAUDE.md` (sección "Modelo de IA actual", estructura de carpetas, lista de demos, estado del Sprint 5) y `.claude/backlog.md`. Verificar releyendo las secciones tocadas.
 
 ## Workflow follow-up
 
