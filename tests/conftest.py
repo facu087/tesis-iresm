@@ -133,8 +133,16 @@ def _sin_clave_del_proveedor(monkeypatch):
     depende de la red. Sin clave, `call_provider()` falla con un error claro
     antes de tocar la red. El test que necesita una clave la define él mismo,
     con un valor falso (ver `tests/test_aislamiento_proveedor.py`).
+
+    Lo mismo para las claves de los proveedores de destino y la variable que
+    los activa (multi-proveedor, Sprint 5): con `NEXUS_PROVEEDORES=destino` y
+    una clave en el `.env`, un test haría una llamada paga.
     """
-    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    for nombre in (
+        "GROQ_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY",
+        "NEXUS_PROVEEDORES",
+    ):
+        monkeypatch.delenv(nombre, raising=False)
 
 
 @pytest.fixture(autouse=True)

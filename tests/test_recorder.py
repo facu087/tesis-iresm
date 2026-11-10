@@ -122,7 +122,7 @@ class TestArchivo:
         datos = json.loads(crudo)
         assert set(datos) == {"generated_at", "entries"}
         assert set(datos["entries"][0]) == {
-            "seq", "task", "agent_id", "agent_name", "model", "truncated", "response",
+            "seq", "task", "agent_id", "agent_name", "provider", "model", "truncated", "response",
         }
         assert datos["entries"][0]["truncated"] is True
         assert datos["entries"][0]["response"] == "neuropatía axonal — ñandú"

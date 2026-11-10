@@ -241,8 +241,10 @@ precisión 1,00 y sobredeclaración 0,45, con 0 citas fuera del RAG.
 
 ### 5.1 Punto único de llamada al proveedor
 
-Ningún módulo instancia el cliente de Groq por su cuenta: el único lugar es
-`call_provider()` en `backend/agents/base_agent.py`. Los agentes llaman a
+Ningún módulo instancia el cliente de un proveedor por su cuenta: el único
+lugar es `call_provider()` en `backend/agents/base_agent.py`, que tiene el
+cliente de Groq y los adaptadores de Anthropic, OpenAI y Google
+(`tests/test_proveedor_por_agente.py` lo comprueba). Los agentes llaman a
 través de `BaseAgent._call_llm(user_message, *, task)`; `pipeline/pico.py` e
 `ingestion/biomarker_extractor.py` llaman a `call_provider()` directamente.
 
@@ -254,10 +256,21 @@ cuya salida se valida por código. El resto usa `GROQ_MAIN`
 (`openai/gpt-oss-120b`). En `call_provider()` viven también el reintento ante
 respuestas 429, la telemetría y el modo mock.
 
+**Proveedor por agente.** Con `NEXUS_PROVEEDORES=destino`, `call_provider()`
+consulta `AGENT_PROVIDERS` (en el mismo `model_tasks.py`): Claude Opus para los
+Agentes 01, 04 y 06, GPT-4o para el 02 y Gemini Pro para el 03, con un techo de
+16.000 tokens para los modelos que razonan. La síntesis PICO, los biomarcadores
+y el Agente 05 siguen en Groq. Si falta la clave o el proveedor falla, la misma
+llamada se repite en Groq con el modelo y el techo de su tarea (respaldo por
+llamada, no por análisis) y queda registrada. El reporte informa en
+`metadata.proveedores` qué proveedor y qué modelo respondieron por cada agente,
+y si hubo respaldo y por qué. Sin la variable, todo va a Groq como antes.
+
 ### 5.2 Telemetría de costos
 
 `backend/telemetry/usage.py` registra por análisis (con `contextvars`) cada
-llamada: paso, modelo, tokens de entrada y salida, latencia y si falló. Al
+llamada: paso, proveedor, modelo, tokens de entrada y salida, latencia, si
+falló y si fue un respaldo en Groq. Al
 cerrar el análisis se agrega una línea a `output/costos.jsonl`. El
 identificador de análisis es aleatorio y la telemetría nunca contiene texto
 clínico, prompts ni respuestas. `backend/telemetry/pricing.py` contiene las
@@ -392,8 +405,12 @@ el contrato de salida en `backend/api/schemas.py`.
 
 ---
 
-## 9. Trabajo pendiente relacionado con la privacidad
+## 9. Privacidad y proveedores externos
 
-La anonimización del texto clínico antes de enviarlo a APIs externas
-(`backend/ingestion/anonimizador.py`) está en revisión en el PR #82 de GitHub y todavía
-no forma parte de la rama `develop`.
+La anonimización del texto clínico (`backend/ingestion/anonimizador.py`, PR #82,
+mergeado el 2026-11-09) corre en `POST /api/analyze` después de la
+normalización y antes de cualquier llamada a un modelo. Aplica igual a Groq y a
+los proveedores de la arquitectura de destino (Anthropic, OpenAI y Google): con
+`NEXUS_PROVEEDORES=destino`, el mismo texto anonimizado llega a tres empresas
+más. Es una red de seguridad determinista, no una desidentificación
+garantizada.

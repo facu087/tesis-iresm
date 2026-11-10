@@ -149,6 +149,9 @@ def construir_grabadas(
         entrada = _validar_entrada(cruda, posicion, vistos)
         por_tarea.setdefault(entrada["task"], []).append({
             "agent_id": entrada["agent_id"],
+            # Proveedor que produjo la respuesta (multi-proveedor, D8). Una
+            # grabación anterior a ese cambio no lo trae: era Groq.
+            "provider": entrada.get("provider") or "groq",
             "model": entrada["model"],
             "seq": entrada["seq"],
             "recorded_at": fecha,

@@ -268,6 +268,18 @@ class TestAnalisisCompletoEnModoMock:
         assert response.status_code == 200
         assert response.json()["metadata"]["mock"] is True
 
+    def test_el_reporte_informa_quien_respondio_por_cada_agente(
+        self, monkeypatch, client_medico_verificado_sin_relanzar
+    ):
+        """Multi-proveedor (Sprint 5): el bloque sale de la telemetría del análisis."""
+        response = self._correr(monkeypatch, client_medico_verificado_sin_relanzar)
+        proveedores = response.json()["metadata"]["proveedores"]
+        assert proveedores, "el análisis no informó ningún proveedor"
+        # Lo grabado es una corrida de Groq: así se reproduce.
+        assert {p["provider"] for p in proveedores} == {"groq"}
+        assert all(p["fallback_reason"] is None for p in proveedores)
+        assert "06" in {p["agent_id"] for p in proveedores}
+
     def test_cada_analisis_abre_y_cierra_su_sesion_de_reproduccion(
         self, monkeypatch, client_medico_verificado_sin_relanzar
     ):
@@ -280,7 +292,7 @@ class TestAnalisisCompletoEnModoMock:
         vistas: list[object] = []
         cerradas: list[object] = []
         abrir, cerrar = mock_responses.open_replay_session, mock_responses.close_replay_session
-        elegir = mock_responses.get_mock_response
+        elegir = mock_responses.get_mock_entry
 
         def abrir_espiado():
             token = abrir()
@@ -297,7 +309,7 @@ class TestAnalisisCompletoEnModoMock:
 
         monkeypatch.setattr(mock_responses, "open_replay_session", abrir_espiado)
         monkeypatch.setattr(mock_responses, "close_replay_session", cerrar_espiado)
-        monkeypatch.setattr("backend.agents.base_agent.get_mock_response", elegir_espiado)
+        monkeypatch.setattr("backend.agents.base_agent.get_mock_entry", elegir_espiado)
 
         for _ in range(2):
             assert self._correr(

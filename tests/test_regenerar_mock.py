@@ -86,7 +86,9 @@ class TestConversion:
         datos = regenerar.construir_grabadas(_grabacion())
         for entradas in datos["tasks"].values():
             for entrada in entradas:
-                assert set(entrada) == {"agent_id", "model", "seq", "recorded_at", "response"}
+                assert set(entrada) == {
+                    "agent_id", "provider", "model", "seq", "recorded_at", "response",
+                }
                 assert entrada["recorded_at"] == "2026-10-06"
         assert datos["recorded_at"] == "2026-10-06"
         assert datos["tasks"]["pico_sintesis"][0]["agent_id"] is None

@@ -72,6 +72,7 @@ crítica sale también de la corrida real. Detalle en
 from __future__ import annotations
 
 import contextvars
+import dataclasses
 import json
 import threading
 from pathlib import Path
@@ -316,11 +317,26 @@ def close_replay_session(token: contextvars.Token) -> None:
 
 # ── Elección de la respuesta ──────────────────────────────────────────────────
 
-def get_mock_response(task: str, *, agent_id: str | None = None) -> str:
+@dataclasses.dataclass(frozen=True)
+class MockEntry:
+    """
+    Respuesta grabada elegida para una llamada, con el proveedor y el modelo
+    que la produjeron en la corrida real (multi-proveedor, Sprint 5 — D8).
+
+    Una grabación anterior a ese cambio no tiene `provider`: era Groq. `model`
+    es `None` si la grabación no lo trae; quien llama usa el de la tarea.
+    """
+
+    response: str
+    provider: str
+    model: str | None
+
+
+def get_mock_entry(task: str, *, agent_id: str | None = None) -> MockEntry:
     """
     Respuesta del modo mock para una llamada de `task` hecha por `agent_id`
-    (`None` si no viene de un agente), o un JSON vacío si la tarea no tiene
-    ninguna grabada.
+    (`None` si no viene de un agente), con su proveedor y modelo, o un JSON
+    vacío si la tarea no tiene ninguna grabada.
 
     Aplica la regla de elección del encabezado del módulo. Dentro de una
     sesión de reproducción cada pedido cuenta; sin sesión se comporta como el
@@ -328,7 +344,7 @@ def get_mock_response(task: str, *, agent_id: str | None = None) -> str:
     """
     entradas = get_recorded_entries().get(task)
     if not entradas:
-        return _SIN_FIXTURE
+        return MockEntry(response=_SIN_FIXTURE, provider="groq", model=None)
 
     sesion = _sesion.get()
     turno = sesion.next_turn(task, agent_id) if sesion is not None else 0
@@ -336,5 +352,16 @@ def get_mock_response(task: str, *, agent_id: str | None = None) -> str:
     propias = [entrada for entrada in entradas if entrada.get("agent_id") == agent_id]
     if not propias:
         # El agente no tiene grabación para esta tarea: la primera de la tarea.
-        return entradas[0]["response"]
-    return propias[min(turno, len(propias) - 1)]["response"]
+        elegida = entradas[0]
+    else:
+        elegida = propias[min(turno, len(propias) - 1)]
+    return MockEntry(
+        response=elegida["response"],
+        provider=elegida.get("provider") or "groq",
+        model=elegida.get("model"),
+    )
+
+
+def get_mock_response(task: str, *, agent_id: str | None = None) -> str:
+    """Solo el texto de `get_mock_entry()`: la respuesta grabada elegida."""
+    return get_mock_entry(task, agent_id=agent_id).response

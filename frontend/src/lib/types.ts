@@ -186,6 +186,19 @@ export interface TrialSearchSummary {
   evaluaciones_descartadas: number;
 }
 
+/**
+ * Which provider and model answered for one agent (multi-provider, S5 — D7).
+ * Identifiers only: never the prompt, the answer or a provider error message.
+ */
+export interface AgentProviderInfo {
+  agent_id: string;
+  agent_name?: string | null;
+  provider: string;
+  model: string;
+  /** null: the assigned provider answered. Otherwise the call ran on Groq. */
+  fallback_reason?: "clave_faltante" | "falla" | null;
+}
+
 export interface ReportMetadata {
   generated_at: string;
   nexus_version: string;
@@ -198,6 +211,11 @@ export interface ReportMetadata {
    * Ausente = reporte anterior a este campo, se trata como false.
    */
   mock?: boolean;
+  /**
+   * Who answered for each agent (multi-provider, S5). Absent or null = report
+   * older than this field: the view leaves the section out.
+   */
+  proveedores?: AgentProviderInfo[] | null;
 }
 
 /** Recuento de la verificación bibliográfica sobre todo el reporte. */

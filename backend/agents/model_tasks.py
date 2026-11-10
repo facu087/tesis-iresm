@@ -40,6 +40,8 @@ alcanzan.
 from __future__ import annotations
 
 import dataclasses
+import os
+import sys
 
 # Modelos disponibles.
 GROQ_MAIN = "openai/gpt-oss-120b"  # Razonamiento clínico
@@ -110,3 +112,129 @@ def get_budget(task: str) -> TaskBudget:
     condición para degradar en silencio.
     """
     return TASK_BUDGETS[task]
+
+
+# ── Proveedor por agente (Sprint 5, OpenSpec `multi-proveedor-por-agente`) ──
+#
+# La arquitectura de la tesis asigna un proveedor a cada agente: Claude Opus a
+# los Agentes 01, 04 y 06, GPT-4o al 02 y Gemini Pro al 03. Ese mapa vive acá,
+# al lado de `TASK_BUDGETS`, para que "qué usa cada cosa" se revise en un solo
+# lugar (design D1). Solo se consulta con `NEXUS_PROVEEDORES=destino` (D2): la
+# presencia de una clave sola nunca activa un proveedor pago. Las llamadas que
+# no son de un agente del mapa —PICO, biomarcadores, Agente 05— siguen en Groq
+# siempre. `call_provider()` (base_agent.py) es quien decide y quien habla con
+# el proveedor; este módulo solo describe la asignación.
+
+PROVIDER_GROQ = "groq"
+PROVIDER_ANTHROPIC = "anthropic"
+PROVIDER_OPENAI = "openai"
+PROVIDER_GOOGLE = "google"
+
+ACTIVATION_ENV = "NEXUS_PROVEEDORES"
+MODE_GROQ = "groq"
+MODE_TARGET = "destino"
+
+# Modelo por defecto de cada proveedor de destino. Se puede cambiar sin tocar
+# el código con la variable de `MODEL_ENV` (design, Open Questions).
+# `gemini-3.1-pro-preview` es el Gemini Pro vigente al 2026-11-09.
+DEFAULT_MODELS: dict[str, str] = {
+    PROVIDER_ANTHROPIC: "claude-opus-5-5",
+    PROVIDER_OPENAI: "gpt-4o",
+    PROVIDER_GOOGLE: "gemini-3.1-pro-preview",
+}
+
+MODEL_ENV: dict[str, str] = {
+    PROVIDER_ANTHROPIC: "NEXUS_MODELO_ANTHROPIC",
+    PROVIDER_OPENAI: "NEXUS_MODELO_OPENAI",
+    PROVIDER_GOOGLE: "NEXUS_MODELO_GOOGLE",
+}
+
+API_KEY_ENV: dict[str, str] = {
+    PROVIDER_ANTHROPIC: "ANTHROPIC_API_KEY",
+    PROVIDER_OPENAI: "OPENAI_API_KEY",
+    PROVIDER_GOOGLE: "GOOGLE_API_KEY",
+}
+
+
+@dataclasses.dataclass(frozen=True)
+class AgentProvider:
+    """
+    Proveedor asignado a un agente y techo de sus llamadas.
+
+    `max_tokens=None` conserva el techo de la tarea (`TASK_BUDGETS`). Claude
+    Opus y Gemini Pro razonan siempre y el razonamiento cuenta dentro de la
+    salida, así que sus llamadas usan 16.000 en lugar de 4.096 para no
+    truncar (design D4). GPT-4o no razona: conserva el techo de la tarea.
+    """
+
+    provider: str
+    max_tokens: int | None
+
+
+AGENT_PROVIDERS: dict[str, AgentProvider] = {
+    "01": AgentProvider(PROVIDER_ANTHROPIC, 16000),
+    "02": AgentProvider(PROVIDER_OPENAI, None),
+    "03": AgentProvider(PROVIDER_GOOGLE, 16000),
+    "04": AgentProvider(PROVIDER_ANTHROPIC, 16000),
+    "06": AgentProvider(PROVIDER_ANTHROPIC, 16000),
+}
+
+
+@dataclasses.dataclass(frozen=True)
+class ResolvedProvider:
+    """Proveedor, modelo y techo con que se hace una llamada de destino."""
+
+    provider: str
+    model: str
+    max_tokens: int
+
+
+_avisos_activacion: set[str] = set()
+
+
+def target_mode_active() -> bool:
+    """
+    `True` solo si `NEXUS_PROVEEDORES=destino` (sin distinguir mayúsculas).
+
+    Vacía o `groq` es el comportamiento de siempre. Cualquier otro valor avisa
+    por stderr una vez por proceso y por valor, y se trata como `groq`: un
+    error de tipeo nunca activa un proveedor pago (design D2).
+    """
+    valor = os.environ.get(ACTIVATION_ENV, "").strip().lower()
+    if valor in ("", MODE_GROQ):
+        return False
+    if valor == MODE_TARGET:
+        return True
+    if valor not in _avisos_activacion:
+        _avisos_activacion.add(valor)
+        print(
+            f"[NEXUS] {ACTIVATION_ENV}={valor!r} no es un valor reconocido "
+            f"({MODE_GROQ!r} o {MODE_TARGET!r}); se usa Groq para todo.",
+            file=sys.stderr,
+        )
+    return False
+
+
+def model_for(provider: str) -> str:
+    """Modelo configurado para un proveedor de destino."""
+    override = os.environ.get(MODEL_ENV[provider], "").strip()
+    return override or DEFAULT_MODELS[provider]
+
+
+def resolve_agent_provider(agent_id: str | None, task: str) -> ResolvedProvider | None:
+    """
+    Proveedor de destino que le corresponde a esta llamada, o `None` si va a
+    Groq.
+
+    Devuelve `None` sin la arquitectura de destino activa, sin `agent_id`
+    (PICO, biomarcadores) o con un agente fuera del mapa (Agente 05). No mira
+    si la clave está configurada: eso lo decide `call_provider()`, que es
+    quien registra el respaldo.
+    """
+    if agent_id is None or not target_mode_active():
+        return None
+    asignado = AGENT_PROVIDERS.get(agent_id)
+    if asignado is None:
+        return None
+    techo = asignado.max_tokens or get_budget(task).max_tokens
+    return ResolvedProvider(asignado.provider, model_for(asignado.provider), techo)

@@ -61,6 +61,13 @@ class CallRecord:
     completion_tokens: int | None = None
     truncated: bool = False  # la respuesta se cortó al alcanzar el techo de tokens
     mock: bool = False       # la respuesta vino del modo mock, no del proveedor real
+    # Proveedor que atendió la llamada (multi-proveedor, Sprint 5). Una entrada
+    # anterior a ese cambio no lo tiene: era Groq.
+    provider: str = "groq"
+    # La llamada se hizo en Groq porque el proveedor asignado al agente no
+    # estaba disponible: "clave_faltante" o "falla" (design D6).
+    fallback: bool = False
+    fallback_reason: str | None = None
 
 
 class AnalysisUsage:
@@ -76,11 +83,20 @@ class AnalysisUsage:
     def __init__(self) -> None:
         self.analysis_id = secrets.token_hex(8)
         self.calls: list[CallRecord] = []
+        self.warned: set[tuple[str, ...]] = set()
         self._lock = threading.Lock()
 
     def record(self, call: CallRecord) -> None:
         with self._lock:
             self.calls.append(call)
+
+    def first_warning(self, key: tuple[str, ...]) -> bool:
+        """`True` la primera vez que se pide esta clave en el análisis."""
+        with self._lock:
+            if key in self.warned:
+                return False
+            self.warned.add(key)
+            return True
 
 
 _current: contextvars.ContextVar[AnalysisUsage | None] = contextvars.ContextVar(
@@ -103,6 +119,30 @@ def current() -> AnalysisUsage | None:
     return _current.get()
 
 
+# Avisos ya emitidos fuera de un análisis (un script, un test): sin registro
+# abierto no hay "análisis" que acote el aviso, así que vale por proceso.
+_warned_without_registry: set[tuple[str, ...]] = set()
+_warned_lock = threading.Lock()
+
+
+def first_warning(key: tuple[str, ...]) -> bool:
+    """
+    `True` si el aviso identificado por `key` todavía no se emitió en este
+    análisis.
+
+    Lo usa `call_provider()` para avisar del respaldo en Groq una vez por
+    análisis, proveedor y motivo (design D6), y no en cada llamada.
+    """
+    registry = _current.get()
+    if registry is not None:
+        return registry.first_warning(key)
+    with _warned_lock:
+        if key in _warned_without_registry:
+            return False
+        _warned_without_registry.add(key)
+        return True
+
+
 def record_call(
     *,
     task: str,
@@ -115,6 +155,9 @@ def record_call(
     completion_tokens: int | None = None,
     truncated: bool = False,
     mock: bool = False,
+    provider: str = "groq",
+    fallback: bool = False,
+    fallback_reason: str | None = None,
 ) -> None:
     """
     Registra un intento de llamada en el registro activo del contexto actual.
@@ -137,6 +180,9 @@ def record_call(
         completion_tokens=completion_tokens,
         truncated=truncated,
         mock=mock,
+        provider=provider,
+        fallback=fallback,
+        fallback_reason=fallback_reason,
     ))
 
 
@@ -151,13 +197,15 @@ def build_summary(
     Es una función pura sobre `registry.calls`: no toca el contexto ni el
     disco. `close_registry()` la usa para lo que escribe a JSONL.
     """
-    grupos: dict[tuple[str | None, str | None, str], dict] = {}
+    grupos: dict[tuple[str | None, str | None, str, str], dict] = {}
     for call in registry.calls:
-        clave = (call.agent_id, call.agent_name, call.model)
+        clave = (call.agent_id, call.agent_name, call.provider, call.model)
         grupo = grupos.setdefault(clave, {
             "agent_id": call.agent_id,
             "agent_name": call.agent_name,
+            "provider": call.provider,
             "model": call.model,
+            "fallback_calls": 0,
             "calls": 0,
             "failed_calls": 0,
             "prompt_tokens": 0,
@@ -179,6 +227,8 @@ def build_summary(
             grupo["truncated_calls"] += 1
         if call.mock:
             grupo["mock_calls"] += 1
+        if call.fallback:
+            grupo["fallback_calls"] += 1
 
     by_agent = list(grupos.values())
     _price_groups(by_agent, price_table)
@@ -191,6 +241,7 @@ def build_summary(
         "calls_without_usage": sum(g["calls_without_usage"] for g in by_agent),
         "truncated_calls": sum(g["truncated_calls"] for g in by_agent),
         "mock_calls": sum(g["mock_calls"] for g in by_agent),
+        "fallback_calls": sum(g["fallback_calls"] for g in by_agent),
         "cost_usd": sum(g["cost_usd"] for g in by_agent),
         "unpriced_models": sorted({g["model"] for g in by_agent if not g["priced"]}),
     }
@@ -201,6 +252,32 @@ def build_summary(
         "totals": totales,
         "by_agent": by_agent,
     }
+
+
+def providers_by_agent(registry: AnalysisUsage) -> list[dict]:
+    """
+    Qué proveedor y qué modelo respondieron por cada agente del análisis, para
+    el reporte (`metadata.proveedores`, design D7).
+
+    Una entrada por (agente, proveedor, modelo, motivo de respaldo) entre las
+    llamadas que respondieron: un agente que tuvo una falla en Anthropic y
+    siguió en Groq aparece dos veces, una con cada uno. Las llamadas sin agente
+    (PICO, biomarcadores) y los intentos fallidos no figuran. Solo
+    identificadores: nunca el prompt, la respuesta ni el mensaje de un error.
+    """
+    vistos: dict[tuple, dict] = {}
+    for call in registry.calls:
+        if not call.ok or call.agent_id is None:
+            continue
+        clave = (call.agent_id, call.provider, call.model, call.fallback_reason)
+        vistos.setdefault(clave, {
+            "agent_id": call.agent_id,
+            "agent_name": call.agent_name,
+            "provider": call.provider,
+            "model": call.model,
+            "fallback_reason": call.fallback_reason,
+        })
+    return sorted(vistos.values(), key=lambda e: (e["agent_id"], e["fallback_reason"] or ""))
 
 
 def _price_groups(
@@ -288,13 +365,15 @@ def _print_summary(record: dict) -> None:
     totales = record["totals"]
     total_tokens = totales["prompt_tokens"] + totales["completion_tokens"]
     aviso_mock = " [modo mock: sin llamadas reales al proveedor]" if record.get("mock") else ""
+    respaldos = totales.get("fallback_calls", 0)
+    aviso_respaldo = f", {respaldos} en respaldo de Groq" if respaldos else ""
     aviso_sin_tarifa = (
         f" (sin tarifa: {', '.join(totales['unpriced_models'])})"
         if totales["unpriced_models"] else ""
     )
     print(
         f"[NEXUS] Consumo del análisis {record['analysis_id']}: "
-        f"{totales['calls']} llamadas ({totales['failed_calls']} fallidas), "
+        f"{totales['calls']} llamadas ({totales['failed_calls']} fallidas{aviso_respaldo}), "
         f"{total_tokens} tokens ({totales['prompt_tokens']} entrada / "
         f"{totales['completion_tokens']} salida), "
         f"costo estimado USD {totales['cost_usd']:.6f}{aviso_sin_tarifa}{aviso_mock}",

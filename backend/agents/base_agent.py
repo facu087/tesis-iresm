@@ -11,6 +11,7 @@ La lógica común (llamada al LLM, parseo de JSON, validación de hipótesis)
 está implementada aquí y es heredada por todos los agentes.
 """
 
+import dataclasses
 import json
 import os
 import re
@@ -21,7 +22,7 @@ from collections.abc import Collection
 
 from ..mock import recorder as response_recorder
 from ..mock.mode import ENV_VAR, is_mock_active
-from ..mock.responses import get_mock_response
+from ..mock.responses import get_mock_entry
 from ..models.hypothesis import EvidenceLevel, Hypothesis, Priority, Source
 from ..models.report import AgentOutput, Critique
 from ..telemetry import usage as usage_telemetry
@@ -50,6 +51,7 @@ def _grabar_respuesta(
     agent_name: str | None,
     truncated: bool,
     response: str,
+    provider: str,
 ) -> None:
     """
     Entrega al grabador de respuestas (si hay uno abierto) la respuesta cruda de
@@ -63,7 +65,7 @@ def _grabar_respuesta(
     try:
         response_recorder.record_response(
             task=task, model=model, agent_id=agent_id, agent_name=agent_name,
-            truncated=truncated, response=response,
+            truncated=truncated, response=response, provider=provider,
         )
     except Exception as exc:
         print(
@@ -71,6 +73,173 @@ def _grabar_respuesta(
             f"({type(exc).__name__}). La llamada continúa igual.",
             file=sys.stderr,
         )
+
+
+# ── Adaptadores de los proveedores de destino (multi-proveedor, Sprint 5) ──
+#
+# Uno por proveedor, en este mismo módulo: `call_provider()` sigue siendo el
+# único lugar del sistema que importa un SDK de proveedor (design D3). Cada SDK
+# se importa recién al llamarlo, así que el modo de siempre (todo en Groq) no
+# los carga. Todos reciben lo mismo y devuelven un `ProviderResult`.
+
+PROVIDER_TIMEOUT_SECONDS = 120.0  # por intento; los SDK reintentan 429 y 5xx (D5)
+ANTHROPIC_EFFORT = "medium"       # explícito: es el default de Opus 5.5, pero puede cambiar (D4)
+
+FALLBACK_MISSING_KEY = "clave_faltante"
+FALLBACK_FAILURE = "falla"
+
+
+class ProviderRefusal(Exception):
+    """
+    El proveedor respondió sin una respuesta utilizable: se negó o bloqueó el
+    contenido. Se trata como falla y la llamada va al respaldo en Groq (D4).
+    """
+
+
+@dataclasses.dataclass(frozen=True)
+class ProviderResult:
+    """Texto y consumo de una respuesta de un proveedor de destino."""
+
+    text: str
+    prompt_tokens: int | None
+    completion_tokens: int | None
+    truncated: bool
+
+
+def _call_anthropic(
+    *, api_key: str, system_prompt: str, user_message: str, model: str,
+    max_tokens: int, temperature: float,
+) -> ProviderResult:
+    """
+    Claude Opus. Sin `temperature`: Opus 5.5 la rechaza. Razona siempre (no se
+    puede desactivar) y la profundidad se controla con `effort`. Con streaming,
+    porque un techo de 16.000 tokens con razonamiento puede tardar más que el
+    timeout de una respuesta no streaming.
+    """
+    import anthropic
+
+    client = anthropic.Anthropic(api_key=api_key, timeout=PROVIDER_TIMEOUT_SECONDS)
+    with client.messages.stream(
+        model=model,
+        max_tokens=max_tokens,
+        system=system_prompt,
+        messages=[{"role": "user", "content": user_message}],
+        output_config={"effort": ANTHROPIC_EFFORT},
+    ) as stream:
+        message = stream.get_final_message()
+    if message.stop_reason == "refusal":
+        raise ProviderRefusal("anthropic: stop_reason=refusal")
+    texto = "".join(b.text for b in message.content if b.type == "text")
+    consumo = getattr(message, "usage", None)
+    return ProviderResult(
+        text=texto,
+        prompt_tokens=getattr(consumo, "input_tokens", None),
+        completion_tokens=getattr(consumo, "output_tokens", None),
+        truncated=message.stop_reason == "max_tokens",
+    )
+
+
+def _call_openai(
+    *, api_key: str, system_prompt: str, user_message: str, model: str,
+    max_tokens: int, temperature: float,
+) -> ProviderResult:
+    """GPT-4o por Chat Completions, con la misma temperatura que Groq."""
+    import openai
+
+    client = openai.OpenAI(api_key=api_key, timeout=PROVIDER_TIMEOUT_SECONDS)
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message},
+        ],
+        max_completion_tokens=max_tokens,
+        temperature=temperature,
+    )
+    choice = response.choices[0]
+    if getattr(choice.message, "refusal", None):
+        raise ProviderRefusal("openai: refusal")
+    consumo = getattr(response, "usage", None)
+    return ProviderResult(
+        text=choice.message.content or "",
+        prompt_tokens=getattr(consumo, "prompt_tokens", None),
+        completion_tokens=getattr(consumo, "completion_tokens", None),
+        truncated=choice.finish_reason == "length",
+    )
+
+
+def _call_google(
+    *, api_key: str, system_prompt: str, user_message: str, model: str,
+    max_tokens: int, temperature: float,
+) -> ProviderResult:
+    """
+    Gemini Pro con `google-genai`. Sin `temperature`: Gemini Pro razona y
+    Google recomienda dejar la de por defecto. Los tokens de razonamiento se
+    cobran como salida, así que se suman a `completion_tokens`.
+    """
+    from google import genai
+    from google.genai import types
+
+    client = genai.Client(
+        api_key=api_key,
+        http_options=types.HttpOptions(
+            timeout=int(PROVIDER_TIMEOUT_SECONDS * 1000),  # milisegundos
+            retry_options=types.HttpRetryOptions(attempts=3),
+        ),
+    )
+    response = client.models.generate_content(
+        model=model,
+        contents=user_message,
+        config=types.GenerateContentConfig(
+            system_instruction=system_prompt,
+            max_output_tokens=max_tokens,
+        ),
+    )
+    candidatos = response.candidates or []
+    if not candidatos:
+        raise ProviderRefusal("google: sin candidatos")
+    motivo = candidatos[0].finish_reason
+    truncada = motivo == types.FinishReason.MAX_TOKENS
+    if motivo not in (types.FinishReason.STOP, types.FinishReason.MAX_TOKENS, None):
+        raise ProviderRefusal(f"google: finish_reason={getattr(motivo, 'name', motivo)}")
+    consumo = response.usage_metadata
+    salida = None
+    if consumo is not None and consumo.candidates_token_count is not None:
+        salida = consumo.candidates_token_count + (consumo.thoughts_token_count or 0)
+    return ProviderResult(
+        text=response.text or "",
+        prompt_tokens=consumo.prompt_token_count if consumo is not None else None,
+        completion_tokens=salida,
+        truncated=truncada,
+    )
+
+
+_ADAPTERS = {
+    model_tasks.PROVIDER_ANTHROPIC: _call_anthropic,
+    model_tasks.PROVIDER_OPENAI: _call_openai,
+    model_tasks.PROVIDER_GOOGLE: _call_google,
+}
+
+
+def _avisar_respaldo(
+    *, provider: str, agent_id: str | None, reason: str, exc: Exception | None,
+) -> None:
+    """
+    Avisa por stderr que una llamada se hizo en Groq, una vez por análisis,
+    proveedor y motivo. Nombra el tipo de la excepción, nunca su mensaje: el
+    mensaje de un error del proveedor puede arrastrar parte del prompt.
+    """
+    if not usage_telemetry.first_warning(("respaldo", provider, reason)):
+        return
+    if reason == FALLBACK_MISSING_KEY:
+        detalle = f"falta {model_tasks.API_KEY_ENV[provider]}"
+    else:
+        detalle = f"falló ({type(exc).__name__})"
+    print(
+        f"[NEXUS] Agente {agent_id}: {provider} {detalle}; la llamada se hace "
+        f"en Groq (respaldo).",
+        file=sys.stderr,
+    )
 
 
 def call_provider(
@@ -100,8 +269,8 @@ def call_provider(
     Args:
         system_prompt: Prompt de sistema del agente o del módulo que llama.
         user_message:  Mensaje de usuario ya armado para esta tarea.
-        model:         Modelo del proveedor a usar (p. ej. GROQ_MAIN o
-                       GROQ_FAST).
+        model:         Modelo de Groq de la tarea (p. ej. GROQ_MAIN o
+                       GROQ_FAST). Es también el del respaldo.
         max_tokens:    Techo de tokens de la respuesta, propio de la tarea que
                        llama: no hay un valor único para todo el sistema.
         task:          Etiqueta de la tarea que originó la llamada (p. ej.
@@ -116,9 +285,18 @@ def call_provider(
     Returns:
         Texto crudo de la respuesta del modelo.
 
-    Reintenta hasta 3 veces con backoff incremental ante errores 429 (rate
-    limit del tier gratuito de Groq). Agota los reintentos y relanza la
-    última excepción si el proveedor sigue devolviendo 429.
+    Con `NEXUS_PROVEEDORES=destino` (multi-proveedor, Sprint 5), una llamada
+    de un agente con proveedor asignado (`model_tasks.AGENT_PROVIDERS`) va a
+    ese proveedor, con su modelo y su techo. Si falta la clave o la llamada
+    falla después de los reintentos del SDK, la misma llamada se repite en
+    Groq con `model` y `max_tokens` (design D6), queda registrada como
+    respaldo y se avisa por stderr una vez por análisis y proveedor. Sin esa
+    variable, todo va a Groq exactamente como antes.
+
+    En Groq reintenta hasta 3 veces con backoff incremental ante errores 429
+    (rate limit del tier gratuito). Agota los reintentos y relanza la última
+    excepción si el proveedor sigue devolviendo 429. Una falla de Groq en el
+    respaldo se propaga igual.
 
     Cada intento —falle o no— queda contabilizado en el registro de
     telemetría activo (control de costos, Sprint 4 — D2), para que el costo
@@ -127,28 +305,106 @@ def call_provider(
     para que una llamada funcione.
 
     En modo mock (S4 — D7, variable `NEXUS_MOCK_LLM`), devuelve una respuesta
-    grabada para `task` y `agent_id` sin tocar la red ni instanciar el
-    proveedor (la regla de elección está en `backend/mock/responses.py`). Es la
-    intercepción, no un endpoint alternativo: la respuesta grabada atraviesa
-    después el mismo parseo que una real, porque quien llamó a `_call_llm()`
-    no se entera de la diferencia.
+    grabada para `task` y `agent_id` sin tocar la red ni instanciar ningún
+    proveedor, con o sin la arquitectura de destino (la regla de elección está
+    en `backend/mock/responses.py`). Es la intercepción, no un endpoint
+    alternativo: la respuesta grabada atraviesa después el mismo parseo que una
+    real, porque quien llamó a `_call_llm()` no se entera de la diferencia.
 
     Sin modo mock, `GROQ_API_KEY` faltante falla con un mensaje claro antes de
-    intentar nada: un fallo de configuración tiene que fallar, no caer en
+    llamar a Groq: un fallo de configuración tiene que fallar, no caer en
     silencio a una respuesta grabada.
     """
     if is_mock_active():
         inicio = time.perf_counter()
         # El agente que llama elige entre las grabaciones de la tarea: cada
         # uno recibe la suya, en el orden en que las produjo la corrida real.
-        contenido = get_mock_response(task, agent_id=agent_id)
+        # La telemetría anota el proveedor y el modelo que produjeron la
+        # grabación (D8): una corrida de destino reproducida muestra Claude.
+        grabada = get_mock_entry(task, agent_id=agent_id)
         usage_telemetry.record_call(
-            task=task, model=model, agent_id=agent_id, agent_name=agent_name,
-            ok=True, latency_seconds=time.perf_counter() - inicio,
+            task=task, model=grabada.model or model, agent_id=agent_id,
+            agent_name=agent_name, ok=True,
+            latency_seconds=time.perf_counter() - inicio,
             prompt_tokens=0, completion_tokens=0, mock=True,
+            provider=grabada.provider,
         )
-        return contenido
+        return grabada.response
 
+    destino = model_tasks.resolve_agent_provider(agent_id, task)
+    motivo_respaldo: str | None = None
+    if destino is not None:
+        clave = os.environ.get(model_tasks.API_KEY_ENV[destino.provider], "").strip()
+        if not clave:
+            motivo_respaldo = FALLBACK_MISSING_KEY
+            _avisar_respaldo(
+                provider=destino.provider, agent_id=agent_id,
+                reason=motivo_respaldo, exc=None,
+            )
+        else:
+            inicio = time.perf_counter()
+            try:
+                resultado = _ADAPTERS[destino.provider](
+                    api_key=clave, system_prompt=system_prompt,
+                    user_message=user_message, model=destino.model,
+                    max_tokens=destino.max_tokens, temperature=temperature,
+                )
+            except Exception as exc:
+                # Error del SDK después de sus reintentos, timeout, clave
+                # rechazada o negativa: va al respaldo (D6). Se registra el
+                # intento fallido con su proveedor, para que se vea el costo.
+                usage_telemetry.record_call(
+                    task=task, model=destino.model, agent_id=agent_id,
+                    agent_name=agent_name, ok=False,
+                    latency_seconds=time.perf_counter() - inicio,
+                    provider=destino.provider,
+                )
+                motivo_respaldo = FALLBACK_FAILURE
+                _avisar_respaldo(
+                    provider=destino.provider, agent_id=agent_id,
+                    reason=motivo_respaldo, exc=exc,
+                )
+            else:
+                usage_telemetry.record_call(
+                    task=task, model=destino.model, agent_id=agent_id,
+                    agent_name=agent_name, ok=True,
+                    latency_seconds=time.perf_counter() - inicio,
+                    prompt_tokens=resultado.prompt_tokens,
+                    completion_tokens=resultado.completion_tokens,
+                    truncated=resultado.truncated, provider=destino.provider,
+                )
+                _grabar_respuesta(
+                    task=task, model=destino.model, agent_id=agent_id,
+                    agent_name=agent_name, truncated=resultado.truncated,
+                    response=resultado.text, provider=destino.provider,
+                )
+                return resultado.text
+
+    return _call_groq(
+        system_prompt=system_prompt, user_message=user_message, model=model,
+        max_tokens=max_tokens, task=task, agent_id=agent_id,
+        agent_name=agent_name, temperature=temperature,
+        fallback_reason=motivo_respaldo,
+    )
+
+
+def _call_groq(
+    *,
+    system_prompt: str,
+    user_message: str,
+    model: str,
+    max_tokens: int,
+    task: str,
+    agent_id: str | None,
+    agent_name: str | None,
+    temperature: float,
+    fallback_reason: str | None,
+) -> str:
+    """
+    Llamada a Groq, con el reintento ante 429 de siempre. Es el camino por
+    defecto y el respaldo de los proveedores de destino: `fallback_reason`
+    distinto de `None` marca la llamada como respaldo en la telemetría.
+    """
     if not os.environ.get("GROQ_API_KEY"):
         raise RuntimeError(
             "GROQ_API_KEY no está configurada y el modo mock está desactivado. "
@@ -158,6 +414,10 @@ def call_provider(
 
     from groq import Groq, RateLimitError
 
+    respaldo = {
+        "fallback": fallback_reason is not None,
+        "fallback_reason": fallback_reason,
+    }
     client = Groq(api_key=os.environ["GROQ_API_KEY"])
     delays = [8, 20, 40]  # segundos de espera entre reintentos
     last_exc: Exception | None = None
@@ -177,7 +437,7 @@ def call_provider(
         except RateLimitError as exc:
             usage_telemetry.record_call(
                 task=task, model=model, agent_id=agent_id, agent_name=agent_name,
-                ok=False, latency_seconds=time.perf_counter() - inicio,
+                ok=False, latency_seconds=time.perf_counter() - inicio, **respaldo,
             )
             last_exc = exc
             if delay is None:
@@ -195,7 +455,7 @@ def call_provider(
             # tiene backoff propio.
             usage_telemetry.record_call(
                 task=task, model=model, agent_id=agent_id, agent_name=agent_name,
-                ok=False, latency_seconds=time.perf_counter() - inicio,
+                ok=False, latency_seconds=time.perf_counter() - inicio, **respaldo,
             )
             raise
 
@@ -208,11 +468,12 @@ def call_provider(
             ok=True, latency_seconds=latencia,
             prompt_tokens=getattr(consumo, "prompt_tokens", None) if consumo else None,
             completion_tokens=getattr(consumo, "completion_tokens", None) if consumo else None,
-            truncated=truncada,
+            truncated=truncada, **respaldo,
         )
         _grabar_respuesta(
             task=task, model=model, agent_id=agent_id, agent_name=agent_name,
             truncated=truncada, response=choice.message.content,
+            provider=model_tasks.PROVIDER_GROQ,
         )
         return choice.message.content
 
