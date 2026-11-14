@@ -399,10 +399,12 @@ verificada".
 No. En `/cuenta` se ve el motivo y el formulario para corregir los datos y reenviar
 la misma solicitud, que vuelve a quedar pendiente.
 
-**¿Por qué el análisis tarda tanto si los pasos avanzan rápido?**
-Los pasos de `/analyzing` son una representación orientativa con tiempos fijos. El
-análisis real tarda unos ocho a nueve minutos en las corridas medidas, y el último
-paso permanece "En curso" hasta que el servidor responde.
+**¿Por qué algunos pasos tardan mucho más que otros?**
+Los pasos de `/analyzing` reflejan el avance real: el servidor informa cada paso
+cuando empieza, y durante el debate indica la ronda en curso ("Ronda 3 de 4"). El
+análisis tarda unos ocho a nueve minutos en las corridas medidas, y casi todo ese
+tiempo se va en la Ronda 1, el debate y la verificación con arbitraje. Los tres
+primeros pasos duran segundos.
 
 **¿Puedo subir una fotografía de un estudio?**
 No. Solo se aceptan PDF (con texto o escaneados) y texto pegado. Una imagen debe

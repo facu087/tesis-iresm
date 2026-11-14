@@ -480,6 +480,8 @@ tesis-iresm/
 │   │   ├── evidence.py         ← clasificación EBM: tope de nivel, estado y orden (S4)
 │   │   ├── consensus.py        ← lógica determinista del Agente 04: partición,
 │   │   │                          representante, contradicciones, solapamiento RAG (S4)
+│   │   ├── progreso.py         ← avisos de avance del pipeline (paso y ronda) por
+│   │   │                          contextvars; sin destino abierto no hace nada (S5)
 │   │   ├── recitation.py       ← Ronda 5: qué se recita y qué se acepta (S4);
 │   │   │                          filtro de citas fuera del RAG (S5, tarjeta #92)
 │   │   ├── trial_matching.py   ← lógica determinista del Agente 05: términos,
@@ -508,7 +510,9 @@ tesis-iresm/
 │   │   ├── retriever.py        ← motor RAG: búsqueda semántica
 │   │   └── __init__.py
 │   ├── api/
-│   │   ├── router.py            ← POST /api/analyze, POST /api/report/pdf (protegidos, S4)
+│   │   ├── router.py            ← POST /api/analyze, POST /api/report/pdf (protegidos, S4);
+│   │   │                           POST /api/analyze/stream: el mismo análisis con el
+│   │   │                           avance en vivo, NDJSON (S5)
 │   │   ├── schemas.py           ← schemas Pydantic del reporte
 │   │   ├── cuentas_router.py    ← POST/PUT /api/registro, /login, /logout, GET /cuenta (S4)
 │   │   ├── admin_router.py      ← GET /api/admin/pendientes, aprobar/rechazar (S4)
@@ -534,7 +538,8 @@ tesis-iresm/
 │   │   │   │   └── layout.tsx      ← metadata propia de la ruta (S4)
 │   │   │   ├── analyzing/
 │   │   │   │   ├── page.tsx        ← vista de progreso del pipeline; los pasos salen
-│   │   │   │   │                      de lib/pipelineSteps.ts (S4)
+│   │   │   │   │                      de lib/pipelineSteps.ts (S4) y el avance lo informa
+│   │   │   │   │                      el servidor por POST /api/analyze/stream (S5)
 │   │   │   │   ├── layout.tsx      ← metadata propia de la ruta (S4)
 │   │   │   │   └── page.test.tsx   ← cierre de la vista: respuesta antes o después
 │   │   │   │                          del último paso, error y caso ausente (S4)

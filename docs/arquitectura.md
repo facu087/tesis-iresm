@@ -34,6 +34,16 @@ sesión de médico en estado `verificado` (`requerir_medico_verificado`) y un
 telemetría de consumo y la sesión de reproducción del modo mock; ambos se
 cierran en un bloque `finally`.
 
+`POST /api/analyze/stream` (función `analyze_stream`) corre el mismo pipeline
+(`_ejecutar_pipeline()`, compartido por los dos endpoints) con la misma
+protección, y transmite el avance como NDJSON: un evento `paso` cuando empieza
+cada uno de los ocho pasos, un evento `ronda` por cada ronda del debate y, al
+final, `reporte` con el `StructuredReport` o `error` con el código y el mensaje.
+Los avisos salen de `backend/pipeline/progreso.py`, que no hace nada si nadie
+escucha. Una entrada inválida se rechaza con su código HTTP antes de transmitir;
+una falla posterior viaja como evento, y si el cliente corta la conexión el
+pipeline se cancela. Es el endpoint que usa `/analyzing`.
+
 ### 2.1 Orden real de ejecución
 
 | Paso | Qué ocurre | Módulo / función |
@@ -365,7 +375,7 @@ sesión.
 | `/cuenta` | Estado de la cuenta y reenvío corregido tras un rechazo | `GET /api/cuenta`, `PUT /api/registro`, `POST /api/logout` |
 | `/admin/pendientes` | Revisión de cuentas pendientes | `GET /api/admin/pendientes`, aprobar/rechazar, `POST /api/logout` |
 | `/analizar` | Carga del PDF o del texto | `GET /api/cuenta` (guarda de sesión); la entrada se guarda en `lib/inputStore.ts` |
-| `/analyzing` | Progreso del pipeline | `POST /api/analyze` (`analyzeFile`/`analyzeText`) |
+| `/analyzing` | Progreso real del pipeline, informado por el servidor | `POST /api/analyze/stream` (`analyzeWithProgress`) |
 | `/report` | Reporte en cinco pestañas: hipótesis, caso clínico, debate, ensayos clínicos y bibliografía | `POST /api/report/pdf` (`downloadPdf`) |
 
 Los pasos que muestra la vista de progreso salen de una fuente única,

@@ -341,8 +341,16 @@ server {
 ```
 
 Un análisis tarda varios minutos (unos 500 s medidos en corridas reales), por lo
-que conviene ampliar el tiempo de espera del proxy para `POST /api/analyze`
-(en nginx, `proxy_read_timeout`).
+que conviene ampliar el tiempo de espera del proxy para `POST /api/analyze` y
+`POST /api/analyze/stream` (en nginx, `proxy_read_timeout`).
+
+`POST /api/analyze/stream` transmite el avance del análisis a medida que ocurre
+(un evento por línea, `application/x-ndjson`), y es el que usa la pantalla
+`/analyzing`. El proxy no tiene que acumular esa respuesta antes de entregarla:
+si lo hace, el análisis funciona igual pero la pantalla no muestra ningún paso
+hasta el final. El backend manda `X-Accel-Buffering: no`, que nginx respeta sin
+configuración adicional; en otro proxy hay que desactivar el buffering de la
+respuesta para esa ruta (en nginx, de forma explícita, `proxy_buffering off;`).
 
 ### 7.4 Content-Security-Policy del frontend
 
