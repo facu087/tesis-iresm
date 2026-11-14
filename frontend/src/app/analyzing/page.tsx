@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ChatsCircleIcon,
@@ -18,51 +18,44 @@ import {
   WarningCircleIcon,
 } from "@phosphor-icons/react/ssr";
 import type { Icon } from "@phosphor-icons/react";
-import { analyzeFile, analyzeText } from "@/lib/api";
+import { analyzeWithProgress } from "@/lib/api";
 import { inputStore } from "@/lib/inputStore";
 import { reportStore } from "@/lib/reportStore";
 import { PIPELINE_STEPS } from "@/lib/pipelineSteps";
-import type { StructuredReport } from "@/lib/types";
 import AuthShell from "@/components/landing/AuthShell";
 import DiagnosticNotice from "@/components/landing/DiagnosticNotice";
 import { FORM_CARD, FormError } from "@/components/landing/FormPrimitives";
 import { SUBMIT_BUTTON } from "@/components/landing/styles";
 
 /**
- * Progress view shown while `POST /api/analyze` runs, in the landing visual
- * system.
+ * Progress view shown while the analysis runs, in the landing visual system.
  *
  * The steps, their order and their texts come from `PIPELINE_STEPS` (shared
  * with the landing and `/analizar`, not edited here). This file only adds, by
- * step `id`, what the view needs on top: an icon and the pacing of the
- * simulated progress.
+ * step `id`, the icon of each one.
  *
- * The backend answers once, with the finished report: it sends no progress
- * events. The steps therefore advance on timers, and the page says so. The
- * last step stays in progress until the request resolves, so the list never
- * reads as complete while the analysis is still running.
+ * The progress is the server's: `POST /api/analyze/stream` reports each step
+ * and each debate round as it starts, and sends the report at the end. Nothing
+ * here advances on a timer, so a step is never shown as started before it is.
  */
 
-/** Icon and simulated duration per step, keyed by the shared step `id`. */
-const STEP_DETAILS: Record<string, { Icon: Icon; ms: number }> = {
-  "01": { Icon: FileTextIcon, ms: 1500 },
-  "02": { Icon: TextAaIcon, ms: 1000 },
-  "03": { Icon: ListChecksIcon, ms: 4000 },
-  "04": { Icon: UsersThreeIcon, ms: 8000 },
-  "05": { Icon: ChatsCircleIcon, ms: 12000 },
-  "06": { Icon: ScalesIcon, ms: 9000 },
-  "07": { Icon: CompassIcon, ms: 5000 },
-  "08": { Icon: ClipboardTextIcon, ms: 1500 },
+/** Icon per step, keyed by the shared step `id`. */
+const STEP_ICONS: Record<string, Icon> = {
+  "01": FileTextIcon,
+  "02": TextAaIcon,
+  "03": ListChecksIcon,
+  "04": UsersThreeIcon,
+  "05": ChatsCircleIcon,
+  "06": ScalesIcon,
+  "07": CompassIcon,
+  "08": ClipboardTextIcon,
 };
 
-/** Pacing of a shared step this file has no entry for yet. */
-const DEFAULT_STEP_MS = 4000;
-
-/** Pause between steps once the report is back and the rest only catch up. */
-const CATCH_UP_MS = 350;
-
 const TOTAL_STEPS = PIPELINE_STEPS.length;
-const LAST_STEP = TOTAL_STEPS - 1;
+
+/** The step whose rounds the server reports, and the last round of the debate. */
+const DEBATE_STEP_ID = "05";
+const LAST_DEBATE_ROUND = 4;
 
 const ERROR_ID = "analisis-error";
 
@@ -107,30 +100,26 @@ function StepBadge({ id, status }: { id: string; status: Status }) {
 
 export default function AnalyzingPage() {
   const router = useRouter();
-  const [statuses, setStatuses] = useState<Status[]>(PIPELINE_STEPS.map(() => "pending"));
+  /** Index of the step in progress; -1 until the server reports the first. */
+  const [activeIdx, setActiveIdx] = useState(-1);
+  /** Debate round in progress, while the debate step is the active one. */
+  const [round, setRound] = useState<number | null>(null);
+  const [finished, setFinished] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState<string | null>(null);
-
-  const canceledRef = useRef(false);
-  const apiDoneRef = useRef(false);
-  const animDoneRef = useRef(false);
-  const reportRef = useRef<StructuredReport | null>(null);
 
   /* Elapsed time. */
   useEffect(() => {
     const start = Date.now();
-    const id = setInterval(() => {
-      if (!canceledRef.current) setElapsed(Math.floor((Date.now() - start) / 1000));
-    }, 1000);
+    const id = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 1000);
     return () => clearInterval(id);
   }, []);
 
-  /* Simulated progress and the request. */
+  /* The request, and the progress it reports. */
   useEffect(() => {
-    // Reset the refs: StrictMode invokes the effect twice in development.
-    canceledRef.current = false;
-    apiDoneRef.current = false;
-    animDoneRef.current = false;
+    // StrictMode invokes the effect twice in development: a run that was
+    // cleaned up must not touch the state or navigate.
+    let canceled = false;
 
     const input = inputStore.get();
     if (!input) {
@@ -139,77 +128,27 @@ export default function AnalyzingPage() {
       return;
     }
 
-    const navigate = () => {
-      if (canceledRef.current) return;
-      reportStore.save(reportRef.current);
-      router.push("/report");
-    };
-
-    /* The report is back and every step was shown: close the list and leave. */
-    const finish = () => {
-      if (canceledRef.current) return;
-      setStatuses((prev) => prev.map(() => "done"));
-      navigate();
-    };
-
-    /* Runs through the remaining steps quickly (the request already resolved). */
-    const finishFast = (from: number) => {
-      if (canceledRef.current) return;
-      let delay = 0;
-      for (let i = from; i < TOTAL_STEPS; i++) {
-        const idx = i;
-        delay += CATCH_UP_MS;
-        setTimeout(() => {
-          if (canceledRef.current) return;
-          setStatuses((prev) => prev.map((s, j) => (j <= idx ? "done" : s)));
-          if (idx === LAST_STEP) navigate();
-        }, delay);
-      }
-    };
-
-    /* Regular pacing, one step after the other. */
-    const runStep = (idx: number) => {
-      if (canceledRef.current) return;
-      setStatuses((prev) =>
-        prev.map((_, j) => (j < idx ? "done" : j === idx ? "active" : "pending")),
-      );
-      setTimeout(() => {
-        if (canceledRef.current) return;
-
-        if (idx === LAST_STEP) {
-          animDoneRef.current = true;
-          // Without the report yet, the last step stays in progress: the
-          // request block below closes the list when it resolves.
-          if (apiDoneRef.current) finish();
-          return;
-        }
-
-        setStatuses((prev) => prev.map((s, j) => (j <= idx ? "done" : s)));
-        if (apiDoneRef.current) {
-          // The request resolved during this step: catch up with the rest.
-          finishFast(idx + 1);
-        } else {
-          runStep(idx + 1);
-        }
-      }, STEP_DETAILS[PIPELINE_STEPS[idx].id]?.ms ?? DEFAULT_STEP_MS);
-    };
-
-    runStep(0);
-
-    /* The actual request. */
     (async () => {
       try {
-        const report =
-          input.mode === "file" ? await analyzeFile(input.file) : await analyzeText(input.text);
-        if (canceledRef.current) return;
-        reportRef.current = report;
-        apiDoneRef.current = true;
+        const report = await analyzeWithProgress(input, (event) => {
+          if (canceled) return;
+          if (event.evento === "paso") {
+            const idx = PIPELINE_STEPS.findIndex((step) => step.id === event.paso);
+            // An unknown step is ignored and the list never moves backwards.
+            if (idx < 0) return;
+            setActiveIdx((prev) => Math.max(prev, idx));
+            setRound(null);
+          } else {
+            setRound(event.ronda);
+          }
+        });
+        if (canceled) return;
         inputStore.clear();
-        // If the steps are still running, the pacing above notices
-        // `apiDoneRef` and catches up; otherwise leave now.
-        if (animDoneRef.current) finish();
+        setFinished(true);
+        reportStore.save(report);
+        router.push("/report");
       } catch (err) {
-        if (canceledRef.current) return;
+        if (canceled) return;
         // fetch() rejects with a TypeError when the server cannot be reached;
         // its message ("Failed to fetch") is browser jargon, so replace it.
         setError(
@@ -223,7 +162,7 @@ export default function AnalyzingPage() {
     })();
 
     return () => {
-      canceledRef.current = true;
+      canceled = true;
     };
   }, [router]);
 
@@ -249,15 +188,20 @@ export default function AnalyzingPage() {
     );
   }
 
-  const activeIdx = statuses.findLastIndex((s) => s === "active");
-  const doneCount = statuses.filter((s) => s === "done").length;
+  const statuses: Status[] = PIPELINE_STEPS.map((_, i) =>
+    finished || i < activeIdx ? "done" : i === activeIdx ? "active" : "pending",
+  );
+  const doneCount = statuses.filter((status) => status === "done").length;
   const progress = Math.round((doneCount / TOTAL_STEPS) * 100);
-  const statusText =
-    doneCount === TOTAL_STEPS
-      ? "Completado — redirigiendo…"
-      : activeIdx >= 0
-        ? `Paso ${activeIdx + 1} de ${TOTAL_STEPS}`
-        : "Iniciando…";
+  const roundText =
+    round !== null && PIPELINE_STEPS[activeIdx]?.id === DEBATE_STEP_ID
+      ? `Ronda ${round} de ${LAST_DEBATE_ROUND}`
+      : null;
+  const statusText = finished
+    ? "Completado — redirigiendo…"
+    : activeIdx >= 0
+      ? `Paso ${activeIdx + 1} de ${TOTAL_STEPS}${roundText ? ` — ${roundText}` : ""}`
+      : "Iniciando…";
 
   return (
     <AuthShell
@@ -293,16 +237,15 @@ export default function AnalyzingPage() {
             />
           </div>
           <p className="mt-3 text-xs text-pretty text-fg-muted">
-            El avance de los pasos es orientativo: esta pantalla no recibe el
-            progreso real del servidor. El reporte se abre cuando termina el
-            análisis.
+            El servidor informa cada paso cuando empieza. El reporte se abre
+            cuando termina el análisis.
           </p>
         </div>
 
         <ol className="flex flex-col gap-4">
           {PIPELINE_STEPS.map((step, i) => {
             const status = statuses[i];
-            const StepIcon = STEP_DETAILS[step.id]?.Icon;
+            const StepIcon = STEP_ICONS[step.id];
             return (
               <li
                 key={step.id}
@@ -320,7 +263,7 @@ export default function AnalyzingPage() {
                   <p className="text-sm text-pretty text-fg-muted">{step.description}</p>
                   {status === "active" && (
                     <p aria-hidden="true" className="mt-1 text-sm font-semibold text-accent">
-                      Procesando…
+                      {roundText ?? "Procesando…"}
                     </p>
                   )}
                 </div>

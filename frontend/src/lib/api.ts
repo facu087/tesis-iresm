@@ -10,6 +10,7 @@ import type {
   RegistroMedicoPayload,
   StructuredReport,
 } from "./types";
+import type { AnalysisInput } from "./inputStore";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -86,6 +87,89 @@ export async function analyzeFile(file: File): Promise<StructuredReport> {
   }
 
   return res.json() as Promise<StructuredReport>;
+}
+
+/** What the server reports while the analysis runs: a step or a debate round. */
+export type AnalysisProgress =
+  | { evento: "paso"; paso: string }
+  | { evento: "ronda"; ronda: number };
+
+const STREAM_CUT_MESSAGE =
+  "La conexión se cortó antes de que terminara el análisis. Intentá de nuevo.";
+
+/**
+ * Runs the analysis on `POST /api/analyze/stream` and reports its progress.
+ *
+ * The response is NDJSON, one event per line: `paso` and `ronda` go to
+ * `onProgress` as they arrive, `reporte` resolves the promise and `error`
+ * rejects it with the backend's message. A request refused before streaming
+ * (401, 403, 413, 422) rejects the same way `analyzeText` does.
+ */
+export async function analyzeWithProgress(
+  input: AnalysisInput,
+  onProgress: (event: AnalysisProgress) => void,
+): Promise<StructuredReport> {
+  const form = new FormData();
+  if (input.mode === "file") form.append("file", input.file);
+  else form.append("text", input.text);
+
+  const res = await fetch(`${API_BASE}/api/analyze/stream`, {
+    method: "POST",
+    credentials: "include",
+    body: form,
+  });
+
+  if (!res.ok) {
+    const error: ApiError = await res.json().catch(() => ({
+      detail: res.statusText,
+    }));
+    throw new Error(extractErrorMessage(error));
+  }
+
+  let report: StructuredReport | null = null;
+
+  /** Handles one line of the stream; an `error` event throws. */
+  const handleLine = (raw: string) => {
+    const text = raw.trim();
+    if (!text) return;
+    let event: { evento?: unknown; [key: string]: unknown };
+    try {
+      event = JSON.parse(text);
+    } catch {
+      // A line cut by a dropped connection: the missing report says so below.
+      return;
+    }
+    if (event.evento === "paso" && typeof event.paso === "string") {
+      onProgress({ evento: "paso", paso: event.paso });
+    } else if (event.evento === "ronda" && typeof event.ronda === "number") {
+      onProgress({ evento: "ronda", ronda: event.ronda });
+    } else if (event.evento === "reporte") {
+      report = event.reporte as StructuredReport;
+    } else if (event.evento === "error") {
+      throw new Error(extractErrorMessage({ detail: event.detail } as ApiError));
+    }
+  };
+
+  if (res.body) {
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    for (;;) {
+      const { done, value } = await reader.read();
+      buffer += done ? decoder.decode() : decoder.decode(value, { stream: true });
+      // The last piece may be half an event: keep it until the rest arrives.
+      const lines = buffer.split("\n");
+      buffer = done ? "" : (lines.pop() ?? "");
+      for (const line of lines) handleLine(line);
+      if (done) break;
+    }
+  } else {
+    // No readable stream in this environment: take the whole body at once.
+    for (const line of (await res.text()).split("\n")) handleLine(line);
+  }
+
+  if (!report) throw new Error(STREAM_CUT_MESSAGE);
+  return report;
 }
 
 /**

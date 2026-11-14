@@ -28,7 +28,7 @@ from ..models.case import ClinicalCase
 from ..models.hypothesis import Hypothesis
 from ..models.report import AgentOutput, Critique, DebateRound, Report, RetrievedArticleRef
 from . import genomic_context as gc_module
-from . import pico, recitation
+from . import pico, progreso, recitation
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -269,6 +269,7 @@ async def run_debate(case: ClinicalCase, round_1_report: Report) -> Report:
         )
 
     # ── Ronda 2: críticas ─────────────────────────────────────────
+    progreso.ronda(2)
     round_2 = await _round_2(agents, context, outputs_by_id)
 
     # ── Ronda 3: primera revisión ─────────────────────────────────
@@ -278,11 +279,13 @@ async def run_debate(case: ClinicalCase, round_1_report: Report) -> Report:
     revision_context = (
         f"{context}\n\n{recitation.lista_de_literatura(round_1_report.retrieved_articles)}"
     )
+    progreso.ronda(3)
     round_3, outputs_r3 = await _round_revision(
         3, agents, revision_context, outputs_by_id, round_2.critiques
     )
 
     # ── Ronda 4: revisión final ───────────────────────────────────
+    progreso.ronda(4)
     round_4, outputs_r4 = await _round_revision(
         4, agents, revision_context, outputs_r3, round_2.critiques
     )

@@ -8,9 +8,13 @@
  * vistas describan el pipeline de forma distinta con el tiempo (design D4 de
  * `openspec/changes/archive/2026-10-04-landing-explicativa/design.md`).
  *
- * Lo que una vista necesita además de esta lista (el ícono y el ritmo del
- * avance simulado de `/analyzing`, los agentes del diagrama de la landing) se
- * agrega en esa vista, indexado por `id`: acá no hay una segunda lista.
+ * Lo que una vista necesita además de esta lista (el ícono de cada paso en
+ * `/analyzing`, los agentes del diagrama de la landing) se agrega en esa vista,
+ * indexado por `id`: acá no hay una segunda lista.
+ *
+ * Los `id` son también los que el backend transmite en
+ * `POST /api/analyze/stream` (`backend/api/router.py`, `_ejecutar_pipeline()`):
+ * si cambian acá, tienen que cambiar allá.
  */
 
 export interface PipelineStep {
