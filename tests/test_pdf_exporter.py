@@ -293,6 +293,44 @@ class TestVerificacionEnPdf:
         assert "Advertencia de verificación bibliográfica" not in texto
 
 
+class TestCitasFueraDelRagEnPdf:
+    """Tarjeta #92: el total de citas descartadas por no venir del RAG se imprime."""
+
+    def _report(self, fuera_del_rag: int | None) -> StructuredReport:
+        report = _make_report()
+        report.verification = VerificationSummary(
+            total_fuentes=2, verificadas=2, hipotesis_respaldadas=1,
+            fuera_del_rag=fuera_del_rag,
+        )
+        return report
+
+    def test_la_portada_informa_las_citas_descartadas(self):
+        texto = _texto_del_pdf(generate_pdf(self._report(3)))
+        assert "Citas fuera de la literatura recuperada 3" in texto
+        assert "3 citas con PMID se descartaron" in texto
+        assert "no figuran en este reporte" in texto
+
+    def test_una_sola_cita_descartada_va_en_singular(self):
+        texto = _texto_del_pdf(generate_pdf(self._report(1)))
+        assert "1 cita con PMID se descartó" in texto
+
+    def test_cero_descartadas_se_informa_sin_advertencia(self):
+        texto = _texto_del_pdf(generate_pdf(self._report(0)))
+        assert "Citas fuera de la literatura recuperada 0" in texto
+        assert "con PMID se descart" not in texto
+
+    def test_un_reporte_anterior_al_filtro_no_afirma_nada(self):
+        texto = _texto_del_pdf(generate_pdf(self._report(None)))
+        assert "Citas fuera de la literatura recuperada" not in texto
+        assert "con PMID se descart" not in texto
+
+    def test_se_informa_aunque_no_quede_ninguna_fuente(self):
+        report = _make_report()
+        report.verification = VerificationSummary(fuera_del_rag=4)
+        texto = _texto_del_pdf(generate_pdf(report))
+        assert "4 citas con PMID se descartaron" in texto
+
+
 # ── Tests: priorización por evidencia EBM en el PDF ───────────────────────────
 
 class TestPriorizacionEnPdf:
@@ -516,6 +554,29 @@ class TestEnsayosNavegados:
         report.clinical_trials = []
         texto = _texto_del_pdf(generate_pdf(report))
         assert "No se encontraron ensayos clínicos activos relacionados." in texto
+
+    def test_pdf_informa_los_ensayos_excluidos_por_edad_y_sexo(self):
+        report = self._report_navegado(excluidos_por_edad=2, excluidos_por_sexo=1)
+        texto = _texto_del_pdf(generate_pdf(report))
+        assert "No se muestran 3 ensayos" in texto
+        assert "2 por edad y 1 por sexo" in texto
+
+    def test_pdf_informa_un_solo_excluido_en_singular(self):
+        report = self._report_navegado(excluidos_por_edad=1)
+        texto = _texto_del_pdf(generate_pdf(report))
+        assert "No se muestra 1 ensayo" in texto
+        assert "1 por edad" in texto
+        assert "por sexo" not in texto
+
+    def test_pdf_informa_los_excluidos_aunque_no_quede_ningun_ensayo(self):
+        report = self._report_navegado(excluidos_por_sexo=2)
+        report.clinical_trials = []
+        texto = _texto_del_pdf(generate_pdf(report))
+        assert "No se muestran 2 ensayos" in texto
+
+    def test_pdf_sin_excluidos_no_menciona_la_exclusion(self):
+        texto = _texto_del_pdf(generate_pdf(self._report_navegado()))
+        assert "No se muestra" not in texto
 
     def test_ensayo_sin_evaluar_se_rotula(self):
         report = self._report_navegado(evaluacion="fallback")

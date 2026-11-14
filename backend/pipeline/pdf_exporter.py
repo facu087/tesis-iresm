@@ -273,6 +273,9 @@ def _cover(report: StructuredReport, s: dict) -> list:
         stats.append(["Hipótesis pendientes de verificación", str(v.hipotesis_pendientes)])
     if v and v.hipotesis_topeadas:
         stats.append(["Hipótesis con nivel de evidencia topeado", str(v.hipotesis_topeadas)])
+    # Tarjeta #92: None = reporte anterior al filtro, no se afirma nada.
+    if v and v.fuera_del_rag is not None:
+        stats.append(["Citas fuera de la literatura recuperada", str(v.fuera_del_rag)])
     a = report.arbitration
     if a and a.status != "sin_hipotesis":
         if a.consensus_hypotheses < a.input_hypotheses:
@@ -382,6 +385,23 @@ def _cover(report: StructuredReport, s: dict) -> list:
                 )
             elems.append(_par(f"<font color='{_hex(_RED)}'>{aviso}</font>", s["disclaimer"]))
             elems.append(Spacer(1, 0.5 * cm))
+
+    # Citas descartadas por no venir del RAG (tarjeta #92): no están en la
+    # bibliografía, así que la portada es el único lugar donde el lector se
+    # entera de que existieron.
+    if v and v.fuera_del_rag:
+        descartadas = (
+            "1 cita con PMID se descartó porque no provenía"
+            if v.fuera_del_rag == 1
+            else f"{v.fuera_del_rag} citas con PMID se descartaron porque no provenían"
+        )
+        elems.append(_par(
+            f"<b>Citas fuera de la literatura recuperada:</b> {descartadas} de los "
+            "artículos que el sistema recuperó de PubMed. No se consultaron y no "
+            "figuran en este reporte.",
+            s["disclaimer"],
+        ))
+        elems.append(Spacer(1, 0.5 * cm))
 
     # El consenso es entre modelos de lenguaje: el médico tiene que saberlo
     # antes de leer las hipótesis, no después.
@@ -677,6 +697,28 @@ def _search_status_notice(report: StructuredReport) -> str:
     return f"Estado de la búsqueda: {'; '.join(avisos)}."
 
 
+def _exclusion_notice(report: StructuredReport) -> str:
+    """Cuántos ensayos quitaron los filtros duros de edad y sexo, y por cuál."""
+    busqueda = report.trial_search
+    if busqueda is None:
+        return ""
+
+    partes: list[str] = []
+    if busqueda.excluidos_por_edad:
+        partes.append(f"{busqueda.excluidos_por_edad} por edad")
+    if busqueda.excluidos_por_sexo:
+        partes.append(f"{busqueda.excluidos_por_sexo} por sexo")
+    if not partes:
+        return ""
+
+    total = busqueda.excluidos_por_edad + busqueda.excluidos_por_sexo
+    sujeto = "No se muestra 1 ensayo" if total == 1 else f"No se muestran {total} ensayos"
+    return (
+        f"{sujeto} cuyos criterios no admiten la edad o el sexo del paciente: "
+        f"{' y '.join(partes)}."
+    )
+
+
 def _trial_block(
     trial: ClinicalTrial, busqueda: TrialSearchSummary | None, s: dict
 ) -> list:
@@ -758,6 +800,10 @@ def _clinical_trials(report: StructuredReport, s: dict) -> list:
     aviso = _search_status_notice(report)
     if aviso:
         elems.append(_par(f"<font color='{_hex(_RED)}'>{aviso}</font>", s["small"]))
+
+    excluidos = _exclusion_notice(report)
+    if excluidos:
+        elems.append(_par(excluidos, s["small"]))
 
     if not report.clinical_trials:
         if busqueda is not None and busqueda.estado_clinicaltrials == "no_disponible":

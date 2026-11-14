@@ -131,7 +131,11 @@ export const FRASES_CAUSA: Record<CausaFallo, string> = {
 };
 
 export function VerificationBanner({ v }: { v: VerificationSummary }) {
-  if (!v.total_fuentes) return null;
+  // null/undefined = report older than the filter (card #92): nothing is claimed.
+  const fueraDelRag = v.fuera_del_rag ?? null;
+  const haySources = v.total_fuentes > 0;
+  // Discarded citations are reported even when no source is left to verify.
+  if (!haySources && !fueraDelRag) return null;
 
   const sospechosas = v.discordantes + v.inexistentes;
   const hayProblema = sospechosas > 0;
@@ -143,8 +147,14 @@ export function VerificationBanner({ v }: { v: VerificationSummary }) {
 
   return (
     <Notice
-      tone={hayProblema ? "danger" : incompleta ? "warning" : "positive"}
-      Icon={hayProblema ? WarningCircleIcon : incompleta ? WarningIcon : SealCheckIcon}
+      tone={hayProblema ? "danger" : incompleta || !haySources ? "warning" : "positive"}
+      Icon={
+        hayProblema
+          ? WarningCircleIcon
+          : incompleta || !haySources
+            ? WarningIcon
+            : SealCheckIcon
+      }
       label="Verificación bibliográfica:"
     >
       {incompleta && (
@@ -163,9 +173,11 @@ export function VerificationBanner({ v }: { v: VerificationSummary }) {
           {" "}{v.hipotesis_especulativas} de {totalHipotesis} hipótesis quedan como especulativas.
         </>
       ) : (
-        <>
-          {v.verificadas} de {v.total_fuentes} referencias confirmadas contra PubMed.
-        </>
+        haySources && (
+          <>
+            {v.verificadas} de {v.total_fuentes} referencias confirmadas contra PubMed.
+          </>
+        )
       )}
       {v.no_verificables > 0 && !incompleta && (
         <> {v.no_verificables} no se pudieron consultar: no se invalidan.</>
@@ -175,6 +187,19 @@ export function VerificationBanner({ v }: { v: VerificationSummary }) {
       )}
       {topeadas > 0 && (
         <> A {topeadas} hipótesis se les bajó el nivel de evidencia declarado por el agente.</>
+      )}
+      {fueraDelRag !== null && fueraDelRag > 0 && (
+        <>
+          {" "}
+          {fueraDelRag === 1
+            ? "Se descartó 1 cita con PMID que no provenía"
+            : `Se descartaron ${fueraDelRag} citas con PMID que no provenían`}{" "}
+          de los artículos recuperados de PubMed: no se consultaron y no figuran en el
+          reporte.
+        </>
+      )}
+      {fueraDelRag === 0 && haySources && (
+        <> Todas las citas con PMID provienen de los artículos recuperados de PubMed.</>
       )}
     </Notice>
   );
