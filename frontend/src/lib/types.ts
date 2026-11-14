@@ -239,6 +239,11 @@ export interface VerificationSummary {
   estado?: EstadoVerificacion | null;
   /** Why the check failed, as a fixed category. Only with parcial/no_disponible. */
   causa?: CausaFallo | null;
+  /**
+   * Citations with a PMID discarded because the RAG never offered that PMID
+   * (card #92). Absent or null = report older than the filter: claim nothing.
+   */
+  fuera_del_rag?: number | null;
 }
 
 export type EstadoVerificacion = "completa" | "parcial" | "no_disponible" | "sin_consulta";

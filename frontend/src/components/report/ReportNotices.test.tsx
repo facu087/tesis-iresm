@@ -77,3 +77,42 @@ describe("VerificationBanner — verification that did not run (card #91)", () =
     expect(Object.keys(FRASES_CAUSA).sort()).toEqual([...causas].sort());
   });
 });
+
+describe("VerificationBanner — citations outside the retrieved literature (card #92)", () => {
+  const complete = { estado: "completa", verificadas: 4, no_verificables: 0, hipotesis_pendientes: 0 } as const;
+
+  it("says how many citations were discarded", () => {
+    render(<VerificationBanner v={summary({ ...complete, fuera_del_rag: 3 })} />);
+    expect(screen.getByText(/Se descartaron 3 citas con PMID/)).toBeInTheDocument();
+    expect(screen.getByText(/no figuran en el reporte/)).toBeInTheDocument();
+  });
+
+  it("uses the singular for one discarded citation", () => {
+    render(<VerificationBanner v={summary({ ...complete, fuera_del_rag: 1 })} />);
+    expect(screen.getByText(/Se descartó 1 cita con PMID/)).toBeInTheDocument();
+  });
+
+  it("says every citation comes from the retrieved literature when none was discarded", () => {
+    render(<VerificationBanner v={summary({ ...complete, fuera_del_rag: 0 })} />);
+    expect(
+      screen.getByText(/Todas las citas con PMID provienen de los artículos recuperados/),
+    ).toBeInTheDocument();
+  });
+
+  it("claims nothing on a report saved before the filter", () => {
+    render(<VerificationBanner v={summary(complete)} />);
+    expect(screen.queryByText(/Se descart/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Todas las citas con PMID/)).not.toBeInTheDocument();
+  });
+
+  it("still reports the discarded citations when no source is left, and not as a success", () => {
+    const { container } = render(
+      <VerificationBanner
+        v={summary({ total_fuentes: 0, no_verificables: 0, hipotesis_pendientes: 0, fuera_del_rag: 4 })}
+      />,
+    );
+    expect(screen.getByText(/Se descartaron 4 citas con PMID/)).toBeInTheDocument();
+    expect(screen.queryByText(/referencias confirmadas/)).not.toBeInTheDocument();
+    expect(looksPositive(container)).toBe(false);
+  });
+});

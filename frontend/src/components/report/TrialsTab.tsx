@@ -83,12 +83,25 @@ function avisosDeBusqueda(s: TrialSearchSummary): string[] {
   return avisos;
 }
 
+/** How many trials the hard age and sex filters removed, and by which one. */
+function avisoDeExcluidos(s: TrialSearchSummary): string | null {
+  const partes: string[] = [];
+  if (s.excluidos_por_edad > 0) partes.push(`${s.excluidos_por_edad} por edad`);
+  if (s.excluidos_por_sexo > 0) partes.push(`${s.excluidos_por_sexo} por sexo`);
+  if (partes.length === 0) return null;
+
+  const total = s.excluidos_por_edad + s.excluidos_por_sexo;
+  const sujeto = total === 1 ? "No se muestra 1 ensayo" : `No se muestran ${total} ensayos`;
+  return `${sujeto} cuyos criterios no admiten la edad o el sexo del paciente: ${partes.join(" y ")}.`;
+}
+
 export function EnsayosTab({ report }: { report: StructuredReport }) {
   // `trial_search` nulo = reporte anterior al Agente 05: se muestra como antes.
   const busqueda = report.trial_search ?? null;
   const trials = report.clinical_trials;
   const raras = report.rare_diseases ?? [];
   const avisos = busqueda ? avisosDeBusqueda(busqueda) : [];
+  const excluidos = busqueda ? avisoDeExcluidos(busqueda) : null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -102,6 +115,13 @@ export function EnsayosTab({ report }: { report: StructuredReport }) {
         <p className="flex items-start gap-2 text-sm text-pretty text-fg-muted">
           <InfoIcon aria-hidden="true" weight="bold" className="mt-0.5 size-4 shrink-0 text-ochre" />
           {TRIAL_DISCLAIMER}
+        </p>
+      )}
+
+      {excluidos && (
+        <p className="flex items-start gap-2 text-sm text-pretty text-fg-muted">
+          <InfoIcon aria-hidden="true" weight="bold" className="mt-0.5 size-4 shrink-0 text-ochre" />
+          {excluidos}
         </p>
       )}
 
