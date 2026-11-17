@@ -378,7 +378,7 @@ revisión médica que informar.
 ## 6. Trabajo futuro
 
 1. **Corrida real de la arquitectura multi-proveedor.** Claude Opus para los Agentes 01, 04 y
-   06, GPT-4o para el Agente 02 y Gemini Pro para el Agente 03 ya están implementados detrás
+   06, GPT-6.1 Sol para el Agente 02 y Gemini 4 Argon para el Agente 03 ya están implementados detrás
    de `NEXUS_PROVEEDORES=destino` (`backend/agents/model_tasks.py`), con respaldo en Groq por
    llamada, pero solo se probaron con dobles de los SDK. Falta una corrida con las tres claves
    (`scripts/medir_costos.py --grabar`) para medir costo y calidad frente a Groq.

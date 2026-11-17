@@ -3,8 +3,9 @@ Tarifas por modelo, para estimar el costo de un análisis a partir de sus
 tokens (control de costos, Sprint 4 — D5).
 
 Los valores de Groq son cero: es el tier gratuito que usa el sistema por
-defecto. Los de la arquitectura de destino (Claude Opus, GPT-4o, Gemini Pro —
-`NEXUS_PROVEEDORES=destino`, Sprint 5) son los de lista pública al 2026-11-09:
+defecto. Los de la arquitectura de destino (Claude Opus, GPT-6.1 Sol, Gemini
+4 Argon — `NEXUS_PROVEEDORES=destino`, Sprint 5) son los de lista pública al
+2026-11-09 (GPT-6.1 Sol y Gemini 4 Argon, al 2026-11-17):
 con esa arquitectura activa, el resumen de un análisis ya informa su costo
 real. Si el modelo de un proveedor se cambia por variable de entorno
 (`NEXUS_MODELO_*`) y no figura acá, el análisis sigue y el modelo queda
@@ -40,7 +41,20 @@ DEFAULT_PRICES: dict[str, ModelPrice] = {
     # (GPT-4o) y ai.google.dev/gemini-api/docs/pricing (Gemini 3.1 Pro Preview,
     # tramo de prompts de hasta 200k tokens: un caso clínico no lo supera).
     "claude-opus-5-5": ModelPrice(input_per_million=4.0, output_per_million=20.0),
+    # GPT-6.1 Sol (Agente 02 desde el 2026-11-17): precio de lista revisado el
+    # 2026-11-17 en developers.openai.com/api/docs/pricing.
+    "gpt-6.1-sol": ModelPrice(input_per_million=2.0, output_per_million=10.0),
+    # Legado: GPT-4o fue el modelo del Agente 02 hasta el 2026-11-17 (deprecado).
+    # Se conserva para costear registros y reportes anteriores que lo nombran.
     "gpt-4o": ModelPrice(input_per_million=2.5, output_per_million=10.0),
+    # Gemini 4 Argon (Agente 03 desde el 2026-11-17): precio introductorio de
+    # USD 2 / 10 hasta el 2026-11-30 y estándar de USD 4 / 20 desde el
+    # 2026-12-01 (ai.google.dev/gemini-api/docs/latest-model). La tabla usa el
+    # estándar para que las estimaciones no queden desactualizadas.
+    "gemini-4-argon": ModelPrice(input_per_million=4.0, output_per_million=20.0),
+    # Legado: Gemini 3.1 Pro Preview fue el modelo del Agente 03 hasta el
+    # 2026-11-17, cuando dejó de estar disponible. Se conserva para costear
+    # registros y reportes anteriores que lo nombran.
     "gemini-3.1-pro-preview": ModelPrice(input_per_million=2.0, output_per_million=12.0),
 }
 

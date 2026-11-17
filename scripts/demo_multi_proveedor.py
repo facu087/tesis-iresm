@@ -3,7 +3,7 @@ Demo — Proveedor por agente con respaldo en Groq (Sprint 5, OpenSpec
 `multi-proveedor-por-agente`).
 
 La arquitectura de la tesis asigna un modelo a cada agente: Claude Opus a los
-Agentes 01, 04 y 06, GPT-4o al 02 y Gemini Pro al 03. Con
+Agentes 01, 04 y 06, GPT-6.1 Sol al 02 y Gemini 4 Argon al 03. Con
 `NEXUS_PROVEEDORES=destino`, `call_provider()` manda cada llamada al proveedor
 de su agente; si falta la clave o el proveedor falla, la repite en Groq y lo
 registra. Sin esa variable, todo va a Groq como siempre.

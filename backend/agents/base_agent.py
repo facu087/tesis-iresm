@@ -84,6 +84,7 @@ def _grabar_respuesta(
 
 PROVIDER_TIMEOUT_SECONDS = 120.0  # por intento; los SDK reintentan 429 y 5xx (D5)
 ANTHROPIC_EFFORT = "medium"       # explícito: es el default de Opus 5.5, pero puede cambiar (D4)
+OPENAI_REASONING_EFFORT = "medium"  # explícito: es el default de GPT-6.1 Sol; "none" da 400 (D4)
 
 FALLBACK_MISSING_KEY = "clave_faltante"
 FALLBACK_FAILURE = "falla"
@@ -143,7 +144,18 @@ def _call_openai(
     *, api_key: str, system_prompt: str, user_message: str, model: str,
     max_tokens: int, temperature: float,
 ) -> ProviderResult:
-    """GPT-4o por Chat Completions, con la misma temperatura que Groq."""
+    """
+    GPT-6.1 Sol por Chat Completions. Sin `temperature`: es un modelo de
+    razonamiento y, con el razonamiento activo, la API rechaza `temperature`,
+    `top_p`, `top_logprobs` y `logprobs`. La profundidad se controla con
+    `reasoning_effort` (no admite `"none"`). Recibe `temperature` igual que los
+    otros adaptadores, pero no la usa.
+
+    Los tokens de razonamiento cuentan dentro de la salida: por eso el techo es
+    de 16.000 y no el de la tarea. `usage.completion_tokens` ya los incluye
+    (`completion_tokens_details.reasoning_tokens` es un desglose de ese mismo
+    total), así que no se suman aparte.
+    """
     import openai
 
     client = openai.OpenAI(api_key=api_key, timeout=PROVIDER_TIMEOUT_SECONDS)
@@ -154,7 +166,7 @@ def _call_openai(
             {"role": "user", "content": user_message},
         ],
         max_completion_tokens=max_tokens,
-        temperature=temperature,
+        reasoning_effort=OPENAI_REASONING_EFFORT,
     )
     choice = response.choices[0]
     if getattr(choice.message, "refusal", None):
@@ -173,8 +185,8 @@ def _call_google(
     max_tokens: int, temperature: float,
 ) -> ProviderResult:
     """
-    Gemini Pro con `google-genai`. Sin `temperature`: Gemini Pro razona y
-    Google recomienda dejar la de por defecto. Los tokens de razonamiento se
+    Gemini (Gemini 4 Argon por defecto) con `google-genai`. Sin `temperature`:
+    el modelo razona y Google recomienda dejar la de por defecto. Los tokens de razonamiento se
     cobran como salida, así que se suman a `completion_tokens`.
     """
     from google import genai

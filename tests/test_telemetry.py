@@ -360,11 +360,21 @@ class TestMultiProveedor:
     def test_costo_real_de_la_arquitectura_de_destino(self, tmp_path):
         """Scenario: Costo real de la arquitectura de destino."""
         token = usage.open_registry()
-        for modelo, proveedor in (("claude-opus-5-5", "anthropic"), ("gpt-4o", "openai"),
-                                  ("gemini-3.1-pro-preview", "google")):
+        for modelo, proveedor in (("claude-opus-5-5", "anthropic"), ("gpt-6.1-sol", "openai"),
+                                  ("gemini-4-argon", "google")):
             usage.record_call(task="debate_critica", model=modelo, ok=True,
                               latency_seconds=1.0, prompt_tokens=1_000_000,
                               completion_tokens=1_000_000, provider=proveedor)
         resumen = usage.close_registry(token, output_path=tmp_path / "costos.jsonl")
         assert resumen["totals"]["unpriced_models"] == []
-        assert resumen["totals"]["cost_usd"] == pytest.approx((4 + 20) + (2.5 + 10) + (2 + 12))
+        assert resumen["totals"]["cost_usd"] == pytest.approx((4 + 20) + (2 + 10) + (4 + 20))
+
+    def test_gpt4o_conserva_su_tarifa_para_registros_anteriores(self):
+        """Un registro o reporte viejo que nombra GPT-4o se sigue pudiendo costear."""
+        assert pricing.price_for("gpt-4o") == pricing.ModelPrice(2.5, 10.0)
+        assert pricing.price_for("gpt-6.1-sol") == pricing.ModelPrice(2.0, 10.0)
+
+    def test_gemini_3_1_conserva_su_tarifa_y_argon_usa_la_estandar(self):
+        """Argon se costea a la tarifa estándar (desde 2026-12-01), no a la introductoria."""
+        assert pricing.price_for("gemini-3.1-pro-preview") == pricing.ModelPrice(2.0, 12.0)
+        assert pricing.price_for("gemini-4-argon") == pricing.ModelPrice(4.0, 20.0)
