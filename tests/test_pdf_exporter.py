@@ -1059,9 +1059,9 @@ def _proveedores_destino() -> list[AgentProviderInfo]:
         AgentProviderInfo(agent_id="01", agent_name="Analista de Literatura",
                           provider="anthropic", model="claude-opus-5-5"),
         AgentProviderInfo(agent_id="02", agent_name="Especialista Genómica",
-                          provider="openai", model="gpt-4o"),
+                          provider="openai", model="gpt-6.1-sol"),
         AgentProviderInfo(agent_id="03", agent_name="Consultor Clínico",
-                          provider="google", model="gemini-3.1-pro-preview"),
+                          provider="google", model="gemini-4-argon"),
         AgentProviderInfo(agent_id="04", agent_name="Árbitro Verificador",
                           provider="anthropic", model="claude-opus-5-5"),
         AgentProviderInfo(agent_id="06", agent_name="Sintetizador",
@@ -1077,7 +1077,7 @@ class TestProveedoresEnElPdf:
         texto = _texto_del_pdf(generate_pdf(report))
         assert "MODELOS QUE RESPONDIERON" in texto
         assert texto.count("claude-opus-5-5") == 3
-        assert "gpt-4o" in texto and "gemini-3.1-pro-preview" in texto
+        assert "gpt-6.1-sol" in texto and "gemini-4-argon" in texto
         assert "Respaldo en Groq" not in texto
 
     def test_corrida_con_respaldo(self):
@@ -1119,7 +1119,7 @@ class TestProveedoresEnElSchema:
         assert _proveedores_del_analisis() is None  # sin registro abierto
         token = usage.open_registry()
         try:
-            usage.record_call(task="agente02_hipotesis", model="gpt-4o", ok=True,
+            usage.record_call(task="agente02_hipotesis", model="gpt-6.1-sol", ok=True,
                               latency_seconds=1.0, agent_id="02",
                               agent_name="Especialista Genómica", provider="openai")
             usage.record_call(task="agente03_hipotesis", model="openai/gpt-oss-120b",

@@ -721,10 +721,10 @@ backfillean los Sprints 1–3. Requiere el CLI: `npm install -g @fission-ai/open
 
 ## Modelo de IA actual
 
-> **Groq — `openai/gpt-oss-120b`** — reemplaza temporalmente a Claude/Gemini/GPT-4o
+> **Groq — `openai/gpt-oss-120b`** — reemplaza temporalmente a Claude/Gemini/GPT
 > mientras se gestionan créditos en las APIs de pago.
 > La arquitectura final usa Claude Opus (agentes 01, 04, 06),
-> GPT-4o (agente 02) y Gemini Pro (agente 03), y **ya está implementada**
+> GPT-6.1 Sol (agente 02) y Gemini 4 Argon (agente 03), y **ya está implementada**
 > detrás de `NEXUS_PROVEEDORES=destino` (Sprint 5, OpenSpec
 > `multi-proveedor-por-agente`; ver "Proveedor por agente" más abajo). Sin esa
 > variable, todo corre en Groq como siempre.
@@ -767,7 +767,7 @@ hipótesis, críticas, revisiones, veredictos o la síntesis PICO usa
 
 `call_provider()` también es donde vive el reintento ante 429, la telemetría
 de consumo (`backend/telemetry/usage.py`) y el modo mock (ver abajo). El swap
-de proveedor (Claude/GPT-4o/Gemini) se agrega en ese único método.
+de proveedor (Claude/GPT/Gemini) se agrega en ese único método.
 
 Vale tenerlo en cuenta al escribir el Agente 06: si asume la firma de Groq en
 lugar de delegar en `_call_llm()`/`call_provider()`, rompe la regla y deja su
@@ -777,12 +777,13 @@ consumo fuera de la telemetría.
 
 Con `NEXUS_PROVEEDORES=destino`, `call_provider()` consulta `AGENT_PROVIDERS`
 en `backend/agents/model_tasks.py` (al lado de `TASK_BUDGETS`): 01/04/06 →
-Anthropic `claude-opus-5-5`, 02 → OpenAI `gpt-4o`, 03 → Google
-`gemini-3.1-pro-preview`. Claude y Gemini razonan siempre y usan un techo de
-16.000 tokens; GPT-4o conserva el de la tarea. PICO, biomarcadores y el Agente 05
+Anthropic `claude-opus-5-5`, 02 → OpenAI `gpt-6.1-sol`, 03 → Google
+`gemini-4-argon`. Los tres razonan y usan un techo de 16.000 tokens, porque el
+razonamiento cuenta dentro de la salida. PICO, biomarcadores y el Agente 05
 siguen en Groq siempre. A Claude no se le manda `temperature` (Opus 5.5 la
 rechaza) y va con `effort: "medium"` y streaming; un `stop_reason: "refusal"` es
-una falla. Timeout de 120 s por intento; los reintentos son los del SDK.
+una falla. A GPT-6.1 Sol tampoco: con el razonamiento activo la rechaza, y va con
+`reasoning_effort: "medium"`. Timeout de 120 s por intento; los reintentos son los del SDK.
 
 **Respaldo por llamada**: sin la clave o si el proveedor falla, la misma llamada
 se repite en Groq con el modelo y techo de la tarea, queda en la telemetría
@@ -792,9 +793,13 @@ lleva `metadata.proveedores` (agente, proveedor, modelo y motivo; `None` en un
 reporte anterior), que `/report` muestra en la pestaña del debate y el PDF en
 "Modelos que respondieron". La grabación guarda el proveedor y el modo mock lo
 reproduce; `grabadas.json` actual se reproduce como Groq. Tarifas de destino en
-`backend/telemetry/pricing.py` (al 2026-11-09). GPT-4o figura como *deprecated*
-en la documentación de OpenAI: se mantiene porque lo pide la arquitectura, y se
-cambia con `NEXUS_MODELO_OPENAI`. Falta la corrida real con claves.
+`backend/telemetry/pricing.py` (al 2026-11-09; GPT-6.1 Sol y Gemini 4 Argon, al
+2026-11-17). El 2026-11-17 GPT-4o se reemplazó por GPT-6.1 Sol, porque OpenAI lo
+deprecó, y `gemini-3.1-pro-preview` por `gemini-4-argon`, porque dejó de estar
+disponible (404). Ambos son modelos de razonamiento. Argon se costea a la tarifa
+estándar (USD 4 / 20 desde el 2026-12-01), no a la introductoria. Los modelos se
+cambian con `NEXUS_MODELO_OPENAI` y `NEXUS_MODELO_GOOGLE`. Falta la corrida real
+con claves.
 
 ### Telemetría de costos
 
@@ -985,11 +990,11 @@ GROQ_API_KEY=           # Groq (gpt-oss) — obligatorio hoy
 # leen con NEXUS_PROVEEDORES=destino: una clave cargada sola no activa nada.
 NEXUS_PROVEEDORES=      # groq (default) | destino. Otro valor avisa y queda en groq.
 ANTHROPIC_API_KEY=      # Claude Opus — Agentes 01, 04, 06
-OPENAI_API_KEY=         # GPT-4o — Agente 02
-GOOGLE_API_KEY=         # Gemini Pro — Agente 03
+OPENAI_API_KEY=         # GPT-6.1 Sol — Agente 02
+GOOGLE_API_KEY=         # Gemini 4 Argon — Agente 03
 NEXUS_MODELO_ANTHROPIC= # Opcional. Default claude-opus-5-5
-NEXUS_MODELO_OPENAI=    # Opcional. Default gpt-4o
-NEXUS_MODELO_GOOGLE=    # Opcional. Default gemini-3.1-pro-preview
+NEXUS_MODELO_OPENAI=    # Opcional. Default gpt-6.1-sol
+NEXUS_MODELO_GOOGLE=    # Opcional. Default gemini-4-argon
 
 # APIs científicas
 PUBMED_API_KEY=         # Opcional, aumenta rate limit

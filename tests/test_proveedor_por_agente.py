@@ -98,9 +98,23 @@ class TestMapaPorAgente:
         assert (del01.provider, del01.model, del01.max_tokens) == (
             PROVIDER_ANTHROPIC, "claude-opus-5-5", 16000,
         )
-        assert (del02.provider, del02.model) == (PROVIDER_OPENAI, "gpt-4o")
-        # GPT-4o conserva el techo de la tarea (design D4).
-        assert del02.max_tokens == TASK_BUDGETS["debate_critica"].max_tokens
+        # GPT-6.1 Sol razona y el razonamiento cuenta dentro de la salida: el
+        # techo de la tarea (4.096) lo truncaría (design D4).
+        assert (del02.provider, del02.model, del02.max_tokens) == (
+            PROVIDER_OPENAI, "gpt-6.1-sol", 16000,
+        )
+        assert TASK_BUDGETS["debate_critica"].max_tokens < del02.max_tokens
+
+    def test_agente03_usa_gemini_4_argon_por_defecto(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # `gemini-3.1-pro-preview` dejó de estar disponible el 2026-11-17.
+        monkeypatch.setenv("NEXUS_PROVEEDORES", "destino")
+        monkeypatch.delenv("NEXUS_MODELO_GOOGLE", raising=False)
+        del03 = resolve_agent_provider("03", "agente03_hipotesis")
+        assert (del03.provider, del03.model, del03.max_tokens) == (
+            PROVIDER_GOOGLE, "gemini-4-argon", 16000,
+        )
 
     def test_modelo_configurable_por_proveedor(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("NEXUS_PROVEEDORES", "destino")
@@ -301,24 +315,27 @@ class TestAdaptadores:
                 model="m", max_tokens=10, temperature=0.3,
             )
 
-    def test_openai_arma_el_pedido(self) -> None:
+    def test_openai_arma_el_pedido_sin_temperature_y_con_razonamiento(self) -> None:
         cliente = MagicMock()
         cliente.chat.completions.create.return_value = _respuesta_chat("hola", "length")
         ctor = MagicMock(return_value=cliente)
         with patch("openai.OpenAI", ctor):
             resultado = base_agent._call_openai(
                 api_key="k", system_prompt="sis", user_message="usr",
-                model="gpt-4o", max_tokens=4096, temperature=0.3,
+                model="gpt-6.1-sol", max_tokens=16000, temperature=0.3,
             )
         _, kwargs = cliente.chat.completions.create.call_args
+        # GPT-6.1 Sol razona: con razonamiento activo rechaza `temperature`.
+        assert "temperature" not in kwargs
+        assert kwargs["reasoning_effort"] == "medium"
         assert kwargs == {
-            "model": "gpt-4o",
+            "model": "gpt-6.1-sol",
             "messages": [
                 {"role": "system", "content": "sis"},
                 {"role": "user", "content": "usr"},
             ],
-            "max_completion_tokens": 4096,
-            "temperature": 0.3,
+            "max_completion_tokens": 16000,
+            "reasoning_effort": "medium",
         }
         assert ctor.call_args.kwargs["timeout"] == 120.0
         assert (resultado.text, resultado.prompt_tokens, resultado.completion_tokens) == (
@@ -333,7 +350,7 @@ class TestAdaptadores:
                 pytest.raises(ProviderRefusal):
             base_agent._call_openai(
                 api_key="k", system_prompt="s", user_message="u",
-                model="gpt-4o", max_tokens=10, temperature=0.3,
+                model="gpt-6.1-sol", max_tokens=10, temperature=0.3,
             )
 
     def test_google_arma_el_pedido(self) -> None:
@@ -345,10 +362,10 @@ class TestAdaptadores:
         with patch("google.genai.Client", ctor):
             resultado = base_agent._call_google(
                 api_key="k", system_prompt="sis", user_message="usr",
-                model="gemini-3.1-pro-preview", max_tokens=16000, temperature=0.3,
+                model="gemini-4-argon", max_tokens=16000, temperature=0.3,
             )
         _, kwargs = cliente.models.generate_content.call_args
-        assert kwargs["model"] == "gemini-3.1-pro-preview"
+        assert kwargs["model"] == "gemini-4-argon"
         assert kwargs["contents"] == "usr"
         assert kwargs["config"].system_instruction == "sis"
         assert kwargs["config"].max_output_tokens == 16000
@@ -382,9 +399,11 @@ class TestDestinoActivo:
         assert _llamar("debate_critica", "02") == "respuesta gpt"
         assert dobles.quien() == {"anthropic": 0, "openai": 1, "google": 0, "groq": 0}
         _, kwargs = dobles.openai.chat.completions.create.call_args
-        assert kwargs["model"] == "gpt-4o"
+        assert kwargs["model"] == "gpt-6.1-sol"
         llamada = registro.calls[-1]
-        assert (llamada.provider, llamada.model, llamada.fallback) == ("openai", "gpt-4o", False)
+        assert (llamada.provider, llamada.model, llamada.fallback) == (
+            "openai", "gpt-6.1-sol", False,
+        )
 
     def test_debate_con_tres_proveedores(self, dobles) -> None:
         """Scenario: Debate con tres proveedores."""
@@ -399,7 +418,7 @@ class TestDestinoActivo:
         _llamar("debate_critica", "02")
         assert dobles.anthropic.pedidos[0]["max_tokens"] == 16000
         _, kwargs = dobles.openai.chat.completions.create.call_args
-        assert kwargs["max_completion_tokens"] == 4096
+        assert kwargs["max_completion_tokens"] == 16000
 
     def test_sintesis_pico_sigue_en_groq(self, dobles) -> None:
         """Scenario: Síntesis PICO con la arquitectura de destino activa."""

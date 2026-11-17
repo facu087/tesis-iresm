@@ -268,8 +268,9 @@ respuestas 429, la telemetría y el modo mock.
 
 **Proveedor por agente.** Con `NEXUS_PROVEEDORES=destino`, `call_provider()`
 consulta `AGENT_PROVIDERS` (en el mismo `model_tasks.py`): Claude Opus para los
-Agentes 01, 04 y 06, GPT-4o para el 02 y Gemini Pro para el 03, con un techo de
-16.000 tokens para los modelos que razonan. La síntesis PICO, los biomarcadores
+Agentes 01, 04 y 06, GPT-6.1 Sol para el 02 y Gemini 4 Argon para el 03, con un
+techo de 16.000 tokens, porque los tres razonan y el razonamiento cuenta dentro de
+la salida. La síntesis PICO, los biomarcadores
 y el Agente 05 siguen en Groq. Si falta la clave o el proveedor falla, la misma
 llamada se repite en Groq con el modelo y el techo de su tarea (respaldo por
 llamada, no por análisis) y queda registrada. El reporte informa en
@@ -415,7 +416,7 @@ el contrato de salida en `backend/api/schemas.py`.
 | Ronda 5 de recitación | Reemplaza el criterio de parada original ("toda hipótesis con referencia verificable"), que no se cumplía nunca: en la corrida que lo motivó, 15 de 15 citas eran discordantes. Una sola iteración acota el costo. |
 | Citas ancladas al RAG | Los agentes citaban PMIDs de memoria que no correspondían al título citado. Aceptar solo lo ofrecido por el RAG garantiza que toda cita provenga de literatura recuperada. |
 | Guardas anti-invención en 02 y 06 | Un hallazgo genético o una referencia inventados son el error más grave para el médico; se descartan por código antes de llegar al reporte. |
-| Groq `gpt-oss` como proveedor temporal | Reemplaza a los modelos de destino mientras se gestionan créditos de las APIs pagas. La arquitectura de destino usa Claude Opus (Agentes 01, 04, 06), GPT-4o (Agente 02) y Gemini Pro (Agente 03); el cambio se concentra en `call_provider()`. |
+| Groq `gpt-oss` como proveedor temporal | Reemplaza a los modelos de destino mientras se gestionan créditos de las APIs pagas. La arquitectura de destino usa Claude Opus (Agentes 01, 04, 06), GPT-6.1 Sol (Agente 02) y Gemini 4 Argon (Agente 03); el cambio se concentra en `call_provider()`. |
 
 ---
 

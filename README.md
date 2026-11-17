@@ -78,7 +78,7 @@ PDF. El detalle de cada paso está en [`docs/arquitectura.md`](docs/arquitectura
 
 Todos los agentes usan hoy **Groq `openai/gpt-oss-120b`** (y `gpt-oss-20b` en tres tareas de
 salida validada por código), como proveedor temporal. La arquitectura de destino asigna Claude
-Opus a los agentes 01, 04 y 06, GPT-4o al 02 y Gemini Pro al 03; el cambio se concentra en un
+Opus a los agentes 01, 04 y 06, GPT-6.1 Sol al 02 y Gemini 4 Argon al 03; el cambio se concentra en un
 único punto de llamada al proveedor (`call_provider()`).
 
 ---

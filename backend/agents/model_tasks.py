@@ -117,9 +117,9 @@ def get_budget(task: str) -> TaskBudget:
 # ── Proveedor por agente (Sprint 5, OpenSpec `multi-proveedor-por-agente`) ──
 #
 # La arquitectura de la tesis asigna un proveedor a cada agente: Claude Opus a
-# los Agentes 01, 04 y 06, GPT-4o al 02 y Gemini Pro al 03. Ese mapa vive acá,
-# al lado de `TASK_BUDGETS`, para que "qué usa cada cosa" se revise en un solo
-# lugar (design D1). Solo se consulta con `NEXUS_PROVEEDORES=destino` (D2): la
+# los Agentes 01, 04 y 06, GPT-6.1 Sol al 02 y Gemini 4 Argon al 03. Ese mapa
+# vive acá, al lado de `TASK_BUDGETS`, para que "qué usa cada cosa" se revise
+# en un solo lugar (design D1). Solo se consulta con `NEXUS_PROVEEDORES=destino` (D2): la
 # presencia de una clave sola nunca activa un proveedor pago. Las llamadas que
 # no son de un agente del mapa —PICO, biomarcadores, Agente 05— siguen en Groq
 # siempre. `call_provider()` (base_agent.py) es quien decide y quien habla con
@@ -136,11 +136,14 @@ MODE_TARGET = "destino"
 
 # Modelo por defecto de cada proveedor de destino. Se puede cambiar sin tocar
 # el código con la variable de `MODEL_ENV` (design, Open Questions).
-# `gemini-3.1-pro-preview` es el Gemini Pro vigente al 2026-11-09.
+# Al 2026-11-17: `gpt-6.1-sol` reemplaza a `gpt-4o` (deprecado), y
+# `gemini-4-argon` a `gemini-3.1-pro-preview`, que dejó de estar disponible
+# (la API responde 404). Argon es el default que recomienda Google; Carbon es
+# el nivel de frontera, más caro.
 DEFAULT_MODELS: dict[str, str] = {
     PROVIDER_ANTHROPIC: "claude-opus-5-5",
-    PROVIDER_OPENAI: "gpt-4o",
-    PROVIDER_GOOGLE: "gemini-3.1-pro-preview",
+    PROVIDER_OPENAI: "gpt-6.1-sol",
+    PROVIDER_GOOGLE: "gemini-4-argon",
 }
 
 MODEL_ENV: dict[str, str] = {
@@ -162,9 +165,9 @@ class AgentProvider:
     Proveedor asignado a un agente y techo de sus llamadas.
 
     `max_tokens=None` conserva el techo de la tarea (`TASK_BUDGETS`). Claude
-    Opus y Gemini Pro razonan siempre y el razonamiento cuenta dentro de la
-    salida, así que sus llamadas usan 16.000 en lugar de 4.096 para no
-    truncar (design D4). GPT-4o no razona: conserva el techo de la tarea.
+    Opus, GPT-6.1 Sol y Gemini 4 Argon razonan y el razonamiento cuenta dentro de
+    la salida, así que sus llamadas usan 16.000 en lugar de 4.096 para no
+    truncar (design D4).
     """
 
     provider: str
@@ -173,7 +176,7 @@ class AgentProvider:
 
 AGENT_PROVIDERS: dict[str, AgentProvider] = {
     "01": AgentProvider(PROVIDER_ANTHROPIC, 16000),
-    "02": AgentProvider(PROVIDER_OPENAI, None),
+    "02": AgentProvider(PROVIDER_OPENAI, 16000),
     "03": AgentProvider(PROVIDER_GOOGLE, 16000),
     "04": AgentProvider(PROVIDER_ANTHROPIC, 16000),
     "06": AgentProvider(PROVIDER_ANTHROPIC, 16000),
