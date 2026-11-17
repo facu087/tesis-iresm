@@ -788,6 +788,11 @@ class BaseAgent(ABC):
             "Identificá inconsistencias, sobre-estimaciones o falta de evidencia.\n\n"
             "En target_agent_id va solo el ID de dos dígitos del agente criticado, "
             "tal como figura entre paréntesis en su encabezado; nunca su nombre.\n\n"
+            # Los prompts de sistema fijan el JSON de `hypotheses`; GPT-6.1 Sol
+            # priorizó ese formato y respondió la crítica con hipótesis.
+            "Esta respuesta no propone hipótesis: es una lista de críticas. "
+            'No uses la clave "hypotheses" aunque tus instrucciones generales '
+            'la pidan; la única clave de la respuesta es "critiques".\n\n'
             "Respondé ÚNICAMENTE con JSON válido:\n"
             '{\n  "critiques": [\n    {\n'
             f'      "target_agent_id": "{id_ejemplo}",\n'

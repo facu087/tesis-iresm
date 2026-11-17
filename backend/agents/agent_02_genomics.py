@@ -78,6 +78,7 @@ REGLAS CRÍTICAS:
    la lista va vacía ([]).
 
 FORMATO DE RESPUESTA:
+Este es el formato para proponer o revisar hipótesis. Si el mensaje pide otro formato (por ejemplo, críticas o recitación de citas), respondé con el formato que pide el mensaje.
 Respondé ÚNICAMENTE con un objeto JSON válido:
 
 {
